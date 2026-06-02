@@ -1,0 +1,13 @@
+models/
+.env
+.env.local
+
+.cache/
+src/voice/.runtime/
+tmp/
+temp/
+*.tmp
+*.temp
+*.part
+*.partial
+*.download

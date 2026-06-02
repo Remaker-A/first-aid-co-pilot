@@ -1,0 +1,86 @@
+{
+  "knowledge_version": "adult_cpr_mvp_2026_06_02",
+  "schema_version": "allowed_intents.v0.2",
+  "language": "zh-CN",
+  "scope": {
+    "scenario": "adult_suspected_cardiac_arrest_cpr",
+    "principle": "单一来源：Gemma 只能在当前 stage 的 gemma_intents_by_stage 内生成 GuidanceActionPatch。decisionFrame 用它告知 Gemma，actionValidator 用它校验 Gemma，两者必须一致。"
+  },
+  "intent_defaults": {
+    "default_tone": "calm_firm",
+    "default_source": "gemma_agent",
+    "gemma_may_create_tool_actions": false,
+    "max_primary_actions": 1
+  },
+  "special_intents": ["defer_to_rule_feedback", "fallback_template"],
+  "global_intents": [],
+  "gemma_intents_by_stage": {
+    "S0_INIT": ["session_started", "check_permissions", "start_recording", "reassure_rescuer"],
+    "S1_SCENE_SAFE": ["ask_scene_safety", "scene_safe_confirmed", "warn_scene_danger", "reassure_rescuer"],
+    "S2_CHECK_RESPONSE": [
+      "ask_response_check",
+      "parse_response_answer",
+      "patient_responsive",
+      "patient_unresponsive",
+      "reassure_rescuer"
+    ],
+    "S3_CHECK_BREATHING": [
+      "ask_breathing_check",
+      "parse_breathing_answer",
+      "clarify_breathing",
+      "normal_breathing_present",
+      "normal_breathing_absent"
+    ],
+    "S4_SUSPECTED_ARREST": [
+      "state_suspected_arrest_handling",
+      "prepare_emergency_call",
+      "start_emergency_call_and_cpr"
+    ],
+    "S5_CALL_EMERGENCY": [
+      "start_emergency_call",
+      "start_emergency_call_and_cpr",
+      "explain_call_status",
+      "attach_gps",
+      "start_local_recording",
+      "calm_rescuer"
+    ],
+    "S6_CPR_READY": [
+      "guide_cpr_position",
+      "answer_position_question",
+      "start_cpr_guidance",
+      "start_cpr_loop",
+      "encourage_rescuer"
+    ],
+    "S7_CPR_LOOP": [
+      "answer_current_cpr_question",
+      "encourage_rescuer",
+      "calm_rescuer",
+      "correction.hand_position",
+      "correction.rate_low",
+      "correction.rate_high",
+      "correction.arm_bent",
+      "correction.interruption",
+      "continue_cpr",
+      "update_cpr_quality"
+    ],
+    "S8_ASSISTANCE": ["guide_rescuer_change", "explain_aed_support", "calm_rescuer", "continue_cpr"],
+    "S9_HANDOVER": [
+      "handover_summary_patch",
+      "explain_handover",
+      "generate_handover_report",
+      "request_share_report",
+      "request_share_video"
+    ],
+    "MONITOR_RESPONSE": ["monitor_patient", "call_help", "reassure_rescuer"],
+    "MONITOR_BREATHING": ["monitor_patient", "call_help", "reassure_rescuer"]
+  },
+  "forbidden_intents": [
+    "diagnose_disease",
+    "declare_cardiac_arrest",
+    "change_cpr_start_rule",
+    "skip_state_machine",
+    "add_unreviewed_medical_step",
+    "promise_survival",
+    "ask_user_to_decide_cpr"
+  ]
+}

@@ -1,0 +1,645 @@
+{
+  "summary": {
+    "session_id": "gemma_text_walkthrough_001",
+    "fixed_now": "2026-06-02T00:00:00.000Z",
+    "started_at": "2026-06-01T18:51:06.320Z",
+    "finished_at": "2026-06-01T18:53:41.361Z",
+    "gemma_command": "C:\\Users\\29989\\.local\\bin\\litert-lm.exe",
+    "total_turns": 11,
+    "real_gemma_turns": 8,
+    "fallback_turns": 3,
+    "total_elapsed_ms": 155039
+  },
+  "turns": [
+    {
+      "turn": 1,
+      "label": "scene_safe",
+      "input_text": "现场是安全的，我可以靠近他",
+      "input_state": {
+        "patientState": {
+          "adult_likely": true,
+          "scene_safe": true,
+          "lying_down": true
+        },
+        "cprQuality": null,
+        "deviceState": null,
+        "rescuerState": null,
+        "metadata": null
+      },
+      "expected_stage": "S2_CHECK_RESPONSE",
+      "elapsed_ms": 12864,
+      "error": null,
+      "inferred_intent": "scene_safe",
+      "stt_confidence": 0.86,
+      "current_stage": "S2_CHECK_RESPONSE",
+      "allowed_intents": [
+        "ask_response_check",
+        "parse_response_answer",
+        "patient_responsive",
+        "patient_unresponsive",
+        "reassure_rescuer",
+        "fallback_template",
+        "defer_to_rule_feedback"
+      ],
+      "gemma": {
+        "fallback": true,
+        "fallbackReason": "patch_validation_failed",
+        "error": {
+          "message": "patch_validation_failed"
+        },
+        "violations": [
+          "invalid_tone:calm"
+        ],
+        "patch_intent": "fallback_template",
+        "patch_tts_text": "请大声叫他，并轻拍双肩。",
+        "patch_ui_main": "检查反应",
+        "patch_reason": "patch_validation_failed",
+        "patch_confidence": 0.6
+      },
+      "gemma_validation": {
+        "ok": true,
+        "violations": []
+      },
+      "state_action": {
+        "intent": "ask_response_check",
+        "tts_text": "请大声叫他，并轻拍双肩。",
+        "priority": "normal"
+      },
+      "guidance_action": {
+        "intent": "fallback_template",
+        "source": "gemma_agent",
+        "priority": "normal",
+        "tts_text": "请大声叫他，并轻拍双肩。",
+        "ui_main": "检查反应"
+      }
+    },
+    {
+      "turn": 2,
+      "label": "check_response -> unresponsive",
+      "input_text": "他没有反应，怎么叫都叫不醒",
+      "input_state": {
+        "patientState": {
+          "responsive": false
+        },
+        "cprQuality": null,
+        "deviceState": null,
+        "rescuerState": null,
+        "metadata": null
+      },
+      "expected_stage": "S3_CHECK_BREATHING",
+      "elapsed_ms": 14365,
+      "error": null,
+      "inferred_intent": "patient_unresponsive",
+      "stt_confidence": 0.86,
+      "current_stage": "S3_CHECK_BREATHING",
+      "allowed_intents": [
+        "ask_breathing_check",
+        "parse_breathing_answer",
+        "clarify_breathing",
+        "normal_breathing_present",
+        "normal_breathing_absent",
+        "fallback_template",
+        "defer_to_rule_feedback"
+      ],
+      "gemma": {
+        "fallback": null,
+        "fallbackReason": null,
+        "error": null,
+        "violations": [],
+        "patch_intent": "normal_breathing_absent",
+        "patch_tts_text": "���������н�����Ԯ��",
+        "patch_ui_main": "�������н�����Ԯ",
+        "patch_reason": "user_input_indicates_unresponsiveness_and_no_breathing_check_is_possible",
+        "patch_confidence": 0.5
+      },
+      "gemma_validation": {
+        "ok": true,
+        "violations": []
+      },
+      "state_action": {
+        "intent": "ask_breathing_check",
+        "tts_text": "请看胸口 5 到 10 秒，有没有正常起伏？",
+        "priority": "high"
+      },
+      "guidance_action": {
+        "intent": "normal_breathing_absent",
+        "source": "gemma_agent",
+        "priority": "normal",
+        "tts_text": "���������н�����Ԯ��",
+        "ui_main": "�������н�����Ԯ"
+      }
+    },
+    {
+      "turn": 3,
+      "label": "check_breathing -> no normal breathing",
+      "input_text": "他没有正常呼吸，只是偶尔喘一下",
+      "input_state": {
+        "patientState": {
+          "normal_breathing": false,
+          "agonal_breathing": true
+        },
+        "cprQuality": null,
+        "deviceState": null,
+        "rescuerState": null,
+        "metadata": null
+      },
+      "expected_stage": "S4_SUSPECTED_ARREST",
+      "elapsed_ms": 14710,
+      "error": null,
+      "inferred_intent": "no_normal_breathing",
+      "stt_confidence": 0.86,
+      "current_stage": "S4_SUSPECTED_ARREST",
+      "allowed_intents": [
+        "state_suspected_arrest_handling",
+        "fallback_template",
+        "defer_to_rule_feedback"
+      ],
+      "gemma": {
+        "fallback": true,
+        "fallbackReason": "patch_validation_failed",
+        "error": {
+          "message": "patch_validation_failed"
+        },
+        "violations": [
+          "intent_not_allowed:state_suspected_cardiac_arrest"
+        ],
+        "patch_intent": "fallback_template",
+        "patch_tts_text": "请按疑似心脏骤停处理。",
+        "patch_ui_main": "疑似心脏骤停",
+        "patch_reason": "patch_validation_failed",
+        "patch_confidence": 0.6
+      },
+      "gemma_validation": {
+        "ok": true,
+        "violations": []
+      },
+      "state_action": {
+        "intent": "state_suspected_arrest_handling",
+        "tts_text": "请按疑似心脏骤停处理。现在准备胸外按压。",
+        "priority": "critical"
+      },
+      "guidance_action": {
+        "intent": "fallback_template",
+        "source": "gemma_agent",
+        "priority": "normal",
+        "tts_text": "请按疑似心脏骤停处理。",
+        "ui_main": "疑似心脏骤停"
+      }
+    },
+    {
+      "turn": 4,
+      "label": "emergency called (120)",
+      "input_text": "我已经拨打120了",
+      "input_state": {
+        "patientState": null,
+        "cprQuality": null,
+        "deviceState": {
+          "emergency_call_started": true,
+          "gps_available": true,
+          "recording": true
+        },
+        "rescuerState": null,
+        "metadata": null
+      },
+      "expected_stage": "S5_CALL_EMERGENCY",
+      "elapsed_ms": 14397,
+      "error": null,
+      "inferred_intent": null,
+      "stt_confidence": 0.62,
+      "current_stage": "S5_CALL_EMERGENCY",
+      "allowed_intents": [
+        "explain_call_status",
+        "calm_rescuer",
+        "fallback_template",
+        "defer_to_rule_feedback"
+      ],
+      "gemma": {
+        "fallback": null,
+        "fallbackReason": null,
+        "error": null,
+        "violations": [],
+        "patch_intent": "explain_call_status",
+        "patch_tts_text": "���Ѿ�����120�ˣ��뱣���ֻ����ᡣ",
+        "patch_ui_main": "�Ѳ�120",
+        "patch_reason": "user_confirmed_emergency_call",
+        "patch_confidence": 0.9
+      },
+      "gemma_validation": {
+        "ok": true,
+        "violations": []
+      },
+      "state_action": {
+        "intent": "start_emergency_call_and_cpr",
+        "tts_text": "我将为你拨打 120，请保持手机免提。现在准备胸外按压。",
+        "priority": "critical"
+      },
+      "guidance_action": {
+        "intent": "explain_call_status",
+        "source": "gemma_agent",
+        "priority": "normal",
+        "tts_text": "���Ѿ�����120�ˣ��뱣���ֻ����ᡣ",
+        "ui_main": "�Ѳ�120"
+      }
+    },
+    {
+      "turn": 5,
+      "label": "patient positioned",
+      "input_text": "他已经平躺在硬地面上了",
+      "input_state": {
+        "patientState": {
+          "lying_down": true
+        },
+        "cprQuality": null,
+        "deviceState": null,
+        "rescuerState": null,
+        "metadata": null
+      },
+      "expected_stage": "S6_CPR_READY",
+      "elapsed_ms": 14612,
+      "error": null,
+      "inferred_intent": null,
+      "stt_confidence": 0.62,
+      "current_stage": "S6_CPR_READY",
+      "allowed_intents": [
+        "guide_cpr_position",
+        "answer_position_question",
+        "encourage_rescuer",
+        "fallback_template",
+        "defer_to_rule_feedback"
+      ],
+      "gemma": {
+        "fallback": null,
+        "fallbackReason": null,
+        "error": null,
+        "violations": [],
+        "patch_intent": "guide_cpr_position",
+        "patch_tts_text": "��ȷ����ƽ����Ӳ�����ϡ�",
+        "patch_ui_main": "ƽ��",
+        "patch_reason": "user_input_describes_position_and_context_for_CPR_start",
+        "patch_confidence": 0.8
+      },
+      "gemma_validation": {
+        "ok": true,
+        "violations": []
+      },
+      "state_action": {
+        "intent": "guide_cpr_position",
+        "tts_text": "让他平躺在硬地面，双手掌根放在胸口中央。",
+        "priority": "critical"
+      },
+      "guidance_action": {
+        "intent": "guide_cpr_position",
+        "source": "gemma_agent",
+        "priority": "normal",
+        "tts_text": "��ȷ����ƽ����Ӳ�����ϡ�",
+        "ui_main": "ƽ��"
+      }
+    },
+    {
+      "turn": 6,
+      "label": "start compressions (quality 32)",
+      "input_text": "我开始按压了",
+      "input_state": {
+        "patientState": null,
+        "cprQuality": {
+          "compressions_started": true,
+          "current_rate": 96,
+          "average_rate": 96,
+          "quality_score": 32,
+          "hand_position": "unknown",
+          "total_compressions": 8
+        },
+        "deviceState": null,
+        "rescuerState": null,
+        "metadata": null
+      },
+      "expected_stage": "S7_CPR_LOOP",
+      "elapsed_ms": 13168,
+      "error": null,
+      "inferred_intent": "continue_cpr",
+      "stt_confidence": 0.86,
+      "current_stage": "S7_CPR_LOOP",
+      "allowed_intents": [
+        "answer_current_cpr_question",
+        "encourage_rescuer",
+        "calm_rescuer",
+        "defer_to_rule_feedback",
+        "fallback_template"
+      ],
+      "gemma": {
+        "fallback": null,
+        "fallbackReason": null,
+        "error": null,
+        "violations": [],
+        "patch_intent": "encourage_rescuer",
+        "patch_tts_text": "������ѹ����Ҫͣ��",
+        "patch_ui_main": "������ѹ",
+        "patch_reason": "no_reason",
+        "patch_confidence": 0.5
+      },
+      "gemma_validation": {
+        "ok": true,
+        "violations": []
+      },
+      "state_action": {
+        "intent": "start_cpr_loop",
+        "tts_text": "现在开始胸外按压，跟着震动快速有力地按。",
+        "priority": "critical"
+      },
+      "guidance_action": {
+        "intent": "encourage_rescuer",
+        "source": "gemma_agent",
+        "priority": "normal",
+        "tts_text": "������ѹ����Ҫͣ��",
+        "ui_main": "������ѹ"
+      }
+    },
+    {
+      "turn": 7,
+      "label": "continue, hand left + rate low (quality 45)",
+      "input_text": "我继续按压",
+      "input_state": {
+        "patientState": null,
+        "cprQuality": {
+          "compressions_started": true,
+          "current_rate": 92,
+          "average_rate": 94,
+          "quality_score": 45,
+          "hand_position": "left",
+          "total_compressions": 24
+        },
+        "deviceState": null,
+        "rescuerState": null,
+        "metadata": null
+      },
+      "expected_stage": "S7_CPR_LOOP",
+      "elapsed_ms": 14295,
+      "error": null,
+      "inferred_intent": "continue_cpr",
+      "stt_confidence": 0.86,
+      "current_stage": "S7_CPR_LOOP",
+      "allowed_intents": [
+        "answer_current_cpr_question",
+        "encourage_rescuer",
+        "calm_rescuer",
+        "defer_to_rule_feedback",
+        "fallback_template"
+      ],
+      "gemma": {
+        "fallback": null,
+        "fallbackReason": null,
+        "error": null,
+        "violations": [],
+        "patch_intent": "encourage_rescuer",
+        "patch_tts_text": "������ѹ����Ҫͣ��",
+        "patch_ui_main": "������ѹ",
+        "patch_reason": "user_input_is_continue_cpr",
+        "patch_confidence": 0.9
+      },
+      "gemma_validation": {
+        "ok": true,
+        "violations": []
+      },
+      "state_action": {
+        "intent": "correct_hand_position",
+        "tts_text": "位置向右一点。",
+        "priority": "high"
+      },
+      "guidance_action": {
+        "intent": "encourage_rescuer",
+        "source": "gemma_agent",
+        "priority": "normal",
+        "tts_text": "������ѹ����Ҫͣ��",
+        "ui_main": "������ѹ"
+      }
+    },
+    {
+      "turn": 8,
+      "label": "rescuer fatigue -> assistance",
+      "input_text": "我有点按不动了，手很酸",
+      "input_state": {
+        "patientState": null,
+        "cprQuality": null,
+        "deviceState": null,
+        "rescuerState": {
+          "emotion": "anxious",
+          "fatigue_level": "high",
+          "confidence": 0.76
+        },
+        "metadata": null
+      },
+      "expected_stage": "S8_ASSISTANCE",
+      "elapsed_ms": 13076,
+      "error": null,
+      "inferred_intent": null,
+      "stt_confidence": 0.62,
+      "current_stage": "S8_ASSISTANCE",
+      "allowed_intents": [
+        "guide_rescuer_change",
+        "explain_aed_support",
+        "calm_rescuer",
+        "fallback_template",
+        "defer_to_rule_feedback"
+      ],
+      "gemma": {
+        "fallback": true,
+        "fallbackReason": "patch_validation_failed",
+        "error": {
+          "message": "patch_validation_failed"
+        },
+        "violations": [
+          "invalid_tone:calm"
+        ],
+        "patch_intent": "fallback_template",
+        "patch_tts_text": "继续按压，我会持续提示。",
+        "patch_ui_main": "继续按压",
+        "patch_reason": "patch_validation_failed",
+        "patch_confidence": 0.6
+      },
+      "gemma_validation": {
+        "ok": true,
+        "violations": []
+      },
+      "state_action": {
+        "intent": "assist_rescuer_fatigue",
+        "tts_text": "如果旁边有人，请准备换手。",
+        "priority": "normal"
+      },
+      "guidance_action": {
+        "intent": "fallback_template",
+        "source": "gemma_agent",
+        "priority": "normal",
+        "tts_text": "继续按压，我会持续提示。",
+        "ui_main": "继续按压"
+      }
+    },
+    {
+      "turn": 9,
+      "label": "AED arrived (still assistance)",
+      "input_text": "旁边有人拿来了AED",
+      "input_state": {
+        "patientState": null,
+        "cprQuality": null,
+        "deviceState": null,
+        "rescuerState": null,
+        "metadata": {
+          "aed_available": true,
+          "helper_arrived": true
+        }
+      },
+      "expected_stage": "S8_ASSISTANCE",
+      "elapsed_ms": 14508,
+      "error": null,
+      "inferred_intent": null,
+      "stt_confidence": 0.62,
+      "current_stage": "S8_ASSISTANCE",
+      "allowed_intents": [
+        "guide_rescuer_change",
+        "explain_aed_support",
+        "calm_rescuer",
+        "fallback_template",
+        "defer_to_rule_feedback"
+      ],
+      "gemma": {
+        "fallback": null,
+        "fallbackReason": null,
+        "error": null,
+        "violations": [],
+        "patch_intent": "guide_rescuer_change",
+        "patch_tts_text": "��׼�����֡�",
+        "patch_ui_main": "׼������",
+        "patch_reason": "user_input_suggests_AED_arrival_and_rescuer_change",
+        "patch_confidence": 0.5
+      },
+      "gemma_validation": {
+        "ok": true,
+        "violations": []
+      },
+      "state_action": {
+        "intent": "assist_aed",
+        "tts_text": "有人取到 AED 时，你继续按压，听设备提示。",
+        "priority": "normal"
+      },
+      "guidance_action": {
+        "intent": "guide_rescuer_change",
+        "source": "gemma_agent",
+        "priority": "normal",
+        "tts_text": "��׼�����֡�",
+        "ui_main": "׼������"
+      }
+    },
+    {
+      "turn": 10,
+      "label": "back to CPR loop (quality 88)",
+      "input_text": "我继续按压",
+      "input_state": {
+        "patientState": null,
+        "cprQuality": {
+          "compressions_started": true,
+          "current_rate": 110,
+          "average_rate": 108,
+          "quality_score": 88,
+          "hand_position": "center",
+          "arm_posture": "straight",
+          "total_compressions": 200
+        },
+        "deviceState": null,
+        "rescuerState": null,
+        "metadata": null
+      },
+      "expected_stage": "S7_CPR_LOOP",
+      "elapsed_ms": 14160,
+      "error": null,
+      "inferred_intent": "continue_cpr",
+      "stt_confidence": 0.86,
+      "current_stage": "S7_CPR_LOOP",
+      "allowed_intents": [
+        "answer_current_cpr_question",
+        "encourage_rescuer",
+        "calm_rescuer",
+        "defer_to_rule_feedback",
+        "fallback_template"
+      ],
+      "gemma": {
+        "fallback": null,
+        "fallbackReason": null,
+        "error": null,
+        "violations": [],
+        "patch_intent": "encourage_rescuer",
+        "patch_tts_text": "������ѹ����Ҫͣ��",
+        "patch_ui_main": "������ѹ",
+        "patch_reason": "user_input_is_continue_cpr",
+        "patch_confidence": 0.9
+      },
+      "gemma_validation": {
+        "ok": true,
+        "violations": []
+      },
+      "state_action": {
+        "intent": "continue_cpr_loop",
+        "tts_text": "继续保持这个节奏。",
+        "priority": "normal"
+      },
+      "guidance_action": {
+        "intent": "encourage_rescuer",
+        "source": "gemma_agent",
+        "priority": "normal",
+        "tts_text": "������ѹ����Ҫͣ��",
+        "ui_main": "������ѹ"
+      }
+    },
+    {
+      "turn": 11,
+      "label": "paramedics arrived -> handover",
+      "input_text": "救护车到了，急救员来了",
+      "input_state": {
+        "patientState": null,
+        "cprQuality": null,
+        "deviceState": null,
+        "rescuerState": null,
+        "metadata": {
+          "ems_arrived": true
+        }
+      },
+      "expected_stage": "S9_HANDOVER",
+      "elapsed_ms": 14884,
+      "error": null,
+      "inferred_intent": "paramedics_arrived",
+      "stt_confidence": 0.86,
+      "current_stage": "S9_HANDOVER",
+      "allowed_intents": [
+        "handover_summary_patch",
+        "explain_handover",
+        "fallback_template",
+        "defer_to_rule_feedback"
+      ],
+      "gemma": {
+        "fallback": null,
+        "fallbackReason": null,
+        "error": null,
+        "violations": [],
+        "patch_intent": "handover_summary_patch",
+        "patch_tts_text": "����Ա�ѵ���һ�Ϊ���ṩ���ӱ��档",
+        "patch_ui_main": "���ӱ���",
+        "patch_reason": "user_input_paramedics_arrived",
+        "patch_confidence": 0.9
+      },
+      "gemma_validation": {
+        "ok": true,
+        "violations": []
+      },
+      "state_action": {
+        "intent": "generate_handover_report",
+        "tts_text": "急救员到达，我正在生成交接报告。",
+        "priority": "critical"
+      },
+      "guidance_action": {
+        "intent": "handover_summary_patch",
+        "source": "gemma_agent",
+        "priority": "normal",
+        "tts_text": "����Ա�ѵ���һ�Ϊ���ṩ���ӱ��档",
+        "ui_main": "���ӱ���"
+      }
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+[Current Stage]
+{{stage}}
+
+[Allowed Intents]
+{{allowed_intents_json}}
+
+[Confirmed Facts]
+{{facts_json}}
+
+[Safety Phrases]
+{{safety_phrases_json}}
+
+[User Input]
+{{user_input}}
+
+[Context]
+- language: zh-CN
+- output_schema: GuidanceActionPatch
+- mode: {{mode}}
+- source: {{source}}
+
+[Task]
+在 allowed_intents 内选择一个 intent，基于 facts 和 safety_phrases 生成一个简短、冷静、可执行的急救提示。
+只输出 GuidanceActionPatch JSON，不要解释。
+
+[Forbidden]
+- 不要诊断疾病。
+- 不要改变状态机结论。
+- 不要新增工具调用。
+- 不要新增未审核医疗步骤。
+- 不要恐吓。
+- 不要承诺结果。
+- 不要让用户自行决定是否 CPR。
+

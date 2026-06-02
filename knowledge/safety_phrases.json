@@ -1,0 +1,255 @@
+{
+  "knowledge_version": "adult_cpr_mvp_2026_05_30",
+  "schema_version": "safety_phrases.v0.1",
+  "language": "zh-CN",
+  "scope": {
+    "scenario": "adult_suspected_cardiac_arrest_cpr",
+    "audience": "untrained_first_responder",
+    "principle": "短、明确、冷静；不诊断、不恐吓、不承诺结果。"
+  },
+  "allowed_phrases": [
+    {
+      "id": "ask_scene_safety",
+      "scenario": "场景安全",
+      "stages": ["S1_SCENE_SAFE"],
+      "intents": ["ask_scene_safety", "warn_scene_unsafe"],
+      "text": "先确认周围安全，再靠近他。",
+      "tone": "calm_firm",
+      "tags": ["safety", "approach"]
+    },
+    {
+      "id": "ask_response_check",
+      "scenario": "判断反应",
+      "stages": ["S2_CHECK_RESPONSE"],
+      "intents": ["ask_response_check"],
+      "text": "请大声呼叫他，并轻拍双肩。",
+      "tone": "calm_firm",
+      "tags": ["response_check"]
+    },
+    {
+      "id": "confirm_unresponsive",
+      "scenario": "无反应",
+      "stages": ["S2_CHECK_RESPONSE", "S3_CHECK_BREATHING"],
+      "intents": ["ack_patient_unresponsive", "ask_breathing_check"],
+      "text": "他没有反应。现在检查呼吸。",
+      "tone": "calm_firm",
+      "tags": ["unresponsive", "breathing_check"]
+    },
+    {
+      "id": "ask_breathing_check",
+      "scenario": "判断呼吸",
+      "stages": ["S3_CHECK_BREATHING"],
+      "intents": ["ask_breathing_check"],
+      "text": "请看胸口 5 到 10 秒，有没有规律、正常的起伏？",
+      "tone": "calm_firm",
+      "tags": ["breathing_check"]
+    },
+    {
+      "id": "uncertain_breathing_high_risk",
+      "scenario": "呼吸不确定",
+      "stages": ["S3_CHECK_BREATHING", "S4_SUSPECTED_ARREST"],
+      "intents": ["handle_uncertain_breathing", "explain_uncertain_breathing"],
+      "text": "如果不确定是否正常呼吸，请按没有正常呼吸处理。",
+      "tone": "calm_firm",
+      "tags": ["breathing_uncertain", "high_risk"]
+    },
+    {
+      "id": "start_cpr",
+      "scenario": "启动 CPR",
+      "stages": ["S4_SUSPECTED_ARREST", "S5_CALL_EMERGENCY", "S6_CPR_READY"],
+      "intents": ["start_emergency_call_and_cpr", "start_cpr_guidance"],
+      "text": "请按疑似心脏骤停处理。现在开始胸外按压。",
+      "tone": "calm_firm",
+      "tags": ["cpr_start", "critical"]
+    },
+    {
+      "id": "emergency_call",
+      "scenario": "呼叫 120",
+      "stages": ["S5_CALL_EMERGENCY"],
+      "intents": ["start_emergency_call", "confirm_emergency_call"],
+      "text": "我将为你拨打 120，请保持手机免提。",
+      "tone": "calm_firm",
+      "tags": ["tool_action", "emergency_call"]
+    },
+    {
+      "id": "place_on_hard_surface",
+      "scenario": "CPR 准备",
+      "stages": ["S6_CPR_READY"],
+      "intents": ["guide_patient_position"],
+      "text": "让他平躺在硬的平面上。",
+      "tone": "calm_firm",
+      "tags": ["position"]
+    },
+    {
+      "id": "hand_position",
+      "scenario": "按压位置",
+      "stages": ["S6_CPR_READY", "S7_CPR_LOOP"],
+      "intents": ["guide_cpr_position", "answer_position_question"],
+      "text": "双手掌根放在胸口中央。",
+      "tone": "calm_firm",
+      "tags": ["hand_position", "chest_center"]
+    },
+    {
+      "id": "start_compressions",
+      "scenario": "开始按压",
+      "stages": ["S6_CPR_READY", "S7_CPR_LOOP"],
+      "intents": ["start_compressions", "guide_cpr_position"],
+      "text": "双手掌根放到胸口中央，现在开始按。",
+      "tone": "calm_firm",
+      "tags": ["compression_start"]
+    },
+    {
+      "id": "metronome",
+      "scenario": "节奏",
+      "stages": ["S7_CPR_LOOP"],
+      "intents": ["guide_compression_rhythm", "start_metronome"],
+      "text": "跟着震动按，快速有力。",
+      "tone": "calm_firm",
+      "tags": ["metronome", "rate"]
+    },
+    {
+      "id": "do_not_stop",
+      "scenario": "中断",
+      "stages": ["S7_CPR_LOOP"],
+      "intents": ["correct_interruption"],
+      "text": "不要停，继续按压。",
+      "tone": "urgent",
+      "tags": ["interruption", "critical"]
+    },
+    {
+      "id": "rate_faster",
+      "scenario": "频率偏慢",
+      "stages": ["S7_CPR_LOOP"],
+      "intents": ["correct_compression_rate"],
+      "text": "再快一点，跟着震动按。",
+      "tone": "calm_firm",
+      "tags": ["rate_low"]
+    },
+    {
+      "id": "rate_slower",
+      "scenario": "频率偏快",
+      "stages": ["S7_CPR_LOOP"],
+      "intents": ["correct_compression_rate"],
+      "text": "稍微慢一点，跟着震动按。",
+      "tone": "calm_firm",
+      "tags": ["rate_high"]
+    },
+    {
+      "id": "hand_position_right",
+      "scenario": "手位偏左",
+      "stages": ["S7_CPR_LOOP"],
+      "intents": ["correct_hand_position"],
+      "text": "位置向右一点。",
+      "tone": "calm_firm",
+      "tags": ["hand_position"]
+    },
+    {
+      "id": "hand_position_lower",
+      "scenario": "手位偏高",
+      "stages": ["S7_CPR_LOOP"],
+      "intents": ["correct_hand_position"],
+      "text": "手再往下移一点。",
+      "tone": "calm_firm",
+      "tags": ["hand_position"]
+    },
+    {
+      "id": "straight_arms",
+      "scenario": "手臂姿势",
+      "stages": ["S7_CPR_LOOP"],
+      "intents": ["correct_arm_posture"],
+      "text": "手臂伸直，用上半身向下压。",
+      "tone": "calm_firm",
+      "tags": ["arm_posture"]
+    },
+    {
+      "id": "encourage",
+      "scenario": "鼓励",
+      "stages": ["S7_CPR_LOOP", "S8_ASSISTANCE"],
+      "intents": ["encourage_rescuer"],
+      "text": "你做得很好，继续跟着节奏。",
+      "tone": "calm_soft",
+      "tags": ["encouragement"]
+    },
+    {
+      "id": "fatigue_switch",
+      "scenario": "疲劳换手",
+      "stages": ["S8_ASSISTANCE"],
+      "intents": ["suggest_rescuer_switch"],
+      "text": "如果旁边有人，请让他准备接替按压。",
+      "tone": "calm_firm",
+      "tags": ["fatigue", "teamwork"]
+    },
+    {
+      "id": "aed_continue_cpr",
+      "scenario": "AED 辅助",
+      "stages": ["S8_ASSISTANCE", "S7_CPR_LOOP"],
+      "intents": ["guide_aed_assist"],
+      "text": "有人取到 AED 时，你继续按压，听设备提示。",
+      "tone": "calm_firm",
+      "tags": ["aed", "continue_cpr"]
+    },
+    {
+      "id": "handover",
+      "scenario": "交接",
+      "stages": ["S9_HANDOVER"],
+      "intents": ["generate_handover_report", "explain_handover_ready"],
+      "text": "急救员到达后，我会生成交接报告。",
+      "tone": "calm_firm",
+      "tags": ["handover"]
+    }
+  ],
+  "forbidden_phrases": [
+    {
+      "category": "诊断过度",
+      "phrases": ["他已经心脏骤停了。"],
+      "reason": "只能说疑似，不能给出确定诊断。",
+      "preferred_replacement": "请按疑似心脏骤停处理。"
+    },
+    {
+      "category": "疾病判断",
+      "phrases": ["这是心梗。", "这是脑卒中。"],
+      "reason": "不能诊断具体疾病。",
+      "preferred_replacement": "现在按急救流程处理。"
+    },
+    {
+      "category": "结果承诺",
+      "phrases": ["这样一定能救活。"],
+      "reason": "不能承诺结果。",
+      "preferred_replacement": "继续按压，等待急救员接手。"
+    },
+    {
+      "category": "责任恐吓",
+      "phrases": ["如果你不按他会死。"],
+      "reason": "不能恐吓或转嫁责任。",
+      "preferred_replacement": "不要停，继续按压。"
+    },
+    {
+      "category": "复杂解释",
+      "phrases": ["现在我来解释心肺复苏的原理。"],
+      "reason": "急救中避免长篇解释。",
+      "preferred_replacement": "现在先按胸口中央。"
+    },
+    {
+      "category": "过度安慰",
+      "phrases": ["不用担心，没事的。"],
+      "reason": "不能弱化风险。",
+      "preferred_replacement": "我会一步步告诉你怎么做。"
+    },
+    {
+      "category": "让用户自决",
+      "phrases": ["你自己决定要不要按压。"],
+      "reason": "关键流程由状态机判断，不能让用户承担决策。",
+      "preferred_replacement": "请按疑似心脏骤停处理。现在开始胸外按压。"
+    }
+  ],
+  "validator_rules": {
+    "max_primary_action_count": 1,
+    "recommended_tts_max_zh_chars": 30,
+    "critical_stage_tts_max_zh_chars": 60,
+    "must_use_allowed_intent": true,
+    "must_not_change_state_machine_decision": true,
+    "must_not_add_tool_actions_from_gemma": true,
+    "must_not_interrupt_critical_with_lower_priority": true
+  }
+}
+

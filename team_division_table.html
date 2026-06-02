@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FirstAid Copilot 团队分工表</title>
+  <style>
+    :root {
+      --ink: #151515;
+      --muted: #5f6368;
+      --line: #d9d9d9;
+      --soft: #f7f7f7;
+      --accent: #c62828;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #ffffff;
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
+      letter-spacing: 0;
+    }
+
+    .page {
+      width: 1440px;
+      min-height: 1860px;
+      padding: 58px 68px 64px;
+      background: #fff;
+    }
+
+    .title {
+      display: flex;
+      align-items: baseline;
+      gap: 18px;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 42px;
+      line-height: 1.22;
+      font-weight: 800;
+    }
+
+    .badge {
+      color: #fff;
+      background: var(--accent);
+      border-radius: 6px;
+      padding: 7px 12px;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .subtitle {
+      margin: 0 0 34px;
+      font-size: 23px;
+      line-height: 1.55;
+      color: var(--muted);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      border-top: 2px solid #1f1f1f;
+      border-bottom: 2px solid #1f1f1f;
+    }
+
+    thead th {
+      padding: 18px 22px;
+      font-size: 27px;
+      line-height: 1.35;
+      text-align: left;
+      background: var(--soft);
+      border-bottom: 2px solid #1f1f1f;
+    }
+
+    th.role-head {
+      width: 25%;
+    }
+
+    th.tasks-head {
+      width: 75%;
+    }
+
+    tbody tr {
+      border-top: 1.5px solid var(--line);
+    }
+
+    tbody td {
+      vertical-align: top;
+      padding: 28px 24px 30px;
+    }
+
+    .role {
+      font-size: 31px;
+      line-height: 1.34;
+      font-weight: 800;
+    }
+
+    .role small {
+      display: block;
+      margin-top: 9px;
+      font-size: 19px;
+      line-height: 1.45;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 28px;
+    }
+
+    li {
+      margin: 0 0 11px;
+      font-size: 24px;
+      line-height: 1.48;
+    }
+
+    li:last-child {
+      margin-bottom: 0;
+    }
+
+    strong {
+      font-weight: 800;
+    }
+
+    .boundary {
+      margin-top: 18px;
+      padding: 14px 18px;
+      border-left: 6px solid var(--accent);
+      background: #fafafa;
+      font-size: 22px;
+      line-height: 1.5;
+    }
+
+    .boundary strong {
+      color: var(--accent);
+    }
+
+    .note {
+      margin-top: 34px;
+      padding: 22px 26px;
+      border: 1.5px solid var(--line);
+      border-radius: 8px;
+      font-size: 22px;
+      line-height: 1.55;
+      background: #fbfbfb;
+    }
+
+    .note strong {
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="title">
+      <h1>FirstAid Copilot 五人分工表</h1>
+      <div class="badge">Edge AI / CPR MVP</div>
+    </div>
+    <p class="subtitle">
+      按产品运行链路拆分：感知输入 → 急救决策 → Android 交互 → 评测工具链 → 医学与交付。
+      原则是每个人都有清晰产物，减少 Gemma、Android、后端之间的职责重叠。
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th class="role-head">角色</th>
+          <th class="tasks-head">具体任务与交付边界</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            <div class="role">
+              1. 队长 / 产品 / 医学合规 / 路演
+              <small>负责让项目不跑偏、讲得可信、交得完整</small>
+            </div>
+          </td>
+          <td>
+            <ul>
+              <li><strong>锁定 MVP：</strong>只做成人疑似心脏骤停 CPR 第一响应，不扩散到多急救场景。</li>
+              <li><strong>医学流程：</strong>整理 AHA / 国内 CPR 指南、禁忌提示、免责声明和安全边界。</li>
+              <li><strong>外部背书：</strong>对接急诊医生、红十字会、急救培训老师，拿反馈或顾问意见。</li>
+              <li><strong>叙事交付：</strong>负责 Demo 剧本、路演稿、答辩 Q&amp;A、技术报告主线和 README。</li>
+              <li><strong>项目管理：</strong>拆任务、控进度、每天验收关键链路，保证最终提交物齐全。</li>
+            </ul>
+            <div class="boundary"><strong>边界：</strong>不独占 Prompt 工程；医学内容负责审核，具体 Agent 实现交给 Gemma 负责人。</div>
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <div class="role">
+              2. Edge Gemma / Agent 决策引擎
+              <small>负责 AI 大脑：离线推理、状态机、急救指令</small>
+            </div>
+          </td>
+          <td>
+            <ul>
+              <li><strong>端侧部署：</strong>验证 Gemma 4 E2B / E4B 在 Android 真机上的加载、延迟、内存和离线推理。</li>
+              <li><strong>Agent 状态机：</strong>设计初筛、呼叫 120、CPR 指导、实时纠错、交接报告的流程引擎。</li>
+              <li><strong>Prompt / Guardrail：</strong>锁死急救步骤，避免模型自由生成危险医疗建议。</li>
+              <li><strong>本地知识库：</strong>整理 CPR 指南、应急话术、分支规则，供 Agent 调用。</li>
+              <li><strong>统一接口：</strong>把感知事件转成下一步指导，把 Session Log 转成 Handover 报告。</li>
+            </ul>
+            <div class="boundary"><strong>边界：</strong>不做 Android 页面；只提供 PerceptionEvent → GuidanceAction / SessionLog → HandoverReport。</div>
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <div class="role">
+              3. CPR 感知识别 / 质量评分
+              <small>负责眼睛和评分器：看懂动作，输出结构化事件</small>
+            </div>
+          </td>
+          <td>
+            <ul>
+              <li><strong>视觉识别：</strong>识别人体姿态、手部位置、胸部区域、手臂是否伸直等粗粒度信号。</li>
+              <li><strong>节奏检测：</strong>判断按压频率、过快/过慢、中断时长，目标区间 100-120 次/分钟。</li>
+              <li><strong>质量评分：</strong>设计 0-100 分合成逻辑，覆盖手位、节奏、连续性、动作稳定性。</li>
+              <li><strong>测试素材：</strong>录制 CPR 假人视频、错误动作视频，建立可回放测试集。</li>
+              <li><strong>数据输出：</strong>向 Agent 提供 hand_position、compression_rate、interruption、confidence 等字段。</li>
+            </ul>
+            <div class="boundary"><strong>边界：</strong>不决定急救流程，不写业务后端；只产出可被 Agent 消费的结构化感知结果。</div>
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <div class="role">
+              4. Android 终端 / 交互实现
+              <small>负责跑起来：App、传感器、语音、震动和 UI 集成</small>
+            </div>
+          </td>
+          <td>
+            <ul>
+              <li><strong>App 架构：</strong>搭建 Android 工程、权限、生命周期、离线运行和模块集成框架。</li>
+              <li><strong>硬件能力：</strong>接入摄像头、麦克风、GPS、震动、TTS、录制和本地存储。</li>
+              <li><strong>急救 UI：</strong>实现大字高对比界面、质量分仪表盘、节拍器、动画和状态提示。</li>
+              <li><strong>流程集成：</strong>串联 Gemma Agent、感知识别、120 拨号、定位展示、Handover 报告。</li>
+              <li><strong>异常兜底：</strong>处理断网、权限未开、识别失败、模型加载慢等演示高风险点。</li>
+            </ul>
+            <div class="boundary"><strong>边界：</strong>可以集成模型和算法，但不负责设计医疗决策规则，也不维护感知算法本身。</div>
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <div class="role">
+              5. 工具链 / QA / Demo 工程 / 设计交付
+              <small>负责让它稳定、好测、好演示、好提交</small>
+            </div>
+          </td>
+          <td>
+            <ul>
+              <li><strong>测试工具：</strong>做视频回放、假数据注入、离线测试脚本，帮助算法和 Agent 快速联调。</li>
+              <li><strong>Demo 兜底：</strong>准备识别失败时的演示模式，确保现场能完整跑完 5 分钟故事线。</li>
+              <li><strong>指标看板：</strong>统计响应时间、模型延迟、节奏误差、识别成功率和质量分变化。</li>
+              <li><strong>UI/UX 细化：</strong>检查字体、颜色、文案、可读性和紧急场景下的误触风险。</li>
+              <li><strong>最终物料：</strong>剪 Demo 视频、整理截图、准备测试清单、提交包和演示设备清单。</li>
+            </ul>
+            <div class="boundary"><strong>边界：</strong>不是“打杂位”；这是黑客松稳定性负责人，保证功能能被验证、能被展示。</div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      <strong>协作原则：</strong>Android 负责“跑起来”，Gemma 负责“想清楚”，感知负责“看明白”，工具链负责“测稳定”，队长负责“讲可信”。
+      项目主链路尽量保持端侧本地运行，“后端”只作为测试、回放和 Demo 辅助，不作为核心依赖。
+    </div>
+  </main>
+</body>
+</html>

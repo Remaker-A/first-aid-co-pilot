@@ -1,0 +1,18 @@
+{
+  "name": "firstaid-copilot-agent-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-first FirstAid Copilot Agent MVP demo chain.",
+  "scripts": {
+    "demo": "node src/cli/runDemo.js",
+    "setup:gemma": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/setupGemma.ps1",
+    "setup:speech": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/setupSpeech.ps1",
+    "verify:local": "node src/cli/verifyLocalLoop.js",
+    "voice:serve": "node src/voice/server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
