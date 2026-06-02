@@ -6,11 +6,16 @@
   "description": "Local-first FirstAid Copilot Agent MVP demo chain.",
   "scripts": {
     "demo": "node src/cli/runDemo.js",
+    "demo:dispatcher": "node src/cli/runDispatcherDemo.js",
+    "demo:voice": "node src/voice/server.js",
     "setup:gemma": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/setupGemma.ps1",
     "setup:speech": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/setupSpeech.ps1",
+    "verify": "node src/cli/verifyLocalLoop.js",
     "verify:local": "node src/cli/verifyLocalLoop.js",
+    "verify:gemma": "node src/cli/verifyLocalLoop.js --require-real-gemma",
     "voice:serve": "node src/voice/server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "test:watch": "node --test --watch"
   },
   "engines": {
     "node": ">=20"

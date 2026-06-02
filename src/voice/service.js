@@ -21,11 +21,16 @@ export function createVoiceDemoService(options = {}) {
 
       session.events.push(event);
 
+      // The voice service runs its own Gemma supplement below (runtime +
+      // ActionValidator), so it needs the pipeline's deterministic,
+      // synchronous state-machine actions. Now that runAgentPipeline defaults
+      // Gemma ON, opt out explicitly to keep the synchronous contract.
       const pipeline = runAgentPipeline({
         events: session.events,
         mode: "demo_assisted",
         sessionId,
         now,
+        useGemma: false,
       });
       const stateAction = pipeline.actions[pipeline.actions.length - 1] || null;
       const frame = createDecisionFrame({

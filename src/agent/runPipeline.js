@@ -12,14 +12,19 @@ import { GemmaRuntime } from "../gemma/runtime.js";
 const defaultNow = () => new Date().toISOString();
 
 // runAgentPipeline keeps the medical flow rule-driven. Gemma is an OPTIONAL,
-// non-critical wording supplement controlled by `options.useGemma` (default
-// false). When the flag is off, the pipeline behaves EXACTLY as before and runs
-// synchronously, returning the result object directly. When the flag is on it
-// must await Gemma, so it returns a Promise resolving to the same shape (plus a
-// `gemma` summary). Existing callers (voice service, demo replay tests, demo
-// CLI) never pass useGemma, so they keep the synchronous contract untouched.
+// non-critical wording supplement controlled by `options.useGemma`. As of this
+// change the supplement defaults ON for live/CLI callers: omitting `useGemma`
+// is treated as enabled. When enabled the pipeline must await Gemma, so it
+// returns a Promise resolving to the result shape plus a `gemma` summary.
+//
+// Deterministic callers must OPT OUT with `useGemma:false`, which restores the
+// fully synchronous, rule-only behavior (identical output, no model calls):
+//   - demo replay (`runDemoPipeline` defaults useGemma:false) and its tests,
+//   - the voice service, which deliberately consumes the deterministic
+//     state-machine actions and layers its own Gemma supplement afterwards.
 export function runAgentPipeline(options = {}) {
-  if (options.useGemma) {
+  const useGemma = options.useGemma ?? true;
+  if (useGemma) {
     return runAgentPipelineWithGemma(options);
   }
 

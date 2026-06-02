@@ -3,6 +3,7 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { AgentStage, runAgentPipeline, runDemoPipeline } from "../src/index.js";
+import { DemoEventPlayer } from "../src/demo/demoEventPlayer.js";
 
 const SCRIPT_PATH = resolve("knowledge", "demo_script_cpr_main_v1.json");
 
@@ -75,10 +76,11 @@ function unsafeRuntime() {
   };
 }
 
-test("runAgentPipeline stays synchronous when useGemma is off", () => {
-  const result = runAgentPipeline({ events: [] });
+test("runAgentPipeline stays synchronous when useGemma is explicitly off", () => {
+  const result = runAgentPipeline({ events: [], useGemma: false });
   assert.equal(typeof result.then, "undefined");
   assert.ok(Array.isArray(result.actions));
+  assert.equal(result.gemma, undefined);
 });
 
 test("runAgentPipeline returns a promise when useGemma is on", async () => {
@@ -87,6 +89,40 @@ test("runAgentPipeline returns a promise when useGemma is on", async () => {
   const result = await pending;
   assert.ok(Array.isArray(result.actions));
   assert.equal(result.gemma.used, true);
+});
+
+test("runAgentPipeline defaults the Gemma supplement ON when useGemma is omitted", async () => {
+  const script = await loadScript();
+  const events = new DemoEventPlayer({
+    script,
+    mode: "demo_assisted",
+    sessionId: "sess_default_on"
+  }).events();
+  const runtime = stageEchoRuntime();
+
+  // No useGemma flag passed -> must default to the async Gemma-assisted path.
+  const pending = runAgentPipeline({
+    events,
+    mode: "demo_assisted",
+    sessionId: "sess_default_on",
+    gemmaRuntime: runtime
+  });
+  assert.equal(typeof pending.then, "function", "omitting useGemma should default to the async Gemma path");
+
+  const result = await pending;
+  assert.equal(result.gemma.used, true);
+  // The mocked runtime (not a real model) was actually consulted by default.
+  assert.ok(runtime.calls.length > 0, "Gemma runtime should be consulted by default");
+  assert.ok(
+    result.gemma.guidance.some((g) => g.source === "gemma_agent"),
+    "at least one non-critical turn should be supplemented by Gemma by default"
+  );
+  // Critical/tool flow is still rule-driven, and handover is still reached.
+  assert.equal(result.state.current_stage, AgentStage.S9_HANDOVER);
+  assert.equal(
+    result.actions.filter((a) => a.intent === "generate_handover_report").length,
+    1
+  );
 });
 
 test("demo replay with useGemma=false is unchanged", async () => {
