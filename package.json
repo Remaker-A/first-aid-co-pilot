@@ -8,6 +8,8 @@
     "demo": "node src/cli/runDemo.js",
     "demo:dispatcher": "node src/cli/runDispatcherDemo.js",
     "demo:voice": "node src/voice/server.js",
+    "scenario": "node src/cli/runScenario.js",
+    "scenario:live": "node src/cli/runScenario.js --mode live",
     "setup:gemma": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/setupGemma.ps1",
     "setup:speech": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/setupSpeech.ps1",
     "verify": "node src/cli/verifyLocalLoop.js",

@@ -1,0 +1,542 @@
+{
+  "knowledge_version": "adult_cpr_mvp_2026_05_30",
+  "schema_version": "demo_event_script.v0.1",
+  "script_id": "scenario_collapse_vision_v1",
+  "title": "路人突然倒地 · 纯视觉驱动全流程场景",
+  "duration_ms": 175000,
+  "default_mode": "demo_replay",
+  "fallback_mode": "demo_replay",
+  "language": "zh-CN",
+  "scenario": "adult_suspected_cardiac_arrest_cpr",
+  "goals": [
+    "完全依赖 vision_* / device 感知（无 STT）驱动 S0→S9 全流程",
+    "视觉判定无反应、无正常呼吸/濒死喘息后触发 120 + 录制 + GPS",
+    "CPR 质量由低到高，并由视觉 cpr_quality 触发手位/手臂/频率/中断四类纠错",
+    "视觉判定疲劳换手与 AED 到达，最终生成交接报告"
+  ],
+  "notes": [
+    "本脚本刻意不含 source=stt 的事件，验证纯视觉链路可独立推进状态机。",
+    "事件 at_ms 拉开间隔（纠错事件间隔 >=10s），避免 ruleFeedbackEngine 节流吞动作。",
+    "S5 的 device.emergency_call_started 与 S9 的 tool_result 是设备/系统事件，非 STT。"
+  ],
+  "quality_curve": [
+    { "timecode": "00:36", "at_ms": 36000, "quality_score": 35 },
+    { "timecode": "00:45", "at_ms": 45000, "quality_score": 42 },
+    { "timecode": "00:55", "at_ms": 55000, "quality_score": 50 },
+    { "timecode": "01:05", "at_ms": 65000, "quality_score": 58 },
+    { "timecode": "01:15", "at_ms": 75000, "quality_score": 55 },
+    { "timecode": "01:25", "at_ms": 85000, "quality_score": 88 },
+    { "timecode": "02:15", "at_ms": 135000, "quality_score": 90 }
+  ],
+  "steps": [
+    {
+      "step_id": "session_start",
+      "timecode": "00:00",
+      "at_ms": 0,
+      "stage_hint": "S0_INIT",
+      "event": {
+        "source": "demo_script",
+        "event_type": "session_started",
+        "ttl_ms": 5000,
+        "patient_state": {
+          "adult_likely": true,
+          "lying_down": true,
+          "responsive": null,
+          "normal_breathing": null,
+          "agonal_breathing": null,
+          "chest_movement": "unknown",
+          "confidence": 0.82,
+          "observed_duration_ms": 0
+        },
+        "device_state": {
+          "camera_available": true,
+          "mic_available": true,
+          "gps_available": true,
+          "recording": true,
+          "emergency_call_started": false,
+          "network": "offline"
+        }
+      },
+      "expected_agent": {
+        "intent": "ensure_scene_safe",
+        "tts": "开始录制，先确认周围安全。",
+        "ui_main_text": "确认现场安全"
+      },
+      "handover_log": {
+        "type": "session_started",
+        "detail": "camera_started_recording"
+      }
+    },
+    {
+      "step_id": "scene_safe_vision",
+      "timecode": "00:04",
+      "at_ms": 4000,
+      "stage_hint": "S1_SCENE_SAFE",
+      "event": {
+        "source": "vision_patient",
+        "event_type": "patient_state_update",
+        "ttl_ms": 5000,
+        "patient_state": {
+          "adult_likely": true,
+          "lying_down": true,
+          "responsive": null,
+          "normal_breathing": null,
+          "agonal_breathing": null,
+          "chest_movement": "unknown",
+          "confidence": 0.86,
+          "observed_duration_ms": 1500
+        },
+        "metadata": {
+          "scene_safe": true
+        }
+      },
+      "expected_agent": {
+        "intent": "ask_response_check",
+        "tts": "请大声叫他，并轻拍双肩。",
+        "ui_main_text": "检查反应"
+      },
+      "handover_log": {
+        "type": "scene_safe",
+        "detail": "vision_no_hazard_detected"
+      }
+    },
+    {
+      "step_id": "vision_unresponsive",
+      "timecode": "00:09",
+      "at_ms": 9000,
+      "stage_hint": "S2_CHECK_RESPONSE",
+      "event": {
+        "source": "vision_patient",
+        "event_type": "patient_state_update",
+        "ttl_ms": 5000,
+        "patient_state": {
+          "adult_likely": true,
+          "lying_down": true,
+          "responsive": false,
+          "normal_breathing": null,
+          "agonal_breathing": null,
+          "chest_movement": "unknown",
+          "confidence": 0.91,
+          "observed_duration_ms": 3000
+        }
+      },
+      "expected_agent": {
+        "intent": "ask_breathing_check",
+        "tts": "他没有反应。现在看胸口有没有正常起伏。",
+        "ui_main_text": "检查呼吸"
+      },
+      "handover_log": {
+        "type": "patient_unresponsive",
+        "detail": "vision_no_response_to_stimulus"
+      }
+    },
+    {
+      "step_id": "vision_no_normal_breathing",
+      "timecode": "00:18",
+      "at_ms": 18000,
+      "stage_hint": "S3_CHECK_BREATHING",
+      "event": {
+        "source": "vision_patient",
+        "event_type": "breathing_update",
+        "ttl_ms": 5000,
+        "patient_state": {
+          "adult_likely": true,
+          "lying_down": true,
+          "responsive": false,
+          "normal_breathing": false,
+          "agonal_breathing": true,
+          "chest_movement": "irregular",
+          "confidence": 0.9,
+          "observed_duration_ms": 9000
+        }
+      },
+      "expected_agent": {
+        "intent": "state_suspected_arrest_handling",
+        "tts": "无反应、无正常呼吸，按疑似心脏骤停处理。",
+        "ui_main_text": "疑似心脏骤停"
+      },
+      "handover_log": {
+        "type": "suspected_cardiac_arrest",
+        "detail": "vision_no_normal_breathing_and_agonal"
+      }
+    },
+    {
+      "step_id": "emergency_call_started",
+      "timecode": "00:24",
+      "at_ms": 24000,
+      "stage_hint": "S5_CALL_EMERGENCY",
+      "event": {
+        "source": "device",
+        "event_type": "device_state_update",
+        "ttl_ms": 5000,
+        "device_state": {
+          "camera_available": true,
+          "mic_available": true,
+          "gps_available": true,
+          "recording": true,
+          "emergency_call_started": true,
+          "network": "offline"
+        }
+      },
+      "expected_agent": {
+        "intent": "start_emergency_call_and_cpr",
+        "tts": "我将为你拨打 120，请保持手机免提。现在准备胸外按压。",
+        "ui_main_text": "正在呼叫 120"
+      },
+      "handover_log": {
+        "type": "emergency_call_started",
+        "detail": "auto_call_120_gps_recording"
+      }
+    },
+    {
+      "step_id": "cpr_ready_vision",
+      "timecode": "00:30",
+      "at_ms": 30000,
+      "stage_hint": "S6_CPR_READY",
+      "event": {
+        "source": "vision_patient",
+        "event_type": "patient_state_update",
+        "ttl_ms": 5000,
+        "patient_state": {
+          "adult_likely": true,
+          "lying_down": true,
+          "responsive": false,
+          "normal_breathing": false,
+          "agonal_breathing": true,
+          "chest_movement": "irregular",
+          "confidence": 0.89,
+          "observed_duration_ms": 4000
+        }
+      },
+      "expected_agent": {
+        "intent": "guide_cpr_position",
+        "tts": "让他平躺在硬地面，双手掌根放在胸口中央。",
+        "ui_main_text": "准备按压"
+      },
+      "handover_log": {
+        "type": "cpr_ready",
+        "detail": "hard_surface_and_chest_center_guidance"
+      }
+    },
+    {
+      "step_id": "cpr_start_vision",
+      "timecode": "00:36",
+      "at_ms": 36000,
+      "stage_hint": "S7_CPR_LOOP",
+      "event": {
+        "source": "vision_cpr",
+        "event_type": "cpr_quality_update",
+        "ttl_ms": 3000,
+        "cpr_quality": {
+          "compressions_started": true,
+          "current_rate": 100,
+          "average_rate": 100,
+          "quality_score": 35,
+          "hand_position": "center",
+          "arm_posture": "straight",
+          "interruption_seconds": 0,
+          "total_compressions": 10
+        }
+      },
+      "expected_agent": {
+        "intent": "start_cpr_loop",
+        "tts": "现在开始胸外按压，跟着震动快速有力地按。",
+        "ui_main_text": "开始按压"
+      },
+      "handover_log": {
+        "type": "cpr_started",
+        "detail": "vision_quality_score_35"
+      }
+    },
+    {
+      "step_id": "vision_hand_left",
+      "timecode": "00:45",
+      "at_ms": 45000,
+      "stage_hint": "S7_CPR_LOOP",
+      "event": {
+        "source": "vision_cpr",
+        "event_type": "cpr_quality_update",
+        "ttl_ms": 3000,
+        "cpr_quality": {
+          "compressions_started": true,
+          "current_rate": 110,
+          "average_rate": 105,
+          "quality_score": 42,
+          "hand_position": "left",
+          "arm_posture": "straight",
+          "interruption_seconds": 0,
+          "total_compressions": 40
+        }
+      },
+      "expected_agent": {
+        "intent": "correct_hand_position",
+        "tts": "位置向右一点。",
+        "ui_main_text": "位置偏左"
+      },
+      "handover_log": {
+        "type": "correction",
+        "detail": "vision_hand_position_left_offset"
+      }
+    },
+    {
+      "step_id": "vision_rate_low",
+      "timecode": "00:55",
+      "at_ms": 55000,
+      "stage_hint": "S7_CPR_LOOP",
+      "event": {
+        "source": "vision_cpr",
+        "event_type": "cpr_quality_update",
+        "ttl_ms": 3000,
+        "cpr_quality": {
+          "compressions_started": true,
+          "current_rate": 82,
+          "average_rate": 95,
+          "quality_score": 50,
+          "hand_position": "center",
+          "arm_posture": "straight",
+          "interruption_seconds": 0,
+          "total_compressions": 70
+        }
+      },
+      "expected_agent": {
+        "intent": "correct_compression_rate",
+        "tts": "再快一点，跟着震动按。",
+        "ui_main_text": "按压偏慢"
+      },
+      "handover_log": {
+        "type": "correction",
+        "detail": "vision_compression_rate_low"
+      }
+    },
+    {
+      "step_id": "vision_arm_bent",
+      "timecode": "01:05",
+      "at_ms": 65000,
+      "stage_hint": "S7_CPR_LOOP",
+      "event": {
+        "source": "vision_cpr",
+        "event_type": "cpr_quality_update",
+        "ttl_ms": 3000,
+        "cpr_quality": {
+          "compressions_started": true,
+          "current_rate": 112,
+          "average_rate": 102,
+          "quality_score": 58,
+          "hand_position": "center",
+          "arm_posture": "bent",
+          "interruption_seconds": 0,
+          "total_compressions": 100
+        }
+      },
+      "expected_agent": {
+        "intent": "correct_arm_posture",
+        "tts": "手臂伸直，用上半身向下压。",
+        "ui_main_text": "手臂伸直"
+      },
+      "handover_log": {
+        "type": "correction",
+        "detail": "vision_arm_bent"
+      }
+    },
+    {
+      "step_id": "vision_interruption",
+      "timecode": "01:15",
+      "at_ms": 75000,
+      "stage_hint": "S7_CPR_LOOP",
+      "event": {
+        "source": "vision_cpr",
+        "event_type": "cpr_quality_update",
+        "ttl_ms": 3000,
+        "cpr_quality": {
+          "compressions_started": false,
+          "current_rate": 0,
+          "average_rate": 100,
+          "quality_score": 55,
+          "hand_position": "center",
+          "arm_posture": "straight",
+          "interruption_seconds": 4,
+          "total_compressions": 120
+        }
+      },
+      "expected_agent": {
+        "intent": "correct_compression_interruption",
+        "tts": "不要停，继续按压。",
+        "ui_main_text": "继续按压"
+      },
+      "handover_log": {
+        "type": "correction",
+        "detail": "vision_compression_interrupted_4s"
+      }
+    },
+    {
+      "step_id": "vision_quality_high",
+      "timecode": "01:25",
+      "at_ms": 85000,
+      "stage_hint": "S7_CPR_LOOP",
+      "event": {
+        "source": "vision_cpr",
+        "event_type": "cpr_quality_update",
+        "ttl_ms": 3000,
+        "cpr_quality": {
+          "compressions_started": true,
+          "current_rate": 112,
+          "average_rate": 108,
+          "quality_score": 88,
+          "hand_position": "center",
+          "arm_posture": "straight",
+          "interruption_seconds": 0,
+          "total_compressions": 160
+        }
+      },
+      "expected_agent": {
+        "intent": "continue_cpr_loop",
+        "tts": "继续保持这个节奏。",
+        "ui_main_text": "持续 CPR"
+      },
+      "handover_log": {
+        "type": "cpr_continued",
+        "detail": "vision_quality_score_88"
+      }
+    },
+    {
+      "step_id": "vision_rescuer_fatigue",
+      "timecode": "01:40",
+      "at_ms": 100000,
+      "stage_hint": "S8_ASSISTANCE",
+      "event": {
+        "source": "vision_rescuer",
+        "event_type": "rescuer_state_update",
+        "ttl_ms": 5000,
+        "rescuer_state": {
+          "emotion": "anxious",
+          "fatigue_level": "high",
+          "hesitation_seconds": 0,
+          "confidence": 0.8
+        }
+      },
+      "expected_agent": {
+        "intent": "assist_rescuer_fatigue",
+        "tts": "如果旁边有人，请准备换手。",
+        "ui_main_text": "准备换手"
+      },
+      "handover_log": {
+        "type": "rescuer_fatigue",
+        "detail": "vision_fatigue_high_switch_suggested"
+      }
+    },
+    {
+      "step_id": "vision_aed_arrived",
+      "timecode": "01:55",
+      "at_ms": 115000,
+      "stage_hint": "S8_ASSISTANCE",
+      "event": {
+        "source": "vision_patient",
+        "event_type": "patient_state_update",
+        "ttl_ms": 5000,
+        "metadata": {
+          "aed_available": true,
+          "helper_arrived": true
+        }
+      },
+      "expected_agent": {
+        "intent": "assist_aed",
+        "tts": "有人取到 AED 时，你继续按压，听设备提示。",
+        "ui_main_text": "AED 到达"
+      },
+      "handover_log": {
+        "type": "aed_arrived",
+        "detail": "vision_aed_and_helper_on_scene"
+      }
+    },
+    {
+      "step_id": "vision_back_to_cpr",
+      "timecode": "02:15",
+      "at_ms": 135000,
+      "stage_hint": "S7_CPR_LOOP",
+      "event": {
+        "source": "vision_cpr",
+        "event_type": "cpr_quality_update",
+        "ttl_ms": 3000,
+        "cpr_quality": {
+          "compressions_started": true,
+          "current_rate": 110,
+          "average_rate": 109,
+          "quality_score": 90,
+          "hand_position": "center",
+          "arm_posture": "straight",
+          "interruption_seconds": 0,
+          "total_compressions": 240
+        }
+      },
+      "expected_agent": {
+        "intent": "continue_cpr_loop",
+        "tts": "继续按压，直到急救员接手。",
+        "ui_main_text": "持续 CPR"
+      },
+      "handover_log": {
+        "type": "cpr_continued",
+        "detail": "vision_quality_score_90"
+      }
+    },
+    {
+      "step_id": "ems_arrived_vision",
+      "timecode": "02:40",
+      "at_ms": 160000,
+      "stage_hint": "S9_HANDOVER",
+      "event": {
+        "source": "vision_patient",
+        "event_type": "handover_requested",
+        "ttl_ms": 10000,
+        "metadata": {
+          "ems_arrived": true
+        }
+      },
+      "expected_agent": {
+        "intent": "generate_handover_report",
+        "tts": "急救员到达，我正在生成交接报告。",
+        "ui_main_text": "交接报告"
+      },
+      "handover_log": {
+        "type": "ems_arrived",
+        "detail": "vision_paramedics_on_scene"
+      }
+    },
+    {
+      "step_id": "report_ready",
+      "timecode": "02:55",
+      "at_ms": 175000,
+      "stage_hint": "S9_HANDOVER",
+      "event": {
+        "source": "device",
+        "event_type": "tool_result",
+        "ttl_ms": 10000,
+        "metadata": {
+          "handover_report_generated": true,
+          "local_video_saved": true
+        }
+      },
+      "expected_agent": {
+        "intent": "explain_handover",
+        "tts": "交接报告已生成，视频记录已本地保存。",
+        "ui_main_text": "报告已生成"
+      },
+      "handover_log": {
+        "type": "report_displayed",
+        "detail": "handover_report_and_local_video_ready"
+      }
+    }
+  ],
+  "handover_report_expected": {
+    "patient_id": "匿名",
+    "assessment": "无反应、无正常呼吸、可能喘息样呼吸，按疑似心脏骤停处理",
+    "cpr_started_at": "00:36",
+    "estimated_total_compressions": 240,
+    "average_rate_per_min": 109,
+    "average_quality_score": 90,
+    "interruptions": ["01:15 中断 4 秒，已提醒继续"],
+    "corrections": ["手位偏左", "频率偏慢", "手臂弯曲", "中断过长"],
+    "aed_status": "available",
+    "rescuer_state": "01:40 疲劳，已提醒旁人准备换手",
+    "video_record": "已本地保存，等待用户同意分享"
+  }
+}

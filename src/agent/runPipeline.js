@@ -31,6 +31,80 @@ export function runAgentPipeline(options = {}) {
   return runAgentPipelineSync(options);
 }
 
+// stepAgentTurn advances a single agent turn: it reduces the event into the
+// session state, runs the state machine + rule feedback, validates the candidate
+// action, and (when a Gemma `runtime` is supplied) layers the non-critical wording
+// supplement. It returns `{ state, action, source, validation, transition }`, where
+// `action` is `null` for turns that produce no guidance.
+//
+// This is the shared per-event core used by BOTH pipelines below, and is exported
+// so closed-loop drivers (e.g. the scene simulator) can advance one event at a time.
+//
+// Sync/async dispatch mirrors `runAgentPipeline`:
+//   - no `runtime`  -> fully synchronous, rule-only (returns a plain object),
+//   - with `runtime` -> awaits the Gemma supplement (returns a Promise).
+export function stepAgentTurn(state, event, options = {}) {
+  const { runtime, now = defaultNow } = options;
+  const sessionId = options.sessionId ?? state?.session_id ?? null;
+  const stepped = stepStateMachine(state, event, now);
+  const nextState = stepped.state;
+  const candidate = stepped.transition.action;
+
+  if (runtime) {
+    return stepAgentTurnWithGemma({
+      nextState,
+      candidate,
+      event,
+      runtime,
+      sessionId,
+      transition: stepped.transition
+    });
+  }
+
+  return stepAgentTurnRuleOnly({ nextState, candidate, transition: stepped.transition });
+}
+
+function stepAgentTurnRuleOnly({ nextState, candidate, transition }) {
+  if (!candidate) {
+    return { state: nextState, action: null, source: null, validation: null, transition };
+  }
+
+  const validation = validateAction(candidate, nextState);
+  return {
+    state: nextState,
+    action: validation.action,
+    source: validation.action?.source ?? "state_machine",
+    validation,
+    transition
+  };
+}
+
+async function stepAgentTurnWithGemma({ nextState, candidate, event, runtime, sessionId, transition }) {
+  if (!candidate) {
+    return { state: nextState, action: null, source: null, validation: null, transition };
+  }
+
+  const stateValidation = validateAction(candidate, nextState);
+  const decision = await supplementWithGemma({
+    stateAction: stateValidation.action,
+    stateValidation,
+    state: nextState,
+    event,
+    runtime,
+    sessionId
+  });
+
+  return {
+    state: nextState,
+    action: decision.action,
+    source: decision.source,
+    validation: decision.validation,
+    gemmaFallbackReason: decision.gemmaFallbackReason ?? null,
+    gemmaViolations: decision.gemmaViolations ?? [],
+    transition
+  };
+}
+
 function runAgentPipelineSync({
   events = [],
   mode = "demo_replay",
@@ -42,20 +116,17 @@ function runAgentPipelineSync({
   const actions = [];
 
   for (const event of events) {
-    const stepped = stepStateMachine(state, event, now);
-    state = stepped.state;
+    const turn = stepAgentTurn(state, event, { now });
+    state = turn.state;
     log.recordEvent(event, state);
     log.recordState(state, event);
 
-    const candidate = stepped.transition.action;
-    if (!candidate) {
+    if (!turn.action) {
       continue;
     }
 
-    const validation = validateAction(candidate, state);
-    const action = validation.action;
-    actions.push(action);
-    log.recordAction(action, state, validation);
+    actions.push(turn.action);
+    log.recordAction(turn.action, state, turn.validation);
   }
 
   return {
@@ -86,36 +157,23 @@ export async function runAgentPipelineWithGemma({
   const guidance = [];
 
   for (const event of events) {
-    const stepped = stepStateMachine(state, event, now);
-    state = stepped.state;
+    const turn = await stepAgentTurn(state, event, { runtime, sessionId, now });
+    state = turn.state;
     log.recordEvent(event, state);
     log.recordState(state, event);
 
-    const candidate = stepped.transition.action;
-    if (!candidate) {
+    if (!turn.action) {
       continue;
     }
 
-    const stateValidation = validateAction(candidate, state);
-    const stateAction = stateValidation.action;
-
-    const decision = await supplementWithGemma({
-      stateAction,
-      stateValidation,
-      state,
-      event,
-      runtime,
-      sessionId
-    });
-
-    actions.push(decision.action);
-    log.recordAction(decision.action, state, decision.validation);
+    actions.push(turn.action);
+    log.recordAction(turn.action, state, turn.validation);
     guidance.push({
       stage: state.current_stage,
-      intent: decision.action.intent,
-      source: decision.source,
-      gemma_fallback_reason: decision.gemmaFallbackReason ?? null,
-      gemma_violations: decision.gemmaViolations ?? []
+      intent: turn.action.intent,
+      source: turn.source,
+      gemma_fallback_reason: turn.gemmaFallbackReason ?? null,
+      gemma_violations: turn.gemmaViolations ?? []
     });
   }
 
