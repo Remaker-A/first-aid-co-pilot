@@ -7,6 +7,12 @@ export const DEFAULT_GEMMA_TIMEOUT_MS = 120000;
 export const DEFAULT_GEMMA_COMMAND = "litert-lm";
 export const DEFAULT_GEMMA_MODEL_FILE_PATTERN = /^gemma-4-E2B-it.*\.litertlm$/i;
 
+// A genuine Gemma 4 E2B `.litertlm` artifact is ~2.6 GB. Anything dramatically
+// smaller (an empty placeholder, a `.metadata` stub, a partial/aborted download)
+// is treated as "not a real model" so verification can surface a clear error
+// instead of silently handing a broken file to LiteRT-LM.
+export const GEMMA_PLACEHOLDER_MIN_BYTES = 1024 * 1024;
+
 const VALID_BACKENDS = new Set(["cpu", "gpu", "npu"]);
 
 export function getDefaultGemmaModelDir({ cwd = process.cwd() } = {}) {
@@ -36,6 +42,68 @@ export function resolveGemmaConfig(options = {}) {
     cwd,
     env
   };
+}
+
+// Human-readable, copy-pasteable instructions for obtaining the restricted
+// Gemma weights. Centralized here so the runtime fallback message, verify:local
+// output, and setup script all speak with one voice.
+export function describeGemmaModelSetup(config = {}) {
+  const repo = config.modelRepo || DEFAULT_GEMMA_MODEL_REPO;
+  const dir = config.modelDir || getDefaultGemmaModelDir();
+  const pattern = DEFAULT_GEMMA_MODEL_FILE_PATTERN.toString();
+  return [
+    `What to download: the LiteRT-LM weights for ${repo} (the gemma-4-E2B-it*.litertlm artifact, ~2.6 GB).`,
+    "How to authorize: accept the Gemma license on Hugging Face, then set HF_TOKEN (or HUGGINGFACE_HUB_TOKEN).",
+    `Where it goes: ${dir}`,
+    "How to download: npm run setup:gemma",
+    "How to import an existing copy: powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/setupGemma.ps1 -ModelSource <path-or-zip-or-url>",
+    `Detection: the runtime auto-discovers the first file matching ${pattern} under the model dir (override with GEMMA_MODEL_DIR or GEMMA_MODEL_FILE).`,
+    "Verify: npm run verify:local -- --require-real-gemma"
+  ].join("\n");
+}
+
+export function describeMissingGemmaModel(config = {}) {
+  const dir = config.modelDir || getDefaultGemmaModelDir();
+  return `No Gemma model file found in ${dir}.\n${describeGemmaModelSetup(config)}`;
+}
+
+// Pure decision logic shared by verify:local. Kept side-effect free so it can be
+// unit-tested without touching the filesystem or spawning LiteRT-LM.
+export function evaluateGemmaModelCheck(inspection = {}, { requireRealGemma = false } = {}) {
+  const remediation = inspection.remediation || describeGemmaModelSetup(inspection);
+
+  if (!inspection.found) {
+    return {
+      status: requireRealGemma ? "fail" : "warn",
+      detail: `No ${DEFAULT_GEMMA_MODEL_FILE_PATTERN} model file found in ${inspection.modelDir || getDefaultGemmaModelDir()}.`,
+      remediation
+    };
+  }
+
+  if (inspection.placeholder) {
+    return {
+      status: requireRealGemma ? "fail" : "warn",
+      detail: `Found ${inspection.file} but it is only ${inspection.bytes} bytes (looks like a placeholder, not the ~2.6 GB model).`,
+      remediation
+    };
+  }
+
+  return {
+    status: "pass",
+    detail: `${inspection.file} (${formatBytes(inspection.bytes)})`,
+    remediation: ""
+  };
+}
+
+function formatBytes(bytes) {
+  const value = Number(bytes) || 0;
+  if (value >= 1024 * 1024 * 1024) {
+    return `${(value / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  }
+  if (value >= 1024 * 1024) {
+    return `${(value / (1024 * 1024)).toFixed(2)} MB`;
+  }
+  return `${value} bytes`;
 }
 
 export function normalizeBackend(value) {

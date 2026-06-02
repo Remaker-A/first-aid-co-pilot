@@ -6,6 +6,9 @@ import { parseGemmaResponse } from "./responseParser.js";
 import { createGemmaFallbackPatch } from "./fallbackPolicy.js";
 import {
   DEFAULT_GEMMA_MODEL_FILE_PATTERN,
+  GEMMA_PLACEHOLDER_MIN_BYTES,
+  describeGemmaModelSetup,
+  describeMissingGemmaModel,
   resolveGemmaConfig
 } from "./modelConfig.js";
 
