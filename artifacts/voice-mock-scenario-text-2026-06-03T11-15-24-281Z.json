@@ -1,0 +1,1648 @@
+{
+  "summary": {
+    "ok": false,
+    "input_mode": "text",
+    "session_id": "probe_mpxyvsqr",
+    "total_steps": 16,
+    "passed": 0,
+    "failed": 16,
+    "runtime_ms": 181430,
+    "slowest_step": {
+      "id": "cpr_ready",
+      "total_ms": 22546,
+      "timings": {
+        "stt_ms": 0,
+        "agent_pipeline_ms": 1,
+        "gemma_ms": 19302,
+        "tts_ms": 3243,
+        "total_ms": 22546
+      }
+    },
+    "gemma_used_steps": [
+      "scene_safe",
+      "unresponsive",
+      "no_normal_breathing",
+      "call_started",
+      "cpr_ready",
+      "cpr_start",
+      "ems_arrived"
+    ],
+    "gemma_skipped_steps": [
+      {
+        "id": "hand_left",
+        "reason": "no_user_input"
+      },
+      {
+        "id": "rate_low",
+        "reason": "no_user_input"
+      },
+      {
+        "id": "arm_bent",
+        "reason": "no_user_input"
+      },
+      {
+        "id": "interrupted",
+        "reason": "no_user_input"
+      },
+      {
+        "id": "quality_good",
+        "reason": "no_user_input"
+      },
+      {
+        "id": "fatigue",
+        "reason": "no_user_input"
+      },
+      {
+        "id": "aed_arrived",
+        "reason": "no_user_input"
+      },
+      {
+        "id": "back_to_cpr",
+        "reason": "no_user_input"
+      },
+      {
+        "id": "report_ready",
+        "reason": "no_user_input"
+      }
+    ],
+    "stt_sources": [
+      "text_input"
+    ],
+    "tts_providers": [
+      "sherpa-onnx"
+    ]
+  },
+  "results": [
+    {
+      "index": 1,
+      "id": "scene_safe",
+      "label": "Scene is safe, ask response check",
+      "spoken_text": "现场安全了",
+      "ideal_answer": "请大声叫他，并轻拍双肩。",
+      "expected": {
+        "stage": "S2_CHECK_RESPONSE",
+        "intent": "ask_response_check",
+        "eventSource": "vision_patient",
+        "ttsIncludes": [
+          "轻拍",
+          "双肩"
+        ],
+        "guidanceSourceAny": [
+          "gemma_agent",
+          "state_machine"
+        ],
+        "maxTotalMs": 45000
+      },
+      "actual": {
+        "ok": true,
+        "transcript": "现场安全了",
+        "sttSource": "text_input",
+        "sttIntent": "scene_safe",
+        "stage": "S0_INIT",
+        "intent": "reassure_rescuer",
+        "eventSource": "vision_patient",
+        "eventType": "patient_state_update",
+        "guidanceSource": "gemma_agent",
+        "gemmaSkipped": false,
+        "gemmaSkipReason": null,
+        "gemmaFallback": false,
+        "gemmaFallbackReason": null,
+        "gemmaPatchIntent": "reassure_rescuer",
+        "ttsProvider": "sherpa-onnx",
+        "ttsOk": true,
+        "ttsText": "环境安全了，我们继续下一步。",
+        "timings": {
+          "stt_ms": 0,
+          "agent_pipeline_ms": 2,
+          "gemma_ms": 18937,
+          "tts_ms": 3234,
+          "total_ms": 22176
+        },
+        "totalMs": 22176,
+        "elapsedMs": 22176
+      },
+      "checks": [
+        {
+          "name": "stage",
+          "ok": false,
+          "expected": "S2_CHECK_RESPONSE",
+          "actual": "S0_INIT"
+        },
+        {
+          "name": "intent",
+          "ok": false,
+          "expected": "ask_response_check",
+          "actual": "reassure_rescuer"
+        },
+        {
+          "name": "event_source",
+          "ok": true,
+          "expected": "vision_patient",
+          "actual": "vision_patient"
+        },
+        {
+          "name": "guidance_source",
+          "ok": true,
+          "expected": "gemma_agent | state_machine",
+          "actual": "gemma_agent"
+        },
+        {
+          "name": "tts:轻拍",
+          "ok": false,
+          "expected": "轻拍",
+          "actual": "环境安全了，我们继续下一步。"
+        },
+        {
+          "name": "tts:双肩",
+          "ok": false,
+          "expected": "双肩",
+          "actual": "环境安全了，我们继续下一步。"
+        },
+        {
+          "name": "latency",
+          "ok": true,
+          "expected": "<=45000ms",
+          "actual": "22176ms"
+        }
+      ],
+      "ok": false
+    },
+    {
+      "index": 2,
+      "id": "unresponsive",
+      "label": "Patient unresponsive, ask breathing check",
+      "spoken_text": "他没有反应",
+      "ideal_answer": "他没有反应。现在看胸口 5 到 10 秒，确认有没有正常呼吸。",
+      "expected": {
+        "stage": "S3_CHECK_BREATHING",
+        "intent": "ask_breathing_check",
+        "eventSource": "vision_patient",
+        "ttsIncludes": [
+          "胸口",
+          "正常"
+        ],
+        "guidanceSourceAny": [
+          "state_machine_critical"
+        ],
+        "gemmaSkipped": true,
+        "maxTotalMs": 12000
+      },
+      "actual": {
+        "ok": true,
+        "transcript": "他没有反应",
+        "sttSource": "text_input",
+        "sttIntent": "patient_unresponsive",
+        "stage": "S0_INIT",
+        "intent": "fallback_template",
+        "eventSource": "vision_patient",
+        "eventType": "patient_state_update",
+        "guidanceSource": "gemma_agent",
+        "gemmaSkipped": false,
+        "gemmaSkipReason": null,
+        "gemmaFallback": false,
+        "gemmaFallbackReason": null,
+        "gemmaPatchIntent": "fallback_template",
+        "ttsProvider": "sherpa-onnx",
+        "ttsOk": true,
+        "ttsText": "请立即拨打急救电话。",
+        "timings": {
+          "stt_ms": 0,
+          "agent_pipeline_ms": 1,
+          "gemma_ms": 18713,
+          "tts_ms": 2957,
+          "total_ms": 21671
+        },
+        "totalMs": 21671,
+        "elapsedMs": 21671
+      },
+      "checks": [
+        {
+          "name": "stage",
+          "ok": false,
+          "expected": "S3_CHECK_BREATHING",
+          "actual": "S0_INIT"
+        },
+        {
+          "name": "intent",
+          "ok": false,
+          "expected": "ask_breathing_check",
+          "actual": "fallback_template"
+        },
+        {
+          "name": "event_source",
+          "ok": true,
+          "expected": "vision_patient",
+          "actual": "vision_patient"
+        },
+        {
+          "name": "guidance_source",
+          "ok": false,
+          "expected": "state_machine_critical",
+          "actual": "gemma_agent"
+        },
+        {
+          "name": "tts:胸口",
+          "ok": false,
+          "expected": "胸口",
+          "actual": "请立即拨打急救电话。"
+        },
+        {
+          "name": "tts:正常",
+          "ok": false,
+          "expected": "正常",
+          "actual": "请立即拨打急救电话。"
+        },
+        {
+          "name": "gemma_skipped",
+          "ok": false,
+          "expected": "true",
+          "actual": "false"
+        },
+        {
+          "name": "latency",
+          "ok": false,
+          "expected": "<=12000ms",
+          "actual": "21671ms"
+        }
+      ],
+      "ok": false
+    },
+    {
+      "index": 3,
+      "id": "no_normal_breathing",
+      "label": "No normal breathing, suspect arrest",
+      "spoken_text": "没有正常呼吸，偶尔喘一下",
+      "ideal_answer": "请按疑似心脏骤停处理。现在准备胸外按压。",
+      "expected": {
+        "stage": "S4_SUSPECTED_ARREST",
+        "intent": "state_suspected_arrest_handling",
+        "eventSource": "vision_patient",
+        "ttsIncludes": [
+          "疑似",
+          "胸外按压"
+        ],
+        "guidanceSourceAny": [
+          "state_machine_critical"
+        ],
+        "gemmaSkipped": true,
+        "maxTotalMs": 12000
+      },
+      "actual": {
+        "ok": true,
+        "transcript": "没有正常呼吸，偶尔喘一下",
+        "sttSource": "text_input",
+        "sttIntent": "no_normal_breathing",
+        "stage": "S0_INIT",
+        "intent": "fallback_template",
+        "eventSource": "vision_patient",
+        "eventType": "breathing_update",
+        "guidanceSource": "gemma_agent",
+        "gemmaSkipped": false,
+        "gemmaSkipReason": null,
+        "gemmaFallback": false,
+        "gemmaFallbackReason": null,
+        "gemmaPatchIntent": "fallback_template",
+        "ttsProvider": "sherpa-onnx",
+        "ttsOk": true,
+        "ttsText": "请立即拨打急救电话。",
+        "timings": {
+          "stt_ms": 0,
+          "agent_pipeline_ms": 1,
+          "gemma_ms": 18471,
+          "tts_ms": 3047,
+          "total_ms": 21519
+        },
+        "totalMs": 21519,
+        "elapsedMs": 21519
+      },
+      "checks": [
+        {
+          "name": "stage",
+          "ok": false,
+          "expected": "S4_SUSPECTED_ARREST",
+          "actual": "S0_INIT"
+        },
+        {
+          "name": "intent",
+          "ok": false,
+          "expected": "state_suspected_arrest_handling",
+          "actual": "fallback_template"
+        },
+        {
+          "name": "event_source",
+          "ok": true,
+          "expected": "vision_patient",
+          "actual": "vision_patient"
+        },
+        {
+          "name": "guidance_source",
+          "ok": false,
+          "expected": "state_machine_critical",
+          "actual": "gemma_agent"
+        },
+        {
+          "name": "tts:疑似",
+          "ok": false,
+          "expected": "疑似",
+          "actual": "请立即拨打急救电话。"
+        },
+        {
+          "name": "tts:胸外按压",
+          "ok": false,
+          "expected": "胸外按压",
+          "actual": "请立即拨打急救电话。"
+        },
+        {
+          "name": "gemma_skipped",
+          "ok": false,
+          "expected": "true",
+          "actual": "false"
+        },
+        {
+          "name": "latency",
+          "ok": false,
+          "expected": "<=12000ms",
+          "actual": "21519ms"
+        }
+      ],
+      "ok": false
+    },
+    {
+      "index": 4,
+      "id": "call_started",
+      "label": "Start emergency call and CPR preparation",
+      "spoken_text": "120 已经拨打",
+      "ideal_answer": "我将为你拨打 120，请保持手机免提。现在准备胸外按压。",
+      "expected": {
+        "stage": "S5_CALL_EMERGENCY",
+        "intent": "start_emergency_call_and_cpr",
+        "eventSource": "device",
+        "ttsIncludes": [
+          "120",
+          "免提",
+          "胸外按压"
+        ],
+        "guidanceSourceAny": [
+          "state_machine_critical"
+        ],
+        "gemmaSkipped": true,
+        "maxTotalMs": 12000
+      },
+      "actual": {
+        "ok": true,
+        "transcript": "120 已经拨打",
+        "sttSource": "text_input",
+        "sttIntent": "emergency_called",
+        "stage": "S0_INIT",
+        "intent": "reassure_rescuer",
+        "eventSource": "device",
+        "eventType": "device_state_update",
+        "guidanceSource": "gemma_agent",
+        "gemmaSkipped": false,
+        "gemmaSkipReason": null,
+        "gemmaFallback": false,
+        "gemmaFallbackReason": null,
+        "gemmaPatchIntent": "reassure_rescuer",
+        "ttsProvider": "sherpa-onnx",
+        "ttsOk": true,
+        "ttsText": "保持冷静，我们正在帮助你。",
+        "timings": {
+          "stt_ms": 0,
+          "agent_pipeline_ms": 1,
+          "gemma_ms": 18936,
+          "tts_ms": 3104,
+          "total_ms": 22041
+        },
+        "totalMs": 22041,
+        "elapsedMs": 22041
+      },
+      "checks": [
+        {
+          "name": "stage",
+          "ok": false,
+          "expected": "S5_CALL_EMERGENCY",
+          "actual": "S0_INIT"
+        },
+        {
+          "name": "intent",
+          "ok": false,
+          "expected": "start_emergency_call_and_cpr",
+          "actual": "reassure_rescuer"
+        },
+        {
+          "name": "event_source",
+          "ok": true,
+          "expected": "device",
+          "actual": "device"
+        },
+        {
+          "name": "guidance_source",
+          "ok": false,
+          "expected": "state_machine_critical",
+          "actual": "gemma_agent"
+        },
+        {
+          "name": "tts:120",
+          "ok": false,
+          "expected": "120",
+          "actual": "保持冷静，我们正在帮助你。"
+        },
+        {
+          "name": "tts:免提",
+          "ok": false,
+          "expected": "免提",
+          "actual": "保持冷静，我们正在帮助你。"
+        },
+        {
+          "name": "tts:胸外按压",
+          "ok": false,
+          "expected": "胸外按压",
+          "actual": "保持冷静，我们正在帮助你。"
+        },
+        {
+          "name": "gemma_skipped",
+          "ok": false,
+          "expected": "true",
+          "actual": "false"
+        },
+        {
+          "name": "latency",
+          "ok": false,
+          "expected": "<=12000ms",
+          "actual": "22041ms"
+        }
+      ],
+      "ok": false
+    },
+    {
+      "index": 5,
+      "id": "cpr_ready",
+      "label": "Guide CPR position after emergency call",
+      "spoken_text": "准备好了",
+      "ideal_answer": "让他平躺在硬地面，双手掌根放在胸口中央。",
+      "expected": {
+        "stage": "S6_CPR_READY",
+        "intent": "guide_cpr_position",
+        "eventSource": "vision_patient",
+        "ttsIncludes": [
+          "平躺",
+          "胸口中央"
+        ],
+        "guidanceSourceAny": [
+          "state_machine_critical"
+        ],
+        "gemmaSkipped": true,
+        "maxTotalMs": 12000
+      },
+      "actual": {
+        "ok": true,
+        "transcript": "准备好了",
+        "sttSource": "text_input",
+        "sttIntent": null,
+        "stage": "S0_INIT",
+        "intent": "session_started",
+        "eventSource": "vision_patient",
+        "eventType": "patient_state_update",
+        "guidanceSource": "gemma_agent",
+        "gemmaSkipped": false,
+        "gemmaSkipReason": null,
+        "gemmaFallback": false,
+        "gemmaFallbackReason": null,
+        "gemmaPatchIntent": "session_started",
+        "ttsProvider": "sherpa-onnx",
+        "ttsOk": true,
+        "ttsText": "开始急救流程，请保持冷静。",
+        "timings": {
+          "stt_ms": 0,
+          "agent_pipeline_ms": 1,
+          "gemma_ms": 19302,
+          "tts_ms": 3243,
+          "total_ms": 22546
+        },
+        "totalMs": 22546,
+        "elapsedMs": 22546
+      },
+      "checks": [
+        {
+          "name": "stage",
+          "ok": false,
+          "expected": "S6_CPR_READY",
+          "actual": "S0_INIT"
+        },
+        {
+          "name": "intent",
+          "ok": false,
+          "expected": "guide_cpr_position",
+          "actual": "session_started"
+        },
+        {
+          "name": "event_source",
+          "ok": true,
+          "expected": "vision_patient",
+          "actual": "vision_patient"
+        },
+        {
+          "name": "guidance_source",
+          "ok": false,
+          "expected": "state_machine_critical",
+          "actual": "gemma_agent"
+        },
+        {
+          "name": "tts:平躺",
+          "ok": false,
+          "expected": "平躺",
+          "actual": "开始急救流程，请保持冷静。"
+        },
+        {
+          "name": "tts:胸口中央",
+          "ok": false,
+          "expected": "胸口中央",
+          "actual": "开始急救流程，请保持冷静。"
+        },
+        {
+          "name": "gemma_skipped",
+          "ok": false,
+          "expected": "true",
+          "actual": "false"
+        },
+        {
+          "name": "latency",
+          "ok": false,
+          "expected": "<=12000ms",
+          "actual": "22546ms"
+        }
+      ],
+      "ok": false
+    },
+    {
+      "index": 6,
+      "id": "cpr_start",
+      "label": "Start CPR loop",
+      "spoken_text": "开始按压",
+      "ideal_answer": "现在开始胸外按压，跟着震动快速有力地按。",
+      "expected": {
+        "stage": "S7_CPR_LOOP",
+        "intent": "start_cpr_loop",
+        "eventSource": "vision_cpr",
+        "ttsIncludes": [
+          "开始胸外按压",
+          "震动"
+        ],
+        "guidanceSourceAny": [
+          "state_machine_critical"
+        ],
+        "gemmaSkipped": true,
+        "maxTotalMs": 12000
+      },
+      "actual": {
+        "ok": true,
+        "transcript": "开始按压",
+        "sttSource": "text_input",
+        "sttIntent": "continue_cpr",
+        "stage": "S0_INIT",
+        "intent": "start_recording",
+        "eventSource": "vision_cpr",
+        "eventType": "cpr_quality_update",
+        "guidanceSource": "gemma_agent",
+        "gemmaSkipped": false,
+        "gemmaSkipReason": null,
+        "gemmaFallback": false,
+        "gemmaFallbackReason": null,
+        "gemmaPatchIntent": "start_recording",
+        "ttsProvider": "sherpa-onnx",
+        "ttsOk": true,
+        "ttsText": "开始进行胸外按压。",
+        "timings": {
+          "stt_ms": 0,
+          "agent_pipeline_ms": 0,
+          "gemma_ms": 18606,
+          "tts_ms": 2966,
+          "total_ms": 21572
+        },
+        "totalMs": 21572,
+        "elapsedMs": 21573
+      },
+      "checks": [
+        {
+          "name": "stage",
+          "ok": false,
+          "expected": "S7_CPR_LOOP",
+          "actual": "S0_INIT"
+        },
+        {
+          "name": "intent",
+          "ok": false,
+          "expected": "start_cpr_loop",
+          "actual": "start_recording"
+        },
+        {
+          "name": "event_source",
+          "ok": true,
+          "expected": "vision_cpr",
+          "actual": "vision_cpr"
+        },
+        {
+          "name": "guidance_source",
+          "ok": false,
+          "expected": "state_machine_critical",
+          "actual": "gemma_agent"
+        },
+        {
+          "name": "tts:开始胸外按压",
+          "ok": false,
+          "expected": "开始胸外按压",
+          "actual": "开始进行胸外按压。"
+        },
+        {
+          "name": "tts:震动",
+          "ok": false,
+          "expected": "震动",
+          "actual": "开始进行胸外按压。"
+        },
+        {
+          "name": "gemma_skipped",
+          "ok": false,
+          "expected": "true",
+          "actual": "false"
+        },
+        {
+          "name": "latency",
+          "ok": false,
+          "expected": "<=12000ms",
+          "actual": "21572ms"
+        }
+      ],
+      "ok": false
+    },
+    {
+      "index": 7,
+      "id": "hand_left",
+      "label": "Correct hand position",
+      "spoken_text": "",
+      "ideal_answer": "位置向右一点。",
+      "expected": {
+        "stage": "S7_CPR_LOOP",
+        "intent": "correct_hand_position",
+        "eventSource": "vision_cpr",
+        "ttsIncludes": [
+          "向右一点"
+        ],
+        "guidanceSourceAny": [
+          "state_machine_critical"
+        ],
+        "gemmaSkipped": true,
+        "maxTotalMs": 12000
+      },
+      "actual": {
+        "ok": true,
+        "transcript": "",
+        "sttSource": "text_input",
+        "sttIntent": null,
+        "stage": "S0_INIT",
+        "intent": "fallback_template",
+        "eventSource": "vision_cpr",
+        "eventType": "cpr_quality_update",
+        "guidanceSource": "state_machine",
+        "gemmaSkipped": true,
+        "gemmaSkipReason": "no_user_input",
+        "gemmaFallback": false,
+        "gemmaFallbackReason": null,
+        "gemmaPatchIntent": null,
+        "ttsProvider": "sherpa-onnx",
+        "ttsOk": true,
+        "ttsText": "我会继续给你一步一步提示。",
+        "timings": {
+          "stt_ms": 0,
+          "agent_pipeline_ms": 1,
+          "tts_ms": 3121,
+          "total_ms": 3122
+        },
+        "totalMs": 3122,
+        "elapsedMs": 3122
+      },
+      "checks": [
+        {
+          "name": "stage",
+          "ok": false,
+          "expected": "S7_CPR_LOOP",
+          "actual": "S0_INIT"
+        },
+        {
+          "name": "intent",
+          "ok": false,
+          "expected": "correct_hand_position",
+          "actual": "fallback_template"
+        },
+        {
+          "name": "event_source",
+          "ok": true,
+          "expected": "vision_cpr",
+          "actual": "vision_cpr"
+        },
+        {
+          "name": "guidance_source",
+          "ok": false,
+          "expected": "state_machine_critical",
+          "actual": "state_machine"
+        },
+        {
+          "name": "tts:向右一点",
+          "ok": false,
+          "expected": "向右一点",
+          "actual": "我会继续给你一步一步提示。"
+        },
+        {
+          "name": "gemma_skipped",
+          "ok": true,
+          "expected": "true",
+          "actual": "true"
+        },
+        {
+          "name": "latency",
+          "ok": true,
+          "expected": "<=12000ms",
+          "actual": "3122ms"
+        }
+      ],
+      "ok": false
+    },
+    {
+      "index": 8,
+      "id": "rate_low",
+      "label": "Correct low compression rate",
+      "spoken_text": "",
+      "ideal_answer": "再快一点，跟着震动按。",
+      "expected": {
+        "stage": "S7_CPR_LOOP",
+        "intent": "correct_compression_rate",
+        "eventSource": "vision_cpr",
+        "ttsIncludes": [
+          "快一点",
+          "震动"
+        ],
+        "guidanceSourceAny": [
+          "state_machine_critical"
+        ],
+        "gemmaSkipped": true,
+        "maxTotalMs": 12000
+      },
+      "actual": {
+        "ok": true,
+        "transcript": "",
+        "sttSource": "text_input",
+        "sttIntent": null,
+        "stage": "S0_INIT",
+        "intent": "fallback_template",
+        "eventSource": "vision_cpr",
+        "eventType": "cpr_quality_update",
+        "guidanceSource": "state_machine",
+        "gemmaSkipped": true,
+        "gemmaSkipReason": "no_user_input",
+        "gemmaFallback": false,
+        "gemmaFallbackReason": null,
+        "gemmaPatchIntent": null,
+        "ttsProvider": "sherpa-onnx",
+        "ttsOk": true,
+        "ttsText": "我会继续给你一步一步提示。",
+        "timings": {
+          "stt_ms": 1,
+          "agent_pipeline_ms": 1,
+          "tts_ms": 3152,
+          "total_ms": 3154
+        },
+        "totalMs": 3154,
+        "elapsedMs": 3154
+      },
+      "checks": [
+        {
+          "name": "stage",
+          "ok": false,
+          "expected": "S7_CPR_LOOP",
+          "actual": "S0_INIT"
+        },
+        {
+          "name": "intent",
+          "ok": false,
+          "expected": "correct_compression_rate",
+          "actual": "fallback_template"
+        },
+        {
+          "name": "event_source",
+          "ok": true,
+          "expected": "vision_cpr",
+          "actual": "vision_cpr"
+        },
+        {
+          "name": "guidance_source",
+          "ok": false,
+          "expected": "state_machine_critical",
+          "actual": "state_machine"
+        },
+        {
+          "name": "tts:快一点",
+          "ok": false,
+          "expected": "快一点",
+          "actual": "我会继续给你一步一步提示。"
+        },
+        {
+          "name": "tts:震动",
+          "ok": false,
+          "expected": "震动",
+          "actual": "我会继续给你一步一步提示。"
+        },
+        {
+          "name": "gemma_skipped",
+          "ok": true,
+          "expected": "true",
+          "actual": "true"
+        },
+        {
+          "name": "latency",
+          "ok": true,
+          "expected": "<=12000ms",
+          "actual": "3154ms"
+        }
+      ],
+      "ok": false
+    },
+    {
+      "index": 9,
+      "id": "arm_bent",
+      "label": "Correct arm posture",
+      "spoken_text": "",
+      "ideal_answer": "手臂伸直，用上半身向下压。",
+      "expected": {
+        "stage": "S7_CPR_LOOP",
+        "intent": "correct_arm_posture",
+        "eventSource": "vision_cpr",
+        "ttsIncludes": [
+          "手臂伸直",
+          "下压"
+        ],
+        "guidanceSourceAny": [
+          "state_machine_critical"
+        ],
+        "gemmaSkipped": true,
+        "maxTotalMs": 12000
+      },
+      "actual": {
+        "ok": true,
+        "transcript": "",
+        "sttSource": "text_input",
+        "sttIntent": null,
+        "stage": "S0_INIT",
+        "intent": "fallback_template",
+        "eventSource": "vision_cpr",
+        "eventType": "cpr_quality_update",
+        "guidanceSource": "state_machine",
+        "gemmaSkipped": true,
+        "gemmaSkipReason": "no_user_input",
+        "gemmaFallback": false,
+        "gemmaFallbackReason": null,
+        "gemmaPatchIntent": null,
+        "ttsProvider": "sherpa-onnx",
+        "ttsOk": true,
+        "ttsText": "我会继续给你一步一步提示。",
+        "timings": {
+          "stt_ms": 0,
+          "agent_pipeline_ms": 1,
+          "tts_ms": 3195,
+          "total_ms": 3196
+        },
+        "totalMs": 3196,
+        "elapsedMs": 3197
+      },
+      "checks": [
+        {
+          "name": "stage",
+          "ok": false,
+          "expected": "S7_CPR_LOOP",
+          "actual": "S0_INIT"
+        },
+        {
+          "name": "intent",
+          "ok": false,
+          "expected": "correct_arm_posture",
+          "actual": "fallback_template"
+        },
+        {
+          "name": "event_source",
+          "ok": true,
+          "expected": "vision_cpr",
+          "actual": "vision_cpr"
+        },
+        {
+          "name": "guidance_source",
+          "ok": false,
+          "expected": "state_machine_critical",
+          "actual": "state_machine"
+        },
+        {
+          "name": "tts:手臂伸直",
+          "ok": false,
+          "expected": "手臂伸直",
+          "actual": "我会继续给你一步一步提示。"
+        },
+        {
+          "name": "tts:下压",
+          "ok": false,
+          "expected": "下压",
+          "actual": "我会继续给你一步一步提示。"
+        },
+        {
+          "name": "gemma_skipped",
+          "ok": true,
+          "expected": "true",
+          "actual": "true"
+        },
+        {
+          "name": "latency",
+          "ok": true,
+          "expected": "<=12000ms",
+          "actual": "3196ms"
+        }
+      ],
+      "ok": false
+    },
+    {
+      "index": 10,
+      "id": "interrupted",
+      "label": "Correct CPR interruption",
+      "spoken_text": "",
+      "ideal_answer": "不要停，继续按压。",
+      "expected": {
+        "stage": "S7_CPR_LOOP",
+        "intent": "correct_compression_interruption",
+        "eventSource": "vision_cpr",
+        "ttsIncludes": [
+          "不要停",
+          "继续按压"
+        ],
+        "guidanceSourceAny": [
+          "state_machine_critical"
+        ],
+        "gemmaSkipped": true,
+        "maxTotalMs": 12000
+      },
+      "actual": {
+        "ok": true,
+        "transcript": "",
+        "sttSource": "text_input",
+        "sttIntent": null,
+        "stage": "S0_INIT",
+        "intent": "fallback_template",
+        "eventSource": "vision_cpr",
+        "eventType": "cpr_quality_update",
+        "guidanceSource": "state_machine",
+        "gemmaSkipped": true,
+        "gemmaSkipReason": "no_user_input",
+        "gemmaFallback": false,
+        "gemmaFallbackReason": null,
+        "gemmaPatchIntent": null,
+        "ttsProvider": "sherpa-onnx",
+        "ttsOk": true,
+        "ttsText": "我会继续给你一步一步提示。",
+        "timings": {
+          "stt_ms": 0,
+          "agent_pipeline_ms": 1,
+          "tts_ms": 3155,
+          "total_ms": 3156
+        },
+        "totalMs": 3156,
+        "elapsedMs": 3156
+      },
+      "checks": [
+        {
+          "name": "stage",
+          "ok": false,
+          "expected": "S7_CPR_LOOP",
+          "actual": "S0_INIT"
+        },
+        {
+          "name": "intent",
+          "ok": false,
+          "expected": "correct_compression_interruption",
+          "actual": "fallback_template"
+        },
+        {
+          "name": "event_source",
+          "ok": true,
+          "expected": "vision_cpr",
+          "actual": "vision_cpr"
+        },
+        {
+          "name": "guidance_source",
+          "ok": false,
+          "expected": "state_machine_critical",
+          "actual": "state_machine"
+        },
+        {
+          "name": "tts:不要停",
+          "ok": false,
+          "expected": "不要停",
+          "actual": "我会继续给你一步一步提示。"
+        },
+        {
+          "name": "tts:继续按压",
+          "ok": false,
+          "expected": "继续按压",
+          "actual": "我会继续给你一步一步提示。"
+        },
+        {
+          "name": "gemma_skipped",
+          "ok": true,
+          "expected": "true",
+          "actual": "true"
+        },
+        {
+          "name": "latency",
+          "ok": true,
+          "expected": "<=12000ms",
+          "actual": "3156ms"
+        }
+      ],
+      "ok": false
+    },
+    {
+      "index": 11,
+      "id": "quality_good",
+      "label": "Continue good CPR rhythm",
+      "spoken_text": "",
+      "ideal_answer": "继续保持这个节奏。",
+      "expected": {
+        "stage": "S7_CPR_LOOP",
+        "intent": "continue_cpr_loop",
+        "eventSource": "vision_cpr",
+        "ttsIncludes": [
+          "继续保持",
+          "节奏"
+        ],
+        "guidanceSourceAny": [
+          "state_machine"
+        ],
+        "gemmaSkipped": true,
+        "maxTotalMs": 12000
+      },
+      "actual": {
+        "ok": true,
+        "transcript": "",
+        "sttSource": "text_input",
+        "sttIntent": null,
+        "stage": "S0_INIT",
+        "intent": "fallback_template",
+        "eventSource": "vision_cpr",
+        "eventType": "cpr_quality_update",
+        "guidanceSource": "state_machine",
+        "gemmaSkipped": true,
+        "gemmaSkipReason": "no_user_input",
+        "gemmaFallback": false,
+        "gemmaFallbackReason": null,
+        "gemmaPatchIntent": null,
+        "ttsProvider": "sherpa-onnx",
+        "ttsOk": true,
+        "ttsText": "我会继续给你一步一步提示。",
+        "timings": {
+          "stt_ms": 0,
+          "agent_pipeline_ms": 1,
+          "tts_ms": 3141,
+          "total_ms": 3142
+        },
+        "totalMs": 3142,
+        "elapsedMs": 3142
+      },
+      "checks": [
+        {
+          "name": "stage",
+          "ok": false,
+          "expected": "S7_CPR_LOOP",
+          "actual": "S0_INIT"
+        },
+        {
+          "name": "intent",
+          "ok": false,
+          "expected": "continue_cpr_loop",
+          "actual": "fallback_template"
+        },
+        {
+          "name": "event_source",
+          "ok": true,
+          "expected": "vision_cpr",
+          "actual": "vision_cpr"
+        },
+        {
+          "name": "guidance_source",
+          "ok": true,
+          "expected": "state_machine",
+          "actual": "state_machine"
+        },
+        {
+          "name": "tts:继续保持",
+          "ok": false,
+          "expected": "继续保持",
+          "actual": "我会继续给你一步一步提示。"
+        },
+        {
+          "name": "tts:节奏",
+          "ok": false,
+          "expected": "节奏",
+          "actual": "我会继续给你一步一步提示。"
+        },
+        {
+          "name": "gemma_skipped",
+          "ok": true,
+          "expected": "true",
+          "actual": "true"
+        },
+        {
+          "name": "latency",
+          "ok": true,
+          "expected": "<=12000ms",
+          "actual": "3142ms"
+        }
+      ],
+      "ok": false
+    },
+    {
+      "index": 12,
+      "id": "fatigue",
+      "label": "Assist rescuer fatigue",
+      "spoken_text": "",
+      "ideal_answer": "如果旁边有人，请准备换手。",
+      "expected": {
+        "stage": "S8_ASSISTANCE",
+        "intent": "assist_rescuer_fatigue",
+        "eventSource": "vision_rescuer",
+        "ttsIncludes": [
+          "准备换手"
+        ],
+        "guidanceSourceAny": [
+          "state_machine"
+        ],
+        "gemmaSkipped": true,
+        "maxTotalMs": 12000
+      },
+      "actual": {
+        "ok": true,
+        "transcript": "",
+        "sttSource": "text_input",
+        "sttIntent": null,
+        "stage": "S0_INIT",
+        "intent": "fallback_template",
+        "eventSource": "vision_rescuer",
+        "eventType": "rescuer_state_update",
+        "guidanceSource": "state_machine",
+        "gemmaSkipped": true,
+        "gemmaSkipReason": "no_user_input",
+        "gemmaFallback": false,
+        "gemmaFallbackReason": null,
+        "gemmaPatchIntent": null,
+        "ttsProvider": "sherpa-onnx",
+        "ttsOk": true,
+        "ttsText": "我会继续给你一步一步提示。",
+        "timings": {
+          "stt_ms": 0,
+          "agent_pipeline_ms": 2,
+          "tts_ms": 3104,
+          "total_ms": 3106
+        },
+        "totalMs": 3106,
+        "elapsedMs": 3106
+      },
+      "checks": [
+        {
+          "name": "stage",
+          "ok": false,
+          "expected": "S8_ASSISTANCE",
+          "actual": "S0_INIT"
+        },
+        {
+          "name": "intent",
+          "ok": false,
+          "expected": "assist_rescuer_fatigue",
+          "actual": "fallback_template"
+        },
+        {
+          "name": "event_source",
+          "ok": true,
+          "expected": "vision_rescuer",
+          "actual": "vision_rescuer"
+        },
+        {
+          "name": "guidance_source",
+          "ok": true,
+          "expected": "state_machine",
+          "actual": "state_machine"
+        },
+        {
+          "name": "tts:准备换手",
+          "ok": false,
+          "expected": "准备换手",
+          "actual": "我会继续给你一步一步提示。"
+        },
+        {
+          "name": "gemma_skipped",
+          "ok": true,
+          "expected": "true",
+          "actual": "true"
+        },
+        {
+          "name": "latency",
+          "ok": true,
+          "expected": "<=12000ms",
+          "actual": "3106ms"
+        }
+      ],
+      "ok": false
+    },
+    {
+      "index": 13,
+      "id": "aed_arrived",
+      "label": "Assist AED arrival",
+      "spoken_text": "",
+      "ideal_answer": "有人取到 AED 时，你继续按压，听设备提示。",
+      "expected": {
+        "stage": "S8_ASSISTANCE",
+        "intent": "assist_aed",
+        "eventSource": "vision_patient",
+        "ttsIncludes": [
+          "AED",
+          "继续按压"
+        ],
+        "guidanceSourceAny": [
+          "state_machine"
+        ],
+        "gemmaSkipped": true,
+        "maxTotalMs": 12000
+      },
+      "actual": {
+        "ok": true,
+        "transcript": "",
+        "sttSource": "text_input",
+        "sttIntent": null,
+        "stage": "S0_INIT",
+        "intent": "fallback_template",
+        "eventSource": "vision_patient",
+        "eventType": "patient_state_update",
+        "guidanceSource": "state_machine",
+        "gemmaSkipped": true,
+        "gemmaSkipReason": "no_user_input",
+        "gemmaFallback": false,
+        "gemmaFallbackReason": null,
+        "gemmaPatchIntent": null,
+        "ttsProvider": "sherpa-onnx",
+        "ttsOk": true,
+        "ttsText": "我会继续给你一步一步提示。",
+        "timings": {
+          "stt_ms": 0,
+          "agent_pipeline_ms": 1,
+          "tts_ms": 3039,
+          "total_ms": 3040
+        },
+        "totalMs": 3040,
+        "elapsedMs": 3040
+      },
+      "checks": [
+        {
+          "name": "stage",
+          "ok": false,
+          "expected": "S8_ASSISTANCE",
+          "actual": "S0_INIT"
+        },
+        {
+          "name": "intent",
+          "ok": false,
+          "expected": "assist_aed",
+          "actual": "fallback_template"
+        },
+        {
+          "name": "event_source",
+          "ok": true,
+          "expected": "vision_patient",
+          "actual": "vision_patient"
+        },
+        {
+          "name": "guidance_source",
+          "ok": true,
+          "expected": "state_machine",
+          "actual": "state_machine"
+        },
+        {
+          "name": "tts:AED",
+          "ok": false,
+          "expected": "AED",
+          "actual": "我会继续给你一步一步提示。"
+        },
+        {
+          "name": "tts:继续按压",
+          "ok": false,
+          "expected": "继续按压",
+          "actual": "我会继续给你一步一步提示。"
+        },
+        {
+          "name": "gemma_skipped",
+          "ok": true,
+          "expected": "true",
+          "actual": "true"
+        },
+        {
+          "name": "latency",
+          "ok": true,
+          "expected": "<=12000ms",
+          "actual": "3040ms"
+        }
+      ],
+      "ok": false
+    },
+    {
+      "index": 14,
+      "id": "back_to_cpr",
+      "label": "Return to CPR loop",
+      "spoken_text": "",
+      "ideal_answer": "继续保持这个节奏。",
+      "expected": {
+        "stage": "S7_CPR_LOOP",
+        "intent": "continue_cpr_loop",
+        "eventSource": "vision_cpr",
+        "ttsIncludes": [
+          "继续保持",
+          "节奏"
+        ],
+        "guidanceSourceAny": [
+          "state_machine"
+        ],
+        "gemmaSkipped": true,
+        "maxTotalMs": 12000
+      },
+      "actual": {
+        "ok": true,
+        "transcript": "",
+        "sttSource": "text_input",
+        "sttIntent": null,
+        "stage": "S0_INIT",
+        "intent": "fallback_template",
+        "eventSource": "vision_cpr",
+        "eventType": "cpr_quality_update",
+        "guidanceSource": "state_machine",
+        "gemmaSkipped": true,
+        "gemmaSkipReason": "no_user_input",
+        "gemmaFallback": false,
+        "gemmaFallbackReason": null,
+        "gemmaPatchIntent": null,
+        "ttsProvider": "sherpa-onnx",
+        "ttsOk": true,
+        "ttsText": "我会继续给你一步一步提示。",
+        "timings": {
+          "stt_ms": 0,
+          "agent_pipeline_ms": 1,
+          "tts_ms": 3002,
+          "total_ms": 3003
+        },
+        "totalMs": 3003,
+        "elapsedMs": 3003
+      },
+      "checks": [
+        {
+          "name": "stage",
+          "ok": false,
+          "expected": "S7_CPR_LOOP",
+          "actual": "S0_INIT"
+        },
+        {
+          "name": "intent",
+          "ok": false,
+          "expected": "continue_cpr_loop",
+          "actual": "fallback_template"
+        },
+        {
+          "name": "event_source",
+          "ok": true,
+          "expected": "vision_cpr",
+          "actual": "vision_cpr"
+        },
+        {
+          "name": "guidance_source",
+          "ok": true,
+          "expected": "state_machine",
+          "actual": "state_machine"
+        },
+        {
+          "name": "tts:继续保持",
+          "ok": false,
+          "expected": "继续保持",
+          "actual": "我会继续给你一步一步提示。"
+        },
+        {
+          "name": "tts:节奏",
+          "ok": false,
+          "expected": "节奏",
+          "actual": "我会继续给你一步一步提示。"
+        },
+        {
+          "name": "gemma_skipped",
+          "ok": true,
+          "expected": "true",
+          "actual": "true"
+        },
+        {
+          "name": "latency",
+          "ok": true,
+          "expected": "<=12000ms",
+          "actual": "3003ms"
+        }
+      ],
+      "ok": false
+    },
+    {
+      "index": 15,
+      "id": "ems_arrived",
+      "label": "Generate handover report",
+      "spoken_text": "急救员到了",
+      "ideal_answer": "急救员到达，我正在生成交接报告。",
+      "expected": {
+        "stage": "S9_HANDOVER",
+        "intent": "generate_handover_report",
+        "eventSource": "vision_patient",
+        "ttsIncludes": [
+          "交接报告"
+        ],
+        "guidanceSourceAny": [
+          "state_machine_critical"
+        ],
+        "gemmaSkipped": true,
+        "maxTotalMs": 12000
+      },
+      "actual": {
+        "ok": true,
+        "transcript": "急救员到了",
+        "sttSource": "text_input",
+        "sttIntent": "paramedics_arrived",
+        "stage": "S9_HANDOVER",
+        "intent": "handover_summary_patch",
+        "eventSource": "vision_patient",
+        "eventType": "handover_requested",
+        "guidanceSource": "gemma_agent",
+        "gemmaSkipped": false,
+        "gemmaSkipReason": null,
+        "gemmaFallback": false,
+        "gemmaFallbackReason": null,
+        "gemmaPatchIntent": "handover_summary_patch",
+        "ttsProvider": "sherpa-onnx",
+        "ttsOk": true,
+        "ttsText": "急救员到达后，我会生成交接报告。",
+        "timings": {
+          "stt_ms": 0,
+          "agent_pipeline_ms": 2,
+          "gemma_ms": 18611,
+          "tts_ms": 3266,
+          "total_ms": 21879
+        },
+        "totalMs": 21879,
+        "elapsedMs": 21879
+      },
+      "checks": [
+        {
+          "name": "stage",
+          "ok": true,
+          "expected": "S9_HANDOVER",
+          "actual": "S9_HANDOVER"
+        },
+        {
+          "name": "intent",
+          "ok": false,
+          "expected": "generate_handover_report",
+          "actual": "handover_summary_patch"
+        },
+        {
+          "name": "event_source",
+          "ok": true,
+          "expected": "vision_patient",
+          "actual": "vision_patient"
+        },
+        {
+          "name": "guidance_source",
+          "ok": false,
+          "expected": "state_machine_critical",
+          "actual": "gemma_agent"
+        },
+        {
+          "name": "tts:交接报告",
+          "ok": true,
+          "expected": "交接报告",
+          "actual": "急救员到达后，我会生成交接报告。"
+        },
+        {
+          "name": "gemma_skipped",
+          "ok": false,
+          "expected": "true",
+          "actual": "false"
+        },
+        {
+          "name": "latency",
+          "ok": false,
+          "expected": "<=12000ms",
+          "actual": "21879ms"
+        }
+      ],
+      "ok": false
+    },
+    {
+      "index": 16,
+      "id": "report_ready",
+      "label": "Explain report ready",
+      "spoken_text": "",
+      "ideal_answer": "交接报告已生成，视频记录已本地保存。",
+      "expected": {
+        "stage": "S9_HANDOVER",
+        "intent": "explain_handover",
+        "eventSource": "device",
+        "ttsIncludes": [
+          "报告已生成",
+          "本地保存"
+        ],
+        "guidanceSourceAny": [
+          "state_machine"
+        ],
+        "gemmaSkipped": true,
+        "maxTotalMs": 12000
+      },
+      "actual": {
+        "ok": true,
+        "transcript": "",
+        "sttSource": "text_input",
+        "sttIntent": null,
+        "stage": "S9_HANDOVER",
+        "intent": "fallback_template",
+        "eventSource": "device",
+        "eventType": "tool_result",
+        "guidanceSource": "state_machine",
+        "gemmaSkipped": true,
+        "gemmaSkipReason": "no_user_input",
+        "gemmaFallback": false,
+        "gemmaFallbackReason": null,
+        "gemmaPatchIntent": null,
+        "ttsProvider": "sherpa-onnx",
+        "ttsOk": true,
+        "ttsText": "我会继续给你一步一步提示。",
+        "timings": {
+          "stt_ms": 0,
+          "agent_pipeline_ms": 2,
+          "tts_ms": 3100,
+          "total_ms": 3102
+        },
+        "totalMs": 3102,
+        "elapsedMs": 3102
+      },
+      "checks": [
+        {
+          "name": "stage",
+          "ok": true,
+          "expected": "S9_HANDOVER",
+          "actual": "S9_HANDOVER"
+        },
+        {
+          "name": "intent",
+          "ok": false,
+          "expected": "explain_handover",
+          "actual": "fallback_template"
+        },
+        {
+          "name": "event_source",
+          "ok": true,
+          "expected": "device",
+          "actual": "device"
+        },
+        {
+          "name": "guidance_source",
+          "ok": true,
+          "expected": "state_machine",
+          "actual": "state_machine"
+        },
+        {
+          "name": "tts:报告已生成",
+          "ok": false,
+          "expected": "报告已生成",
+          "actual": "我会继续给你一步一步提示。"
+        },
+        {
+          "name": "tts:本地保存",
+          "ok": false,
+          "expected": "本地保存",
+          "actual": "我会继续给你一步一步提示。"
+        },
+        {
+          "name": "gemma_skipped",
+          "ok": true,
+          "expected": "true",
+          "actual": "true"
+        },
+        {
+          "name": "latency",
+          "ok": true,
+          "expected": "<=12000ms",
+          "actual": "3102ms"
+        }
+      ],
+      "ok": false
+    }
+  ]
+}

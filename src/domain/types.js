@@ -175,6 +175,7 @@ export function createInitialSessionState(options = {}) {
       recording_status: options.recordingStatus ?? RecordingStatus.NOT_STARTED,
       handover_generated: false,
     },
+    location: options.location ?? null,
     cpr_state: {
       started: false,
       started_at: null,
@@ -295,4 +296,3 @@ function isPlainObject(value) {
     Object.getPrototypeOf(value) === Object.prototype
   );
 }
-

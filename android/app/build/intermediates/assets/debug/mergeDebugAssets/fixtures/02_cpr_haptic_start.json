@@ -1,0 +1,67 @@
+{
+  "schema_version": "guidance_action.v0.1",
+  "action_id": "act_fixture_cpr_haptic_start",
+  "session_id": "sess_android_fixture",
+  "timestamp": "2026-06-03T20:30:10+08:00",
+  "stage": "S7_CPR_LOOP",
+  "intent": "start_cpr_loop",
+  "priority": "critical",
+  "source": "state_machine",
+  "reason_codes": [
+    "unresponsive",
+    "no_normal_breathing",
+    "cpr_ready"
+  ],
+  "ttl_ms": 5000,
+  "throttle_key": "cpr.metronome",
+  "min_interval_ms": 0,
+  "tts": {
+    "text": "现在开始胸外按压，跟着震动快速有力地按。",
+    "tone": "calm_firm",
+    "speed": "normal",
+    "interrupt_policy": "interrupt_lower_priority"
+  },
+  "ui": {
+    "main_text": "开始按压",
+    "secondary_text": "目标 100-120 次/分钟",
+    "status_tags": [
+      "快速有力",
+      "跟着震动"
+    ],
+    "quality_score": 32,
+    "primary_button": null
+  },
+  "haptic": {
+    "enabled": true,
+    "pattern": "metronome",
+    "bpm": 110
+  },
+  "visual_overlay": {
+    "mode": "prepare_cpr_position",
+    "highlight_target": "chest_center"
+  },
+  "tool_actions": [
+    {
+      "type": "start_haptic_metronome",
+      "bpm": 110,
+      "requires_user_confirmation": false
+    }
+  ],
+  "log_event": {
+    "schema_version": "log_event.v0.1",
+    "log_event_id": "log_fixture_cpr_haptic_start",
+    "session_id": "sess_android_fixture",
+    "timestamp": "2026-06-03T20:30:10+08:00",
+    "stage": "S7_CPR_LOOP",
+    "intent": "start_cpr_loop",
+    "source": "state_machine",
+    "type": "cpr_haptic",
+    "detail": "start_metronome_110_bpm",
+    "reason_codes": [
+      "cpr_ready"
+    ],
+    "metadata": {
+      "fixture": true
+    }
+  }
+}

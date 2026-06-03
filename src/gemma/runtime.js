@@ -117,9 +117,10 @@ export function buildLiteRtLmArgs({
   messages,
   supportsMessages = false,
   promptArg = "--prompt",
+  commandPrefixArgs = [],
   extraArgs = []
 } = {}) {
-  const args = ["run"];
+  const args = [...commandPrefixArgs, "run"];
 
   if (modelFile) {
     args.push(modelFile);

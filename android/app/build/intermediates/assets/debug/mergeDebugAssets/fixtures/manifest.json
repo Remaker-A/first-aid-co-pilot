@@ -1,0 +1,122 @@
+{
+  "schema_version": "android_guidance_fixtures.v0.1",
+  "session_id": "sess_android_fixture",
+  "description": "GuidanceAction fixtures for Android adapter bring-up. Android consumes these actions after Agent validation; it does not decide medical flow.",
+  "fixtures": [
+    {
+      "file": "01_ui_tts_response_check.json",
+      "covers": [
+        "ui",
+        "tts"
+      ],
+      "expected_android_channels": [
+        "ui",
+        "tts",
+        "log"
+      ]
+    },
+    {
+      "file": "02_cpr_haptic_start.json",
+      "covers": [
+        "ui",
+        "tts",
+        "haptic_start",
+        "visual_overlay"
+      ],
+      "expected_android_channels": [
+        "ui",
+        "tts",
+        "haptic",
+        "log"
+      ]
+    },
+    {
+      "file": "03_cpr_haptic_update.json",
+      "covers": [
+        "ui",
+        "tts",
+        "haptic_update",
+        "visual_overlay"
+      ],
+      "expected_android_channels": [
+        "ui",
+        "tts",
+        "haptic",
+        "log"
+      ]
+    },
+    {
+      "file": "04_cpr_haptic_stop.json",
+      "covers": [
+        "ui",
+        "tts",
+        "haptic_stop"
+      ],
+      "expected_android_channels": [
+        "ui",
+        "tts",
+        "haptic",
+        "log"
+      ]
+    },
+    {
+      "file": "05_critical_emergency_call_mock.json",
+      "covers": [
+        "critical",
+        "mock_emergency_call",
+        "recording_mock",
+        "gps_mock"
+      ],
+      "expected_android_channels": [
+        "ui",
+        "tts",
+        "tool",
+        "log"
+      ]
+    },
+    {
+      "file": "06_share_video_unconfirmed.json",
+      "covers": [
+        "share_video",
+        "requires_confirmation",
+        "blocked"
+      ],
+      "expected_android_channels": [
+        "ui",
+        "tts",
+        "tool_blocked",
+        "log"
+      ]
+    },
+    {
+      "file": "07_share_video_confirmed.json",
+      "covers": [
+        "share_video",
+        "confirmed",
+        "execute"
+      ],
+      "expected_android_channels": [
+        "ui",
+        "tts",
+        "tool",
+        "log"
+      ]
+    },
+    {
+      "file": "08_unknown_intent_fallback.json",
+      "covers": [
+        "unknown_intent",
+        "safe_ui_fallback"
+      ],
+      "expected_android_channels": [
+        "ui_fallback",
+        "log"
+      ]
+    }
+  ],
+  "safety_notes": [
+    "Demo default must not automatically dial real 120.",
+    "Sharing, external sending, uploading, and deleting require explicit user confirmation.",
+    "Mock fixture success is not strict real-device readiness."
+  ]
+}

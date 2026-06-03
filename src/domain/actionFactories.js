@@ -98,9 +98,34 @@ export function createEmergencyCallToolAction(input = {}) {
   return {
     type: "emergency_call",
     target: input.target ?? "120",
-    mode: input.mode ?? "auto_with_cancel_window",
-    cancel_window_seconds: input.cancelWindowSeconds ?? 3,
+    mode: input.mode ?? "demo_configured",
+    demo_modes: input.demoModes ?? input.demo_modes ?? [
+      "test_auto_call",
+      "accessibility_click_120",
+      "dial_only_fallback",
+    ],
+    cancel_window_seconds: input.cancelWindowSeconds ?? input.cancel_window_seconds ?? 3,
     requires_user_confirmation: input.requiresUserConfirmation ?? false,
+    speakerphone: input.speakerphone ?? true,
+    visible_script_required: input.visibleScriptRequired ?? input.visible_script_required ?? true,
+    briefing: {
+      mode: input.briefing?.mode ?? "speaker_tts_best_effort",
+      repeat_interval_seconds:
+        input.briefing?.repeatIntervalSeconds ??
+        input.briefing?.repeat_interval_seconds ??
+        12,
+      visible_script_required:
+        input.briefing?.visibleScriptRequired ??
+        input.briefing?.visible_script_required ??
+        true,
+    },
+    audit: {
+      demo_hack: input.audit?.demoHack ?? input.audit?.demo_hack ?? true,
+      real_emergency_test_requires_manual_approval:
+        input.audit?.realEmergencyTestRequiresManualApproval ??
+        input.audit?.real_emergency_test_requires_manual_approval ??
+        true,
+    },
     demo_safe: input.demoSafe ?? false,
   };
 }

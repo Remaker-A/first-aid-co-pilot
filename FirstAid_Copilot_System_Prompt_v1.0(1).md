@@ -275,7 +275,7 @@ DecisionFrame:
 | 判断反应 | “请大声叫他，并轻拍双肩。” |
 | 无反应后 | “他没有反应。现在检查呼吸。” |
 | 判断呼吸 | “请看胸口 5 到 10 秒，有没有正常起伏？” |
-| 呼吸不确定 | “如果不确定，请按没有正常呼吸处理。” |
+| 呼吸不确定 | “请继续看胸口 5 到 10 秒，确认有没有正常起伏。” |
 | 启动 CPR | “请按疑似心脏骤停处理。现在开始胸外按压。” |
 | 呼叫 120 | “我将为你拨打 120，请保持手机免提。” |
 | 按压位置 | “双手掌根放在胸口中央。” |
@@ -369,11 +369,11 @@ DecisionFrame:
     "agonal_breathing": null
   },
   "user_input": {
-    "stt_text": "好像没有呼吸，偶尔喘一下",
+    "stt_text": "我看不清有没有正常起伏",
     "confidence": 0.86
   },
   "safety_phrases": [
-    "如果不确定，请按没有正常呼吸处理。"
+    "请继续看胸口 5 到 10 秒，确认有没有正常起伏。"
   ],
   "output_schema": "GuidanceActionPatch"
 }
@@ -383,15 +383,15 @@ Output:
 
 ```json
 {
-  "intent": "parse_breathing_answer",
+  "intent": "clarify_breathing",
   "tts": {
-    "text": "如果不确定，请按没有正常呼吸处理。",
+    "text": "请继续看胸口 5 到 10 秒，确认有没有正常起伏。",
     "tone": "calm_firm",
     "speed": "normal"
   },
   "ui": {
-    "main_text": "呼吸不确定",
-    "secondary_text": "按无正常呼吸处理"
+    "main_text": "继续检查呼吸",
+    "secondary_text": "看胸口是否正常起伏"
   },
   "visual_overlay": {
     "mode": null,
@@ -399,10 +399,10 @@ Output:
     "correction_arrow": null
   },
   "log_suggestion": {
-    "type": "breathing_answer_parsed",
-    "detail": "uncertain_or_agonal_breathing"
+    "type": "breathing_recheck_requested",
+    "detail": "uncertain_breathing"
   },
-  "reason": "user_reported_uncertain_or_agonal_breathing",
+  "reason": "user_reported_uncertain_breathing",
   "confidence": 0.86
 }
 ```

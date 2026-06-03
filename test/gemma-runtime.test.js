@@ -8,6 +8,7 @@ import {
   GEMMA_SYSTEM_PROMPT,
   buildGemmaPrompt,
   buildLiteRtLmArgs,
+  evaluateGemmaModelCheck,
   findGemmaModelFile,
   parseGemmaResponse,
   resolveGemmaConfig
@@ -71,7 +72,9 @@ test("Gemma config honors backend and timeout environment overrides", () => {
   const config = resolveGemmaConfig({
     env: {
       GEMMA_BACKEND: "gpu",
-      GEMMA_TIMEOUT_MS: "45000"
+      GEMMA_TIMEOUT_MS: "45000",
+      GEMMA_COMMAND: "python",
+      GEMMA_COMMAND_PREFIX_ARGS: "-m litert_lm_cli.main"
     },
     cwd: "D:\\test-workspace"
   });
@@ -79,6 +82,8 @@ test("Gemma config honors backend and timeout environment overrides", () => {
   assert.equal(config.modelRepo, GEMMA_4_REPO);
   assert.equal(config.backend, "gpu");
   assert.equal(config.timeoutMs, 45000);
+  assert.equal(config.command, "python");
+  assert.deepEqual(config.commandPrefixArgs, ["-m", "litert_lm_cli.main"]);
 });
 
 test("findGemmaModelFile resolves a Gemma 4 LiteRT-LM file", async () => {
@@ -109,14 +114,43 @@ test("findGemmaModelFile rejects a directory without Gemma 4 LiteRT-LM files", a
   }
 });
 
+test("evaluateGemmaModelCheck fails a placeholder model in strict mode", () => {
+  const result = evaluateGemmaModelCheck(
+    {
+      found: true,
+      file: "D:\\models\\gemma\\gemma-4-E2B-it.litertlm",
+      bytes: 512,
+      placeholder: true
+    },
+    { requireRealGemma: true }
+  );
+
+  assert.equal(result.status, "fail");
+  assert.match(result.detail, /placeholder|2\.6 GB/i);
+});
+
+test("evaluateGemmaModelCheck reports a usable model file size", () => {
+  const result = evaluateGemmaModelCheck({
+    found: true,
+    file: "D:\\models\\gemma\\gemma-4-E2B-it.litertlm",
+    bytes: 2.59 * 1024 * 1024 * 1024,
+    placeholder: false
+  });
+
+  assert.equal(result.status, "pass");
+  assert.match(result.detail, /2\.59 GB/);
+});
+
 test("buildLiteRtLmArgs includes model, backend, and timeout inputs", () => {
   const args = buildLiteRtLmArgs({
     modelFile: "D:\\models\\gemma\\gemma-4-E2B-it-q4_k_m.litertlm",
     backend: "cpu",
-    timeoutMs: 120000
+    timeoutMs: 120000,
+    commandPrefixArgs: ["-m", "litert_lm_cli.main"]
   });
 
   assert.ok(Array.isArray(args));
+  assert.deepEqual(args.slice(0, 3), ["-m", "litert_lm_cli.main", "run"]);
   assert.ok(args.some((arg) => String(arg).includes("gemma-4-E2B-it-q4_k_m.litertlm")));
   assert.ok(args.some((arg) => String(arg).includes("cpu")));
 });
@@ -220,6 +254,23 @@ test("Gemma parser rejects corrupt decoded speech text", () => {
       tts: {
         ...VALID_PATCH.tts,
         text: "\uFFFD\uFFFD\uFFFD\uFFFD"
+      }
+    }),
+    DECISION_FRAME
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error, "patch_validation_failed");
+  assert.ok(result.violations.includes("corrupt_text"));
+});
+
+test("Gemma parser rejects mojibake replacement text", () => {
+  const result = parseGemmaResponse(
+    JSON.stringify({
+      ...VALID_PATCH,
+      tts: {
+        ...VALID_PATCH.tts,
+        text: "锟斤拷锟斤拷锟叫斤拷锟斤拷"
       }
     }),
     DECISION_FRAME

@@ -6,7 +6,10 @@ param(
   [string]$Repo = "litert-community/gemma-4-E2B-it-litert-lm",
   [string]$ModelDir = "models/gemma/gemma-4-E2B-it-litert-lm",
   [string]$ModelSource = "",
-  [string]$LiteRtCommand = ""
+  [string]$LiteRtCommand = "",
+  [string]$LiteRtPackageSource = "",
+  [string]$UvPython = "",
+  [string[]]$LiteRtPackages = @("litert-lm-nightly", "litert-lm")
 )
 
 Set-StrictMode -Version Latest
@@ -16,6 +19,7 @@ $ModelPattern = "gemma-4-E2B-it*.litertlm"
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 $WorkspaceUvCacheDir = Join-Path $RepoRoot ".cache\uv"
 $WorkspaceUvToolDir = Join-Path $RepoRoot ".cache\uv\tools"
+$WorkspaceUvPythonInstallDir = Join-Path $RepoRoot ".cache\uv\python"
 $WorkspaceHfHomeDir = Join-Path $RepoRoot ".cache\huggingface"
 $WorkspaceHfHubCacheDir = Join-Path $WorkspaceHfHomeDir "hub"
 
@@ -24,6 +28,9 @@ if ([string]::IsNullOrWhiteSpace($env:UV_CACHE_DIR)) {
 }
 if ([string]::IsNullOrWhiteSpace($env:UV_TOOL_DIR)) {
   $env:UV_TOOL_DIR = $WorkspaceUvToolDir
+}
+if ([string]::IsNullOrWhiteSpace($env:UV_PYTHON_INSTALL_DIR)) {
+  $env:UV_PYTHON_INSTALL_DIR = $WorkspaceUvPythonInstallDir
 }
 if ([string]::IsNullOrWhiteSpace($env:HF_HOME)) {
   $env:HF_HOME = $WorkspaceHfHomeDir
@@ -56,21 +63,21 @@ function Join-CommandForDisplay {
 }
 
 function Get-UvLauncher {
-  $uvx = Get-Command "uvx" -ErrorAction SilentlyContinue
-  if ($uvx) {
-    return @{
-      Command = $uvx.Source
-      Prefix = @()
-      Name = "uvx"
-    }
-  }
-
   $uv = Get-Command "uv" -ErrorAction SilentlyContinue
   if ($uv) {
     return @{
       Command = $uv.Source
       Prefix = @("tool", "run")
       Name = "uv tool run"
+    }
+  }
+
+  $uvx = Get-Command "uvx" -ErrorAction SilentlyContinue
+  if ($uvx) {
+    return @{
+      Command = $uvx.Source
+      Prefix = @()
+      Name = "uvx"
     }
   }
 
@@ -100,14 +107,20 @@ function Get-HuggingFaceCliLauncher {
 function New-UvToolCommand {
   param(
     [hashtable]$Launcher,
+    [string]$Python,
     [string[]]$ToolArgs
   )
 
-  if ($null -eq $Launcher) {
-    return @("uvx") + $ToolArgs
+  $pythonArgs = @()
+  if (-not [string]::IsNullOrWhiteSpace($Python)) {
+    $pythonArgs = @("--python", $Python)
   }
 
-  return @($Launcher.Command) + [string[]]$Launcher.Prefix + $ToolArgs
+  if ($null -eq $Launcher) {
+    return @("uvx") + $pythonArgs + $ToolArgs
+  }
+
+  return @($Launcher.Command) + [string[]]$Launcher.Prefix + $pythonArgs + $ToolArgs
 }
 
 function Get-LiteRtLmCommand {
@@ -122,13 +135,64 @@ function Get-LiteRtLmCommand {
 
   $fromPath = Get-Command "litert-lm" -ErrorAction SilentlyContinue
   if ($fromPath) {
-    return @{
-      Command = $fromPath.Source
-      Name = "litert-lm"
+    try {
+      & $fromPath.Source --help 1>$null 2>$null
+      if ($LASTEXITCODE -eq 0) {
+        return @{
+          Command = $fromPath.Source
+          Name = "litert-lm"
+        }
+      }
+    } catch {
+      # Fall through to uv package candidates below.
     }
+
+    Write-Warning "Found litert-lm at $($fromPath.Source), but it is not callable. Will try uv package candidates instead."
   }
 
   return $null
+}
+
+function New-LiteRtVerifyCommands {
+  param(
+    [hashtable]$LiteRtLm,
+    [hashtable]$UvLauncher,
+    [string]$Python,
+    [string]$PackageSource,
+    [string[]]$Packages
+  )
+
+  $commands = New-Object System.Collections.Generic.List[object]
+  if ($LiteRtLm) {
+    $commands.Add([pscustomobject]@{
+      Parts = [string[]]@($LiteRtLm.Command, "--help")
+    }) | Out-Null
+    return $commands
+  }
+
+  $candidateSources = New-Object System.Collections.Generic.List[string]
+  if (-not [string]::IsNullOrWhiteSpace($PackageSource)) {
+    $candidateSources.Add((Resolve-LocalPath -PathValue $PackageSource)) | Out-Null
+  }
+  foreach ($package in $Packages) {
+    if ([string]::IsNullOrWhiteSpace($package)) {
+      continue
+    }
+
+    $candidateSources.Add($package) | Out-Null
+  }
+
+  foreach ($source in $candidateSources) {
+    $toolArgs = @(
+      "--from", $source,
+      "litert-lm", "--help"
+    )
+    $commands.Add([pscustomobject]@{
+      Parts = [string[]](New-UvToolCommand -Launcher $UvLauncher -Python $Python -ToolArgs $toolArgs)
+    }) | Out-Null
+  }
+
+  return $commands
 }
 
 function Test-HttpSource {
@@ -223,6 +287,24 @@ function Invoke-NativeCommand {
   }
 }
 
+function Invoke-FirstSuccessfulCommand {
+  param($CommandCandidates)
+
+  $failures = @()
+  foreach ($candidate in $CommandCandidates) {
+    $commandParts = [string[]]$candidate.Parts
+    try {
+      Invoke-NativeCommand -CommandParts $commandParts
+      return
+    } catch {
+      $failures += $_.Exception.Message
+      Write-Warning $_.Exception.Message
+    }
+  }
+
+  throw "All LiteRT-LM verification commands failed.`n$($failures -join "`n")"
+}
+
 function Find-GemmaModelFile {
   param([string]$SearchDir)
 
@@ -281,19 +363,11 @@ if ($huggingFaceCli) {
     "--local-dir", $ResolvedModelDir,
     "--local-dir-use-symlinks", "False"
   )
-  $downloadCommand = New-UvToolCommand -Launcher $uvLauncher -ToolArgs $downloadArgs
+  $downloadCommand = New-UvToolCommand -Launcher $uvLauncher -Python $UvPython -ToolArgs $downloadArgs
 }
 
 $liteRtLm = Get-LiteRtLmCommand -ExplicitCommand $LiteRtCommand
-if ($liteRtLm) {
-  $litertVerifyCommand = @($liteRtLm.Command, "--help")
-} else {
-  $litertVerifyArgs = @(
-    "--from", "litert-lm",
-    "litert-lm", "--help"
-  )
-  $litertVerifyCommand = New-UvToolCommand -Launcher $uvLauncher -ToolArgs $litertVerifyArgs
-}
+$litertVerifyCommands = New-LiteRtVerifyCommands -LiteRtLm $liteRtLm -UvLauncher $uvLauncher -Python $UvPython -PackageSource $LiteRtPackageSource -Packages $LiteRtPackages
 
 Write-Step "Gemma model repo: $Repo"
 Write-Step "Gemma model directory: $ResolvedModelDir"
@@ -301,6 +375,13 @@ Write-Step "Gemma model source: $(if ([string]::IsNullOrWhiteSpace($ModelSource)
 Write-Step "Gemma model file pattern: $ModelPattern"
 Write-Step "uv cache directory: $env:UV_CACHE_DIR"
 Write-Step "uv tool directory: $env:UV_TOOL_DIR"
+Write-Step "uv Python install directory: $env:UV_PYTHON_INSTALL_DIR"
+if (-not [string]::IsNullOrWhiteSpace($UvPython)) {
+  Write-Step "uv tool Python override: $UvPython"
+}
+if (-not [string]::IsNullOrWhiteSpace($LiteRtPackageSource)) {
+  Write-Step "LiteRT-LM local package source: $(Resolve-LocalPath -PathValue $LiteRtPackageSource)"
+}
 Write-Step "Hugging Face cache directory: $env:HF_HUB_CACHE"
 
 if ($DryRun) {
@@ -327,8 +408,10 @@ if ($DryRun) {
     Write-Step "LiteRT-LM CLI: $($liteRtLm.Name) at $($liteRtLm.Command)"
   } elseif ($SkipLiteRtVerify) {
     Write-Step "Would skip LiteRT-LM CLI verification because -SkipLiteRtVerify was supplied."
+  } elseif (-not [string]::IsNullOrWhiteSpace($LiteRtPackageSource)) {
+    Write-Step "LiteRT-LM CLI was not found or not callable; would try local package source first, then uv package candidates: $($LiteRtPackages -join ', ')."
   } else {
-    Write-Step "LiteRT-LM CLI was not found; would use uvx to run litert-lm --help."
+    Write-Step "LiteRT-LM CLI was not found or not callable; would use uv package candidates: $($LiteRtPackages -join ', ')."
   }
 
   if ($Force) {
@@ -339,21 +422,24 @@ if ($DryRun) {
     Write-Step "Would download with: $(Join-CommandForDisplay $downloadCommand)"
   }
   if (-not $SkipLiteRtVerify) {
-    Write-Step "Would verify LiteRT-LM CLI with: $(Join-CommandForDisplay $litertVerifyCommand)"
+    foreach ($candidate in $litertVerifyCommands) {
+      Write-Step "Would verify LiteRT-LM CLI with: $(Join-CommandForDisplay ([string[]]$candidate.Parts))"
+    }
   }
   Write-Step "Would scan for: $ModelPattern"
   exit 0
 }
 
-if (-not $tokenSource -and [string]::IsNullOrWhiteSpace($ModelSource)) {
-  throw "HF_TOKEN or HUGGINGFACE_HUB_TOKEN is required. Set one after accepting the Gemma model terms on Hugging Face, then rerun npm run setup:gemma."
+$existingModel = Find-GemmaModelFile -SearchDir $ResolvedModelDir
+if (-not $existingModel -and -not $tokenSource -and [string]::IsNullOrWhiteSpace($ModelSource)) {
+  throw "HF_TOKEN or HUGGINGFACE_HUB_TOKEN is required to download the Gemma model. Set one after accepting the Gemma model terms on Hugging Face, pass -ModelSource <path>, or keep the existing model file in place."
 }
 
 if (-not $uvLauncher -and -not $huggingFaceCli -and [string]::IsNullOrWhiteSpace($ModelSource)) {
   throw "uv or uvx was not found. Install uv first, then rerun npm run setup:gemma. See https://docs.astral.sh/uv/"
 }
-if (-not $SkipLiteRtVerify -and -not $liteRtLm -and -not $uvLauncher) {
-  throw "litert-lm was not found and uv/uvx is unavailable for verification. Install litert-lm, pass -LiteRtCommand <path>, or rerun with -SkipLiteRtVerify."
+if (-not $SkipLiteRtVerify -and -not $liteRtLm -and (-not $uvLauncher -or $litertVerifyCommands.Count -eq 0)) {
+  throw "litert-lm was not found and uv/uvx is unavailable for verification. Install litert-lm, pass -LiteRtCommand <path>, set GEMMA_COMMAND/GEMMA_COMMAND_PREFIX_ARGS for a module runner, or rerun with -SkipLiteRtVerify."
 }
 
 if ([string]::IsNullOrWhiteSpace($env:HF_TOKEN) -and -not [string]::IsNullOrWhiteSpace($env:HUGGINGFACE_HUB_TOKEN)) {
@@ -363,7 +449,6 @@ if ([string]::IsNullOrWhiteSpace($env:HUGGINGFACE_HUB_TOKEN) -and -not [string]:
   $env:HUGGINGFACE_HUB_TOKEN = $env:HF_TOKEN
 }
 
-$existingModel = Find-GemmaModelFile -SearchDir $ResolvedModelDir
 if ($existingModel -and -not $Force) {
   Write-Step "Found existing model file; skipping download: $($existingModel.FullName)"
 } else {
@@ -390,7 +475,9 @@ Write-Step "Verified model file: $($modelFile.FullName)"
 if ($SkipLiteRtVerify) {
   Write-Step "Skipping LiteRT-LM CLI verification because -SkipLiteRtVerify was supplied."
 } else {
-  Write-Step "Verifying LiteRT-LM CLI with: $(Join-CommandForDisplay $litertVerifyCommand)"
-  Invoke-NativeCommand -CommandParts $litertVerifyCommand
+  foreach ($candidate in $litertVerifyCommands) {
+    Write-Step "LiteRT-LM verification candidate: $(Join-CommandForDisplay ([string[]]$candidate.Parts))"
+  }
+  Invoke-FirstSuccessfulCommand -CommandCandidates $litertVerifyCommands
 }
 Write-Step "Gemma setup complete."

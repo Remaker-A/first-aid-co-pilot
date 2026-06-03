@@ -228,6 +228,10 @@ async function supplementWithGemma({ stateAction, stateValidation, state, event,
   // Gemma may only supplement when it produces a patch that passes the
   // ActionValidator. An invalid patch never overrides the rule-driven action.
   if (gemmaValidation.ok) {
+    if (gemmaValidation.action.intent !== stateAction.intent) {
+      return { action: stateAction, validation: stateValidation, source: "state_machine" };
+    }
+
     return { action: gemmaValidation.action, validation: gemmaValidation, source: "gemma_agent" };
   }
 
@@ -247,6 +251,10 @@ function isCriticalFlowAction(action) {
   }
 
   if (action.priority === "critical") {
+    return true;
+  }
+
+  if (action.source === "state_machine" && action.priority === "high") {
     return true;
   }
 
@@ -306,7 +314,6 @@ function applyTransition(state, transition, now) {
       AgentStage.S6_CPR_READY,
       AgentStage.S7_CPR_LOOP,
       AgentStage.S8_ASSISTANCE,
-      AgentStage.S9_HANDOVER,
     ].includes(nextStage)
   ) {
     next.confirmed_facts.suspected_cardiac_arrest = true;

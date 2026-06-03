@@ -14,7 +14,10 @@
     "setup:speech": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/setupSpeech.ps1",
     "verify": "node src/cli/verifyLocalLoop.js",
     "verify:local": "node src/cli/verifyLocalLoop.js",
+    "verify:local:strict": "node src/cli/verifyLocalLoop.js --require-real-gemma --require-real-speech",
     "verify:gemma": "node src/cli/verifyLocalLoop.js --require-real-gemma",
+    "probe:voice": "node scripts/voiceMockScenarioProbe.mjs --input=text",
+    "probe:voice:stt": "node scripts/voiceMockScenarioProbe.mjs --input=tts-stt",
     "voice:serve": "node src/voice/server.js",
     "test": "node --test",
     "test:watch": "node --test --watch"

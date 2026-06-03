@@ -26,7 +26,7 @@ FirstAid Copilot 的目标不是做一个静态急救百科，也不是做一个
 ```text
 成人疑似心脏骤停
 → 判断无反应
-→ 判断无正常呼吸或不确定
+→ 判断无正常呼吸或濒死喘息
 → 呼叫 120
 → 启动胸外按压
 → 实时纠错
@@ -180,7 +180,8 @@ flowchart TD
   S2 -->|有反应| M1["MONITOR_RESPONSE<br/>观察 + 呼叫帮助"]
   S2 -->|无反应 / 不确定| S3["S3_CHECK_BREATHING<br/>判断正常呼吸"]
   S3 -->|有正常呼吸| M2["MONITOR_BREATHING<br/>保持观察 + 呼叫120"]
-  S3 -->|无正常呼吸 / 喘息 / 不确定| S4["S4_SUSPECTED_ARREST<br/>疑似心脏骤停"]
+  S3 -->|无正常呼吸 / 喘息| S4["S4_SUSPECTED_ARREST<br/>疑似心脏骤停"]
+  S3 -->|仍不确定| S3
   S4 --> S5["S5_CALL_EMERGENCY<br/>呼叫120 + GPS + 录制"]
   S5 --> S6["S6_CPR_READY<br/>CPR 姿势准备"]
   S6 --> S7["S7_CPR_LOOP<br/>实时按压循环"]
@@ -211,18 +212,21 @@ flowchart TD
 ```text
 IF scope.adult_likely == true
 AND confirmed_facts.responsive == false
-AND confirmed_facts.normal_breathing != true
+AND (
+  confirmed_facts.normal_breathing == false
+  OR confirmed_facts.agonal_breathing == true
+)
 THEN suspected_cardiac_arrest = true
 AND start_emergency_call
 AND start_cpr_guidance
 ```
 
-`normal_breathing != true` 包含：
+可启动 CPR 的呼吸证据：
 
 | 值 | 含义 | 处理 |
 | --- | --- | --- |
 | `false` | 明确没有正常呼吸 | 启动 CPR |
-| `null` | 用户不确定是否正常呼吸 | 按高风险处理，启动 CPR |
+| `null` | 用户不确定是否正常呼吸 | 不直接启动 CPR，继续检查并准备呼叫 120 |
 | `agonal_breathing == true` | 只有喘息样呼吸 | 不视为正常呼吸，启动 CPR |
 
 推荐话术：
@@ -243,8 +247,8 @@ AND start_cpr_guidance
 
 | 决策结果 | 条件 | Agent 输出 |
 | --- | --- | --- |
-| `START_CPR` | 成人 + 无反应 + 无正常呼吸/喘息/不确定 | 启动 120 和 CPR |
-| `PREPARE_EMERGENCY_CALL` | 成人 + 无反应，但呼吸尚未判断 | 准备呼叫 120，继续判断呼吸 |
+| `START_CPR` | 成人 + 无反应 + 无正常呼吸/喘息 | 启动 120 和 CPR |
+| `PREPARE_EMERGENCY_CALL` | 成人 + 无反应，但呼吸尚未判断或仍不确定 | 准备呼叫 120，继续判断呼吸 |
 | `MONITOR_AND_CALL_HELP` | 有反应，或有明确正常呼吸 | 不启动 CPR，保持观察并呼叫急救 |
 | `OUT_OF_SCOPE` | 明确不是成人场景 | 提示立即呼叫 120，本版只支持成人 CPR 指导 |
 | `RECHECK_ON_CONFLICT` | 用户和视觉冲突 | 请求用户复查关键事实 |
@@ -256,12 +260,15 @@ function decideCprStart(state: SessionState): Decision {
   const adult = state.scope.adult_likely === true;
   const unresponsive = state.confirmed_facts.responsive === false;
   const normalBreathing = state.confirmed_facts.normal_breathing === true;
+  const noNormalBreathing =
+    state.confirmed_facts.normal_breathing === false ||
+    state.confirmed_facts.agonal_breathing === true;
 
   if (!adult) return "OUT_OF_SCOPE";
   if (!unresponsive) return "MONITOR_AND_CALL_HELP";
   if (normalBreathing) return "MONITOR_AND_CALL_HELP";
 
-  return "START_CPR";
+  return noNormalBreathing ? "START_CPR" : "PREPARE_EMERGENCY_CALL";
 }
 ```
 
@@ -276,7 +283,8 @@ function decideCprStart(state: SessionState): Decision {
 | `S2_CHECK_RESPONSE` | 无反应 | `S3_CHECK_BREATHING` | 准备呼叫 120，判断呼吸 |
 | `S2_CHECK_RESPONSE` | 不确定 | `S3_CHECK_BREATHING` | 按高风险推进到呼吸判断 |
 | `S3_CHECK_BREATHING` | 有正常呼吸 | `MONITOR_BREATHING` | 不做 CPR，保持观察并呼叫 120 |
-| `S3_CHECK_BREATHING` | 无呼吸 / 喘息 / 不确定 | `S4_SUSPECTED_ARREST` | 生成疑似心脏骤停结论 |
+| `S3_CHECK_BREATHING` | 无呼吸 / 喘息 | `S4_SUSPECTED_ARREST` | 生成疑似心脏骤停结论 |
+| `S3_CHECK_BREATHING` | 仍不确定 | `S3_CHECK_BREATHING` | 继续引导观察并准备呼叫 120 |
 | `S4_SUSPECTED_ARREST` | 规则满足 | `S5_CALL_EMERGENCY` | 默认拨打 120，启动 GPS 和录制 |
 | `S5_CALL_EMERGENCY` | 拨号已触发 / 已有人拨打 | `S6_CPR_READY` | 引导摆放硬地面、定位胸口中央 |
 | `S6_CPR_READY` | 用户准备好 / Demo 事件到达 | `S7_CPR_LOOP` | 启动节拍器和按压指导 |
@@ -895,7 +903,7 @@ Gemma 生成的内容必须通过校验：
 | 判断反应 | “请大声呼叫他，并轻拍双肩。” |
 | 无反应 | “他没有反应。现在检查呼吸。” |
 | 判断呼吸 | “请看胸口 5 到 10 秒，有没有规律、正常的起伏？” |
-| 呼吸不确定 | “如果不确定是否正常呼吸，请按没有正常呼吸处理。” |
+| 呼吸不确定 | “请继续看胸口 5 到 10 秒，确认有没有正常起伏。” |
 | 启动 CPR | “请按疑似心脏骤停处理。现在开始胸外按压。” |
 | 呼叫 120 | “我将为你拨打 120，请保持手机免提。” |
 | 按压位置 | “双手掌根放在胸口中央。” |
@@ -997,7 +1005,7 @@ AED：02:35 现场人员取到 AED，已提示继续 CPR
 ```text
 启动急救
 → 判断无反应
-→ 判断无正常呼吸/不确定
+→ 确认无正常呼吸/濒死喘息
 → 触发 120 + GPS + 本地录制
 → 开始 CPR
 → 质量分从低到高
@@ -1142,7 +1150,7 @@ DemoEventScript
 - 有反应时不进入 CPR。
 - 无反应 + 有正常呼吸时不进入 CPR。
 - 无反应 + 无正常呼吸时进入 CPR。
-- 无反应 + 不确定呼吸时进入 CPR。
+- 无反应 + 不确定呼吸时不直接进入 CPR，继续呼吸检查并准备呼叫 120。
 - 喘息样呼吸不视为正常呼吸。
 - 用户与视觉冲突时进入复查。
 

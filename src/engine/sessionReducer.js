@@ -54,6 +54,7 @@ export function createInitialSessionState(overrides = {}) {
         handover_generated: false,
         network: null,
       },
+      location: null,
       cpr_state: {
         started: false,
         started_at: null,
@@ -152,6 +153,9 @@ function cloneSessionState(state) {
       evidence: [...(state.confirmed_facts?.evidence ?? [])],
     },
     tool_state: { ...(state.tool_state ?? {}) },
+    location: state.location && typeof state.location === "object"
+      ? { ...state.location }
+      : state.location ?? null,
     cpr_state: { ...(state.cpr_state ?? {}) },
     rescuer_state: { ...(state.rescuer_state ?? {}) },
     dialogue_state: {
@@ -316,6 +320,11 @@ function reduceMetadata(next, event, timestamp) {
   if (metadata.local_video_saved === true) {
     next.tool_state.recording_status = "saved";
   }
+
+  const location = normalizeLocation(metadata.location ?? metadata.gps_location);
+  if (location) {
+    next.location = location;
+  }
 }
 
 function reduceDeviceState(next, event) {
@@ -340,6 +349,12 @@ function reduceDeviceState(next, event) {
 
   if (hasOwn(device, "gps_attached")) {
     next.tool_state.gps_attached = device.gps_attached;
+  }
+
+  const location = normalizeLocation(device.location ?? device.gps_location);
+  if (location) {
+    next.location = location;
+    next.tool_state.gps_attached = true;
   }
 
   if (hasOwn(device, "recording")) {
@@ -370,6 +385,10 @@ function reduceToolResult(next, event) {
 
   if (toolType === "attach_gps_location") {
     next.tool_state.gps_attached = status !== "failed";
+    const location = normalizeLocation(result.location ?? result.gps_location ?? result.payload?.location);
+    if (location) {
+      next.location = location;
+    }
   }
 
   if (toolType === "start_local_recording") {
@@ -725,6 +744,29 @@ function definedValues(values) {
   return Object.fromEntries(
     Object.entries(values).filter(([, value]) => value !== undefined),
   );
+}
+
+function normalizeLocation(location) {
+  if (!location || typeof location !== "object") {
+    return null;
+  }
+
+  const latitude = firstNumber(location.latitude, location.lat);
+  const longitude = firstNumber(location.longitude, location.lng, location.lon);
+  const accuracy = firstNumber(location.accuracy_m, location.accuracyMeters, location.accuracy);
+
+  return definedValues({
+    address_line: location.address_line ?? location.address ?? location.formatted_address,
+    landmark: location.landmark,
+    floor: location.floor,
+    manual_note: location.manual_note ?? location.note,
+    latitude,
+    longitude,
+    accuracy_m: accuracy,
+    provider: location.provider,
+    captured_at: location.captured_at ?? location.timestamp,
+    low_accuracy: location.low_accuracy,
+  });
 }
 
 function mergeObjects(base, overrides) {

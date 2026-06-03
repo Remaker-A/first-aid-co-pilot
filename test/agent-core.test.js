@@ -86,6 +86,19 @@ test("CPR start rule does not start CPR when normal breathing is confirmed", () 
   assert.equal(decision, "MONITOR_AND_CALL_HELP");
 });
 
+test("CPR start rule waits for breathing evidence before starting CPR", () => {
+  const decision = decideCprStart({
+    scope: { adult_likely: true },
+    confirmed_facts: {
+      responsive: false,
+      normal_breathing: null,
+      agonal_breathing: null
+    }
+  });
+
+  assert.equal(decision, "PREPARE_EMERGENCY_CALL");
+});
+
 test("demo replay reaches handover and generates a report", async () => {
   const scriptPath = resolve("knowledge", "demo_script_cpr_main_v1.json");
   const script = JSON.parse(await readFile(scriptPath, "utf8"));
@@ -98,6 +111,78 @@ test("demo replay reaches handover and generates a report", async () => {
   );
   assert.equal(result.actions.at(-1).intent, "explain_handover");
   assert.match(result.report.text, /交接报告/);
+});
+
+test("monitor branches can call emergency services without CPR diagnosis", () => {
+  for (const stage of [AgentStage.MONITOR_RESPONSE, AgentStage.MONITOR_BREATHING]) {
+    const validation = validateAction(
+      {
+        stage,
+        intent: stage === AgentStage.MONITOR_RESPONSE
+          ? "monitor_responsive_patient"
+          : "monitor_breathing_patient",
+        priority: "high",
+        source: "state_machine",
+        tts: { text: "请呼叫 120 并持续观察。", tone: "calm_firm" },
+        tool_actions: [{ type: "emergency_call", requires_user_confirmation: false }]
+      },
+      { current_stage: stage }
+    );
+
+    assert.equal(validation.ok, true, `${stage} should allow emergency_call`);
+  }
+});
+
+test("responsive handover report does not claim suspected cardiac arrest", () => {
+  const result = runDemoPipeline({
+    sessionId: "sess_responsive_handover",
+    script: [
+      {
+        at_ms: 0,
+        event: {
+          source: "demo_script",
+          event_type: "session_started",
+          patient_state: { adult_likely: true, responsive: null, normal_breathing: null }
+        }
+      },
+      {
+        at_ms: 1000,
+        event: {
+          source: "demo_script",
+          event_type: "patient_state_update",
+          patient_state: { adult_likely: true },
+          metadata: { scene_safe: true }
+        }
+      },
+      {
+        at_ms: 2000,
+        event: {
+          source: "stt",
+          event_type: "user_response",
+          user_input: {
+            stt_text: "他有反应",
+            intent: "patient_responsive",
+            confidence: 0.9
+          },
+          patient_state: { adult_likely: true, responsive: true }
+        }
+      },
+      {
+        at_ms: 3000,
+        event: {
+          source: "demo_script",
+          event_type: "handover_requested",
+          metadata: { ems_arrived: true }
+        }
+      }
+    ]
+  });
+
+  assert.equal(result.state.current_stage, AgentStage.S9_HANDOVER);
+  assert.equal(result.state.confirmed_facts.responsive, true);
+  assert.equal(result.state.confirmed_facts.suspected_cardiac_arrest, false);
+  assert.equal(result.report.json.symptoms.suspected_cardiac_arrest, false);
+  assert.doesNotMatch(result.report.text, /疑似心脏骤停/);
 });
 
 test("action validator blocks forbidden diagnostic language", () => {

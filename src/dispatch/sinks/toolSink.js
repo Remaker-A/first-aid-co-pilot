@@ -6,6 +6,7 @@ import {
   isToolConfirmed,
   listSystemTools,
 } from "./toolPolicy.js";
+import { buildEmergencyCallDemoDetail } from "./emergencyCallDemoTool.js";
 
 // ToolSink —— 系统工具通道（拨打120 / GPS / 本地录制 / 生成交接报告 / 分享外发等）。
 //
@@ -61,11 +62,13 @@ export class ToolSink {
 
     // 关键工具（拨打急救电话）：永不拦截。
     if (isCriticalTool(tool)) {
+      const detail = buildEmergencyCallDemoDetail(tool, action, context);
+      warnings.push(...detail.warnings);
       return {
         type,
         outcome: "executed",
         critical: true,
-        detail: mockEmergencyCallDetail(tool),
+        detail,
         warnings,
       };
     }
@@ -100,14 +103,6 @@ export class ToolSink {
     // 其余系统工具（GPS / 录制 / 生成报告 / 检查权限 等）：mock 直接执行。
     return { type, outcome: "executed", warnings };
   }
-}
-
-function mockEmergencyCallDetail(tool) {
-  return {
-    target: tool.target ?? "120",
-    mode: tool.mode ?? "auto_with_cancel_window",
-    cancel_window_seconds: tool.cancel_window_seconds ?? null,
-  };
 }
 
 export function createToolSink() {

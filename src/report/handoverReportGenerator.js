@@ -1,3 +1,7 @@
+import { generateCallBrief } from "./callBrief.js";
+
+export { generateCallBrief, generateCallBriefScript } from "./callBrief.js";
+
 export function generateHandoverReport(logInput = {}, state = {}, options = {}) {
   const entries = normalizeEntries(logInput);
   const json = generateHandoverJson(entries, state, options);
@@ -13,6 +17,11 @@ export function generateHandoverJson(entries = [], state = {}, options = {}) {
   const facts = state.confirmed_facts || {};
   const cprState = state.cpr_state || {};
   const toolState = state.tool_state || {};
+  const generatedAt = options.generatedAt || new Date().toISOString();
+  const callBrief = generateCallBrief(state, {
+    ...options,
+    generatedAt,
+  });
   const qualitySamples = collectQualitySamples(entries);
   const interruptions = collectInterruptions(entries);
   const corrections = collectCorrections(entries);
@@ -23,10 +32,12 @@ export function generateHandoverJson(entries = [], state = {}, options = {}) {
     schema: "firstaid_handover_report_v1",
     session_id: state.session_id || inferSessionId(entries) || "sess_unknown",
     patient_id: options.patientId || "anonymous",
-    generated_at: options.generatedAt || new Date().toISOString(),
+    generated_at: generatedAt,
     initial_assessment_time: findInitialAssessmentTime(entries),
     cpr_started_at: findCprStartTime(entries, state),
     current_stage: state.current_stage || null,
+    location: callBrief.location,
+    call_brief: callBrief,
     symptoms: {
       responsive: facts.responsive ?? null,
       normal_breathing: facts.normal_breathing ?? null,
@@ -65,6 +76,8 @@ export function generateHandoverText(report = {}) {
     `\u60a3\u8005ID\uff1a${report.patient_id === "anonymous" ? "\u533f\u540d" : report.patient_id}`,
     `\u4f1a\u8bddID\uff1a${report.session_id || "\u672a\u77e5"}`,
     `\u521d\u5224\u65f6\u95f4\uff1a${formatDisplayTime(report.initial_assessment_time)}`,
+    `位置：${formatLocation(report.location, report.call_brief?.flags || [])}`,
+    `120 \u64ad\u62a5\u6458\u8981\uff1a${formatCallBrief(report.call_brief)}`,
     `\u75c7\u72b6\uff1a${report.symptoms?.summary || "\u6682\u65e0\u5b8c\u6574\u5224\u65ad"}`,
     `CPR \u5f00\u59cb\uff1a${formatDisplayTime(report.cpr_started_at)}`,
     `\u7d2f\u8ba1\u6309\u538b\uff1a${formatCount(report.cpr?.total_compressions, "\u6b21")}`,
@@ -332,6 +345,45 @@ function averageNumber(values) {
 
 function numberOrNull(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function formatLocation(location, flags = []) {
+  if (!location) {
+    return "位置未获取";
+  }
+
+  const parts = [
+    location.address_line,
+    location.landmark ? `\u5730\u6807${location.landmark}` : null,
+    location.floor ? `\u697c\u5c42${location.floor}` : null,
+    location.manual_note ? `\u73b0\u573a\u5907\u6ce8${location.manual_note}` : null,
+  ].filter(Boolean);
+
+  if (typeof location.latitude === "number" && typeof location.longitude === "number") {
+    parts.push(`\u5750\u6807${location.latitude.toFixed(6)},${location.longitude.toFixed(6)}`);
+  }
+
+  if (typeof location.accuracy_m === "number") {
+    parts.push(`\u5b9a\u4f4d\u7cbe\u5ea6\u7ea6${formatDistance(location.accuracy_m)}\u7c73`);
+  }
+
+  if (flags.includes("low_accuracy_location") || location.low_accuracy === true) {
+    parts.push("\u5b9a\u4f4d\u53ef\u80fd\u4e0d\u7cbe\u786e");
+  }
+
+  return parts.length > 0 ? parts.join("\uff0c") : "位置未获取";
+}
+
+function formatCallBrief(callBrief) {
+  if (!callBrief?.script) {
+    return "\u672a\u751f\u6210";
+  }
+
+  return callBrief.script;
+}
+
+function formatDistance(value) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function formatDisplayTime(value) {

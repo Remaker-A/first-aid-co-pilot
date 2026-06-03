@@ -421,9 +421,21 @@ function emergencyCallTool() {
   return {
     type: "emergency_call",
     target: "120",
-    mode: "auto_with_cancel_window",
+    mode: "demo_configured",
+    demo_modes: ["test_auto_call", "accessibility_click_120", "dial_only_fallback"],
     cancel_window_seconds: 3,
     requires_user_confirmation: false,
+    speakerphone: true,
+    visible_script_required: true,
+    briefing: {
+      mode: "speaker_tts_best_effort",
+      repeat_interval_seconds: 12,
+      visible_script_required: true,
+    },
+    audit: {
+      demo_hack: true,
+      real_emergency_test_requires_manual_approval: true,
+    },
   };
 }
 

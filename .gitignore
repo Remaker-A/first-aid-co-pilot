@@ -11,3 +11,4 @@ temp/
 *.part
 *.partial
 *.download
+android/local.properties

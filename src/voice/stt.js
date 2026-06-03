@@ -47,8 +47,28 @@ const INTENT_RULES = [
     pattern: /(normal breathing|breathing normally|正常呼吸|有正常呼吸)/i,
   },
   {
+    intent: "ask_cpr_quality",
+    pattern: /(按得对|按的对|这样.*(可以|对吗|行吗)|我.*按.*(对吗|可以吗|行吗)|我爱你的对吗|位置.*对吗|节奏.*对吗|质量.*怎么样)/i,
+  },
+  {
+    intent: "ask_can_stop",
+    pattern: /(能不能停|能不能听|可以停|能停|要不要停|是不是.*停|还要按多久|按到什么时候)/i,
+  },
+  {
+    intent: "ask_aed_help",
+    pattern: /(aed|a e d|除颤仪|自动体外除颤|电击|[说需]?[除出]?颤[仪姨]|出差[一姨仪疑]).*?(来了|到了|怎么办|怎么用|要怎么做)|(?:来了|到了).*?(aed|除颤仪|[说需]?[除出]?颤[仪姨]|出差[一姨仪疑])/i,
+  },
+  {
+    intent: "ask_next_step",
+    pattern: /(下一步|接下来|现在怎么办|现在做什么|然后呢|下一步做什么|我该怎么办)/i,
+  },
+  {
+    intent: "ask_emergency_call",
+    pattern: /(要不要.*120|需不需要.*120|现在.*打120|120.*要不要|120.*需不需要|急救电话.*要不要|急救电话.*打吗)/i,
+  },
+  {
     intent: "emergency_called",
-    pattern: /(called|call connected|120.*(已打|打了|接通|已经拨打|已拨打)|急救电话.*(通|打))/i,
+    pattern: /(called|call connected|120.*(已打|打了|拨打|已拨|接通)|(?:已|已经)?(?:拨打|拨通|打了?|呼叫)120|急救电话.*(通|打))/i,
   },
   {
     intent: "continue_cpr",
@@ -56,7 +76,7 @@ const INTENT_RULES = [
   },
   {
     intent: "paramedics_arrived",
-    pattern: /(paramedics|ems arrived|ambulance arrived|急救员到了|救护车到了|医生到了)/i,
+    pattern: /(paramedics|ems arrived|ambulance arrived|急救员.*(到|来)|急救人员.*(到|来|大佬)|救[护货]车.*(到|来)|医生.*(到|来)|医护.*(到|来|赶到)|救援.*(到|来))/i,
   },
 ];
 
@@ -96,6 +116,23 @@ export async function transcribeInput(input = {}, options = {}) {
     try {
       return await transcribeWithSherpa(audioBase64, audio, plan);
     } catch (error) {
+      if (shouldRetryWithAutoLanguage(plan, error)) {
+        try {
+          return {
+            ...(await transcribeWithSherpa(audioBase64, audio, {
+              ...plan,
+              language: "auto",
+            })),
+            language_retry: "auto",
+          };
+        } catch (retryError) {
+          return mockAudioFallback(audio, {
+            error: normalizeError(retryError),
+            hint: buildRuntimeHint({ ...plan, language: "auto" }, retryError),
+          });
+        }
+      }
+
       return mockAudioFallback(audio, {
         error: normalizeError(error),
         hint: buildRuntimeHint(plan, error),
@@ -134,7 +171,7 @@ export function inferIntent(transcript = "") {
 // to the bundled Python sherpa-onnx wrapper.
 export function resolveSttPlan(options = {}) {
   const modelDir = firstNonEmpty(options.modelDir, process.env.SPEECH_STT_MODEL_DIR) || DEFAULT_MODEL_DIR;
-  const language = firstNonEmpty(options.language, process.env.SPEECH_LANGUAGE) || "zh";
+  const language = firstNonEmpty(options.language, process.env.SPEECH_LANGUAGE) || "auto";
   const timeoutMs = positiveNumber(options.timeoutMs, process.env.VOICE_STT_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
 
   const explicitCommand = firstNonEmpty(
@@ -185,11 +222,11 @@ export function buildSttInvocation(plan, { audioPath, outputPath }) {
   }
 
   const args = [
-    plan.script,
+    toChildProcessPath(plan.script),
     "--model-dir",
-    path.resolve(plan.modelDir),
+    toChildProcessPath(path.resolve(plan.modelDir)),
     "--audio",
-    audioPath,
+    toChildProcessPath(audioPath),
     "--language",
     plan.language,
   ];
@@ -240,19 +277,37 @@ async function transcribeWithSherpa(audioBase64, audio, plan) {
 
 function buildCommandArgs(template, { audioPath, outputPath, modelDir, language }) {
   if (!template) {
-    return ["--wave-filename", audioPath];
+    return ["--wave-filename", toChildProcessPath(audioPath)];
   }
 
   return splitArgs(template).map((item) =>
     item
-      .replaceAll("{audio}", audioPath)
-      .replaceAll("{audio_path}", audioPath)
-      .replaceAll("{out}", outputPath)
-      .replaceAll("{output}", outputPath)
-      .replaceAll("{output_path}", outputPath)
-      .replaceAll("{model_dir}", path.resolve(modelDir))
+      .replaceAll("{audio}", toChildProcessPath(audioPath))
+      .replaceAll("{audio_path}", toChildProcessPath(audioPath))
+      .replaceAll("{out}", toChildProcessPath(outputPath))
+      .replaceAll("{output}", toChildProcessPath(outputPath))
+      .replaceAll("{output_path}", toChildProcessPath(outputPath))
+      .replaceAll("{model_dir}", toChildProcessPath(path.resolve(modelDir)))
       .replaceAll("{language}", language)
   );
+}
+
+function toChildProcessPath(targetPath) {
+  if (!targetPath) {
+    return targetPath;
+  }
+
+  const absolute = path.resolve(targetPath);
+  const relative = path.relative(process.cwd(), absolute);
+  if (
+    relative &&
+    !relative.startsWith("..") &&
+    !path.isAbsolute(relative)
+  ) {
+    return relative;
+  }
+
+  return absolute;
 }
 
 async function readTranscript(stdout, outputPath) {
@@ -426,6 +481,13 @@ function normalizeProvider(provider) {
 
 function shouldAttemptRealStt(provider) {
   return provider === "sherpa" || provider === "auto";
+}
+
+function shouldRetryWithAutoLanguage(plan, error) {
+  return (
+    plan.language !== "auto" &&
+    /invalid unordered_map/i.test(error?.message || "")
+  );
 }
 
 function normalizeText(value) {

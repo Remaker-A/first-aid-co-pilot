@@ -212,6 +212,35 @@ function Find-SherpaExecutable {
   return $null
 }
 
+function Find-PythonCommand {
+  foreach ($candidate in @("python", "python3")) {
+    $command = Get-Command $candidate -ErrorAction SilentlyContinue
+    if ($command) {
+      if ($command.Source) {
+        return $command.Source
+      }
+      return $candidate
+    }
+  }
+
+  return $null
+}
+
+function Test-SherpaOnnxPythonPackage {
+  param([string]$PythonCommand)
+
+  if ([string]::IsNullOrWhiteSpace($PythonCommand)) {
+    return $false
+  }
+
+  try {
+    & $PythonCommand -c "import sherpa_onnx" 1>$null 2>$null
+    return $LASTEXITCODE -eq 0
+  } catch {
+    return $false
+  }
+}
+
 function Find-ModelFiles {
   param([string]$SearchDir)
 
@@ -235,24 +264,26 @@ SPEECH_MODE=mock
 VOICE_STT_PROVIDER=mock
 VOICE_TTS_PROVIDER=mock
 
-# Switch to sherpa-onnx after setupSpeech.ps1 reports executable and model files found.
+# Switch to sherpa-onnx after setupSpeech.ps1 reports Python, sherpa-onnx, and model files found.
 # SPEECH_MODE=sherpa-onnx
-SHERPA_ONNX_STT_COMMAND=models/speech/bin/sherpa-onnx-offline.exe
-SHERPA_ONNX_TTS_COMMAND=models/speech/bin/sherpa-onnx-offline-tts.exe
+# VOICE_STT_PROVIDER=sherpa-onnx
+# VOICE_TTS_PROVIDER=sherpa-onnx
+SHERPA_ONNX_STT_COMMAND=python
+SHERPA_ONNX_TTS_COMMAND=python
 SPEECH_STT_MODEL_DIR=models/speech/stt
 SPEECH_TTS_MODEL_DIR=models/speech/tts
 
-# Args are model-specific. Use placeholders:
+# Args are model-specific. The bundled wrappers use these placeholders:
 # {audio}, {out}, {model_dir}, {language} for STT.
 # {text}, {out}, {model_dir} for TTS.
-# SHERPA_ONNX_STT_ARGS=--wave-filename "{audio}"
-# SHERPA_ONNX_TTS_ARGS=--text "{text}" --output "{out}"
+SHERPA_ONNX_STT_ARGS=scripts/speech/sherpa_stt.py --model-dir "{model_dir}" --audio "{audio}" --language "{language}"
+SHERPA_ONNX_TTS_ARGS=scripts/speech/sherpa_tts.py --model-dir "{model_dir}" --output "{out}" --text "{text}"
 
 # Optional runtime tuning for the voice server or adapters.
 SPEECH_SAMPLE_RATE=16000
-SPEECH_LANGUAGE=zh
-VOICE_STT_TIMEOUT_MS=15000
-VOICE_TTS_TIMEOUT_MS=15000
+SPEECH_LANGUAGE=auto
+VOICE_STT_TIMEOUT_MS=60000
+VOICE_TTS_TIMEOUT_MS=60000
 '@
 
   if ($DryRun) {
@@ -309,13 +340,35 @@ if (-not $SkipEnvExample) {
 }
 
 $sherpaExecutable = Find-SherpaExecutable -SearchDir $BinDir
+$pythonCommand = Find-PythonCommand
+$pythonSherpaReady = Test-SherpaOnnxPythonPackage -PythonCommand $pythonCommand
+$sttWrapperPath = Join-Path $RepoRoot "scripts/speech/sherpa_stt.py"
+$ttsWrapperPath = Join-Path $RepoRoot "scripts/speech/sherpa_tts.py"
+$pythonWrapperReady = (
+  $pythonCommand -and
+  $pythonSherpaReady -and
+  (Test-Path -LiteralPath $sttWrapperPath) -and
+  (Test-Path -LiteralPath $ttsWrapperPath)
+)
 $sttFiles = @(Find-ModelFiles -SearchDir $SttDir)
 $ttsFiles = @(Find-ModelFiles -SearchDir $TtsDir)
 
 if ($sherpaExecutable) {
   Write-Step "Found sherpa-onnx executable: $sherpaExecutable"
+} elseif ($pythonWrapperReady) {
+  Write-Step "Standalone sherpa-onnx executable was not found; Python wrapper runtime is ready."
 } else {
-  Write-Warning "sherpa-onnx executable was not found. Install it on PATH or rerun with -SherpaOnnxSource <local path or URL>."
+  Write-Warning "Neither standalone sherpa-onnx nor the Python wrapper runtime is ready. Install sherpa-onnx on PATH, install the Python package, or rerun with -SherpaOnnxSource <local path or URL>."
+}
+
+if ($pythonCommand) {
+  Write-Step "Found Python command: $pythonCommand"
+} else {
+  Write-Warning "Python was not found on PATH. Set SHERPA_ONNX_STT_COMMAND/SHERPA_ONNX_TTS_COMMAND to a Python executable if using the bundled wrappers."
+}
+
+if ($pythonCommand -and -not $pythonSherpaReady) {
+  Write-Warning "Python is present, but 'import sherpa_onnx' failed. Install the sherpa-onnx Python package for wrapper-based real speech."
 }
 
 if ($sttFiles.Count -gt 0) {
@@ -330,7 +383,7 @@ if ($ttsFiles.Count -gt 0) {
   Write-Warning "No TTS model files were found under $TtsDir. Rerun with -TtsModelSource <local path or URL> for real TTS."
 }
 
-if ($sherpaExecutable -and $sttFiles.Count -gt 0 -and $ttsFiles.Count -gt 0) {
+if (($sherpaExecutable -or $pythonWrapperReady) -and $sttFiles.Count -gt 0 -and $ttsFiles.Count -gt 0) {
   Write-Step "Real sherpa-onnx speech setup looks ready."
 } else {
   Write-Step "Mock speech mode is ready to use. Use .env.speech.example as the non-secret template while real assets are missing."

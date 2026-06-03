@@ -4,6 +4,15 @@
 日期：2026-06-01  
 依据文档：`FirstAid_Copilot_Agent_Technical_Design.md`
 
+当前实现状态（2026-06-03）：
+
+```text
+Agent Core 主链路已实现。
+本地 Gemma 4 E2B LiteRT-LM runner 已接入。
+Sherpa-ONNX STT/TTS 真实语音链路已通过严格验证。
+仍待 Android 真机层替换的边界：摄像头视觉、拨号、GPS、录制、震动实际执行。
+```
+
 ## 1. 当前定案
 
 本项目 MVP 按以下设计执行：
@@ -115,7 +124,7 @@ Execution is Android-driven
 
 ```text
 mock 输入能跑通：
-无反应 → 无正常呼吸/不确定 → 呼叫120 → CPR → 纠错 → 交接报告
+无反应 → 确认无正常呼吸/濒死喘息 → 呼叫120 → CPR → 纠错 → 交接报告
 ```
 
 ### A2. CPRStartRule
@@ -125,7 +134,7 @@ mock 输入能跑通：
 ```text
 adult_likely == true
 AND responsive == false
-AND normal_breathing != true
+AND (normal_breathing == false OR agonal_breathing == true)
 → START_CPR
 ```
 
@@ -133,7 +142,7 @@ AND normal_breathing != true
 
 - 无反应 + 无正常呼吸：启动 CPR。
 - 无反应 + 喘息样呼吸：启动 CPR。
-- 无反应 + 不确定呼吸：启动 CPR。
+- 无反应 + 不确定呼吸：不直接启动 CPR，继续引导 5-10 秒呼吸检查并准备呼叫 120。
 - 有反应：不启动 CPR。
 - 明确正常呼吸：不启动 CPR。
 
@@ -384,9 +393,9 @@ DemoEventScript
 
 ```text
 先跑通 mock 主链路
-再接 Gemma
-再接真实感知
-最后打磨 Demo
+再接 Gemma 和真实语音
+再接 Android 真机感知与工具执行
+最后打磨 Demo 与交接材料
 ```
 
 这能最大程度保证比赛交付稳定。

@@ -36,6 +36,11 @@ export function resolveGemmaConfig(options = {}) {
     backend: normalizeBackend(options.backend || env.GEMMA_BACKEND || DEFAULT_GEMMA_BACKEND),
     timeoutMs: normalizeTimeout(options.timeoutMs ?? env.GEMMA_TIMEOUT_MS),
     command: options.command || env.GEMMA_COMMAND || env.LITERT_LM_COMMAND || DEFAULT_GEMMA_COMMAND,
+    commandPrefixArgs: normalizeExtraArgs(
+      options.commandPrefixArgs ??
+      env.GEMMA_COMMAND_PREFIX_ARGS ??
+      env.LITERT_LM_COMMAND_PREFIX_ARGS
+    ),
     supportsMessages: parseBoolean(options.supportsMessages ?? env.GEMMA_SUPPORTS_MESSAGES),
     promptArg: options.promptArg || env.GEMMA_PROMPT_ARG || "--prompt",
     extraArgs: normalizeExtraArgs(options.extraArgs ?? env.GEMMA_EXTRA_ARGS),
@@ -58,6 +63,7 @@ export function describeGemmaModelSetup(config = {}) {
     "How to download: npm run setup:gemma",
     "How to import an existing copy: powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/setupGemma.ps1 -ModelSource <path-or-zip-or-url>",
     `Detection: the runtime auto-discovers the first file matching ${pattern} under the model dir (override with GEMMA_MODEL_DIR or GEMMA_MODEL_FILE).`,
+    "Runner override: set GEMMA_COMMAND to an executable; for module runners use GEMMA_COMMAND_PREFIX_ARGS, for example GEMMA_COMMAND=python and GEMMA_COMMAND_PREFIX_ARGS=\"-m litert_lm_cli.main\".",
     "Verify: npm run verify:local -- --require-real-gemma"
   ].join("\n");
 }

@@ -1,0 +1,59 @@
+{
+  "schema_version": "guidance_action.v0.1",
+  "action_id": "act_fixture_cpr_haptic_stop",
+  "session_id": "sess_android_fixture",
+  "timestamp": "2026-06-03T20:31:00+08:00",
+  "stage": "S9_HANDOVER",
+  "intent": "stop_cpr_loop",
+  "priority": "normal",
+  "source": "state_machine",
+  "reason_codes": [
+    "handover_started"
+  ],
+  "ttl_ms": 5000,
+  "throttle_key": "cpr.metronome",
+  "min_interval_ms": 0,
+  "tts": {
+    "text": "可以停止按压了，急救员接手。",
+    "tone": "calm_firm",
+    "speed": "normal",
+    "interrupt_policy": "queue"
+  },
+  "ui": {
+    "main_text": "停止按压",
+    "secondary_text": "急救员已接手",
+    "status_tags": [
+      "停止",
+      "交接"
+    ],
+    "quality_score": null,
+    "primary_button": null
+  },
+  "haptic": {
+    "enabled": false
+  },
+  "visual_overlay": null,
+  "tool_actions": [
+    {
+      "type": "stop_haptic_metronome",
+      "requires_user_confirmation": false
+    }
+  ],
+  "log_event": {
+    "schema_version": "log_event.v0.1",
+    "log_event_id": "log_fixture_cpr_haptic_stop",
+    "session_id": "sess_android_fixture",
+    "timestamp": "2026-06-03T20:31:00+08:00",
+    "stage": "S9_HANDOVER",
+    "intent": "stop_cpr_loop",
+    "source": "state_machine",
+    "type": "cpr_haptic",
+    "detail": "stop_metronome",
+    "reason_codes": [
+      "handover_started"
+    ],
+    "metadata": {
+      "fixture": true
+    }
+  }
+}

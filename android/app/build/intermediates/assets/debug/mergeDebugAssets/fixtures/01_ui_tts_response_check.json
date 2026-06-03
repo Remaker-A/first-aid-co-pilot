@@ -1,0 +1,57 @@
+{
+  "schema_version": "guidance_action.v0.1",
+  "action_id": "act_fixture_ui_tts_response_check",
+  "session_id": "sess_android_fixture",
+  "timestamp": "2026-06-03T20:30:01+08:00",
+  "stage": "S2_CHECK_RESPONSE",
+  "intent": "ask_response_check",
+  "priority": "normal",
+  "source": "gemma_agent",
+  "reason_codes": [
+    "response_unknown"
+  ],
+  "ttl_ms": 5000,
+  "throttle_key": "dialogue.ask_response_check",
+  "min_interval_ms": 1000,
+  "tts": {
+    "text": "请大声叫他，并轻拍双肩。",
+    "tone": "calm_firm",
+    "speed": "normal",
+    "interrupt_policy": "do_not_interrupt_critical"
+  },
+  "ui": {
+    "main_text": "检查反应",
+    "secondary_text": "呼叫并轻拍双肩",
+    "status_tags": [
+      "呼叫",
+      "拍肩"
+    ],
+    "quality_score": null,
+    "primary_button": {
+      "label": "没有反应",
+      "action": "mark_unresponsive"
+    }
+  },
+  "haptic": {
+    "enabled": false
+  },
+  "visual_overlay": null,
+  "tool_actions": [],
+  "log_event": {
+    "schema_version": "log_event.v0.1",
+    "log_event_id": "log_fixture_ui_tts_response_check",
+    "session_id": "sess_android_fixture",
+    "timestamp": "2026-06-03T20:30:01+08:00",
+    "stage": "S2_CHECK_RESPONSE",
+    "intent": "ask_response_check",
+    "source": "gemma_agent",
+    "type": "dialogue_prompt",
+    "detail": "ask_response_check",
+    "reason_codes": [
+      "response_unknown"
+    ],
+    "metadata": {
+      "fixture": true
+    }
+  }
+}

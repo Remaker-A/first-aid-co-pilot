@@ -21,7 +21,8 @@ const VALID_TONES = new Set(["calm_firm", "calm_soft", "urgent"]);
 const VALID_SPEEDS = new Set(["normal", "slow"]);
 const VALID_ARROWS = new Set(["left", "right", "up", "down", null]);
 const PATCH_WRAPPER_KEYS = Object.freeze(["GuidanceActionPatch", "patch", "action"]);
-const CORRUPT_TEXT_PATTERN = /\uFFFD|(?:[\u00C2-\u00C3][\u0080-\u00BF]?)/u;
+const CORRUPT_TEXT_PATTERN =
+  /\uFFFD|锟斤拷|(?:[\u00C2-\u00C3][\u0080-\u00BF]?)|(?:[ÃÂ][\u0080-\u00FF])/u;
 
 export function parseGemmaResponse(raw, frameOrOptions = {}, maybeOptions = {}) {
   const { frame, options } = splitFrameAndOptions(frameOrOptions, maybeOptions);

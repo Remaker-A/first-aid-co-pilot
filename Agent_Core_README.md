@@ -1,7 +1,7 @@
 # FirstAid Copilot Agent Core MVP
 
 This is the local Node.js implementation of the v0.1 FirstAid Copilot agent chain.
-The next local closed-loop target uses Gemma 4 E2B LiteRT-LM for the controlled
+The local closed-loop target uses Gemma 4 E2B LiteRT-LM for the controlled
 language layer, with speech I/O handled by offline STT/TTS adapters.
 
 ## What Runs
@@ -18,9 +18,11 @@ DemoEventScript
 -> HandoverReport
 ```
 
-The current scope is the adult suspected cardiac arrest CPR demo path. Vision,
-CPR quality recognition, emergency calling, GPS, and recording integrations can
-remain mocked while the local Gemma + STT/TTS loop is being brought up.
+The current scope is the adult suspected cardiac arrest CPR demo path. The
+local Gemma + STT/TTS loop is wired and covered by strict readiness checks.
+Vision, CPR quality recognition, emergency calling, GPS, and recording
+integrations remain replaceable boundary adapters until the Android device
+layer is connected.
 
 ## Local Gemma Runtime
 
@@ -28,6 +30,7 @@ The Gemma runtime is expected to use:
 
 - Model repo: `litert-community/gemma-4-E2B-it-litert-lm`
 - Local model directory: `models/gemma/gemma-4-E2B-it-litert-lm/`
+- CLI runner: `litert-lm`
 - Default backend: `cpu`
 - Override backend: `GEMMA_BACKEND=gpu`
 - Default timeout: `GEMMA_TIMEOUT_MS=120000`
@@ -49,17 +52,18 @@ the script should fail with a clear message to check the downloaded model repo.
 It prefers the modern `hf download` CLI when present, and keeps uv/Hugging Face
 cache directories under `.cache/` inside the workspace.
 
-If Hugging Face is blocked in the current shell, download the LiteRT-LM artifact
-elsewhere and import it locally:
+If Hugging Face is blocked in the current shell, download the LiteRT-LM model
+artifact elsewhere and import it locally:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setupGemma.ps1 -ModelSource <path-to-litertlm-or-zip-or-dir> -SkipLiteRtVerify
 ```
 
 If `litert-lm` is already installed on PATH, the setup script verifies it
-directly. Otherwise it falls back to `uvx --from litert-lm litert-lm --help`.
-You can pass `-LiteRtCommand <path>` or `-SkipLiteRtVerify` for constrained
-offline setups.
+directly. Otherwise it tries uv package candidates, preferring
+`litert-lm-nightly` and then `litert-lm`. You can pass `-UvPython <python>`,
+`-LiteRtPackageSource <wheel-or-dir>`, `-LiteRtCommand <path>`, or
+`-SkipLiteRtVerify` for constrained offline setups.
 
 Do not commit downloaded model files. The entire `models/` tree is local runtime
 state and should stay out of source control.
@@ -78,9 +82,9 @@ browser microphone WAV
 -> browser playback
 ```
 
-For early development, the browser, STT transcript, perception events, and TTS
-audio may be mocked independently as long as the Agent/Gemma/validator contract
-stays the same.
+Mocks remain supported for browser, STT transcript, perception events, and TTS
+audio as long as the Agent/Gemma/validator contract stays the same. Production
+readiness should use the strict real-asset verifier.
 
 Run `npm run setup:speech -- -DryRun` to preview speech setup. A real sherpa-onnx
 install can pass local paths or URLs:
@@ -111,6 +115,7 @@ required flags.
 npm run setup:gemma
 npm run setup:speech
 npm run verify:local
+npm run verify:local:strict
 npm run voice:serve
 npm test
 node --test
@@ -120,7 +125,8 @@ node src/cli/runDemo.js
 `npm run verify:local` audits model files, Gemma/LiteRT command availability,
 speech command configuration, and a local voice-loop smoke test. Add
 `-- --require-real-gemma --require-real-speech` when you want missing local model
-or sherpa assets to fail the readiness check instead of warning.
+or sherpa assets to fail the readiness check instead of warning, or run
+`npm run verify:local:strict`.
 
 The core tests remain pure ESM `node:test` and do not require npm runtime
 dependencies. Local model setup may install or call external CLI tools.

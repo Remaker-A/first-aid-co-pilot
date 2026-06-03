@@ -27,6 +27,7 @@ export function decideCprStart(state = {}) {
   const adult = scope.adult_likely === true;
   const unresponsive = facts.responsive === false;
   const normalBreathing = facts.normal_breathing === true;
+  const noNormalBreathing = facts.normal_breathing === false || facts.agonal_breathing === true;
 
   if (!adult) {
     return CprStartDecision.OUT_OF_SCOPE;
@@ -40,7 +41,9 @@ export function decideCprStart(state = {}) {
     return CprStartDecision.MONITOR_AND_CALL_HELP;
   }
 
-  return CprStartDecision.START_CPR;
+  return noNormalBreathing
+    ? CprStartDecision.START_CPR
+    : CprStartDecision.PREPARE_EMERGENCY_CALL;
 }
 
 export function getCprStartReasonCodes(state = {}) {
@@ -66,7 +69,7 @@ export function getCprStartReasonCodes(state = {}) {
 
   if (facts.normal_breathing === true) {
     reasonCodes.push(CPR_START_REASON.NORMAL_BREATHING);
-  } else if (facts.responsive === false) {
+  } else if (facts.normal_breathing === false || facts.agonal_breathing === true) {
     reasonCodes.push(CPR_START_REASON.NO_NORMAL_BREATHING);
   }
 

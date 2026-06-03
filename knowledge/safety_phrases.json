@@ -47,11 +47,11 @@
     {
       "id": "uncertain_breathing_high_risk",
       "scenario": "呼吸不确定",
-      "stages": ["S3_CHECK_BREATHING", "S4_SUSPECTED_ARREST"],
-      "intents": ["handle_uncertain_breathing", "explain_uncertain_breathing"],
-      "text": "如果不确定是否正常呼吸，请按没有正常呼吸处理。",
+      "stages": ["S3_CHECK_BREATHING"],
+      "intents": ["ask_breathing_check", "clarify_breathing"],
+      "text": "请继续看胸口 5 到 10 秒，确认有没有正常起伏。",
       "tone": "calm_firm",
-      "tags": ["breathing_uncertain", "high_risk"]
+      "tags": ["breathing_uncertain", "recheck"]
     },
     {
       "id": "start_cpr",
@@ -252,4 +252,3 @@
     "must_not_interrupt_critical_with_lower_priority": true
   }
 }
-

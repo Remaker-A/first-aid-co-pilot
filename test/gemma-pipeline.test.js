@@ -7,6 +7,18 @@ import { DemoEventPlayer } from "../src/demo/demoEventPlayer.js";
 
 const SCRIPT_PATH = resolve("knowledge", "demo_script_cpr_main_v1.json");
 
+const STATE_INTENT_BY_STAGE = Object.freeze({
+  S1_SCENE_SAFE: "ensure_scene_safe",
+  S2_CHECK_RESPONSE: "ask_response_check",
+  S3_CHECK_BREATHING: "ask_breathing_check",
+  S4_SUSPECTED_ARREST: "state_suspected_arrest_handling",
+  S5_CALL_EMERGENCY: "start_emergency_call_and_cpr",
+  S6_CPR_READY: "guide_cpr_position",
+  S7_CPR_LOOP: "continue_cpr_loop",
+  S8_ASSISTANCE: "assist_rescuer_fatigue",
+  S9_HANDOVER: "explain_handover"
+});
+
 async function loadScript() {
   return JSON.parse(await readFile(SCRIPT_PATH, "utf8"));
 }
@@ -19,6 +31,7 @@ function stageEchoRuntime() {
     async generatePatch(frame) {
       runtime.calls.push(frame);
       const intent =
+        STATE_INTENT_BY_STAGE[frame.current_stage] ||
         (frame.allowed_intents || []).find(
           (item) => item && !["defer_to_rule_feedback", "fallback_template"].includes(item)
         ) || "fallback_template";
@@ -70,6 +83,42 @@ function unsafeRuntime() {
           ui: { main_text: "诊断", secondary_text: "" },
           reason: "should_be_blocked",
           confidence: 0.95
+        }
+      };
+    }
+  };
+}
+
+function intentChangingRuntime(intent = "patient_unresponsive") {
+  return {
+    async generatePatch() {
+      return {
+        ok: true,
+        patch: {
+          intent,
+          tts: { text: "他没有反应。现在检查呼吸。", tone: "calm_firm", speed: "normal" },
+          ui: { main_text: "检查呼吸", secondary_text: "" },
+          reason: "intent_change_probe",
+          confidence: 0.91
+        }
+      };
+    }
+  };
+}
+
+function breathingJudgmentRuntime() {
+  return {
+    calls: [],
+    async generatePatch(frame) {
+      breathingJudgmentRuntime.calls?.push?.(frame);
+      return {
+        ok: true,
+        patch: {
+          intent: "normal_breathing_absent",
+          tts: { text: "没有正常呼吸。", tone: "calm_firm", speed: "normal" },
+          ui: { main_text: "无正常呼吸", secondary_text: "" },
+          reason: "gemma_should_not_decide_breathing",
+          confidence: 0.9
         }
       };
     }
@@ -186,4 +235,86 @@ test("Invalid Gemma patch is rejected by ActionValidator and never overrides the
     result.gemma.guidance.some((g) => (g.gemma_violations || []).includes("forbidden_speech"))
   );
   assert.ok(result.gemma.guidance.every((g) => g.source !== "gemma_agent"));
+});
+
+test("Gemma cannot change intent on pure perception turns without user input", async () => {
+  const events = [
+    {
+      source: "demo_script",
+      event_type: "session_started",
+      patient_state: {
+        adult_likely: true,
+        responsive: null,
+        normal_breathing: null
+      }
+    },
+    {
+      source: "vision_patient",
+      event_type: "patient_state_update",
+      patient_state: {
+        adult_likely: true,
+        responsive: null,
+        normal_breathing: null,
+        confidence: 0.86
+      },
+      metadata: { scene_safe: true }
+    }
+  ];
+
+  const result = await runAgentPipeline({
+    events,
+    mode: "demo_assisted",
+    sessionId: "sess_pure_perception_guard",
+    gemmaRuntime: intentChangingRuntime()
+  });
+
+  assert.equal(result.state.current_stage, AgentStage.S2_CHECK_RESPONSE);
+  assert.equal(result.actions.at(-1).intent, "ask_response_check");
+  assert.equal(result.gemma.guidance.at(-1).source, "state_machine");
+});
+
+test("Gemma cannot replace high-priority breathing assessment guidance", async () => {
+  const script = [
+    {
+      at_ms: 0,
+      event: {
+        source: "demo_script",
+        event_type: "session_started",
+        patient_state: { adult_likely: true, responsive: null, normal_breathing: null }
+      }
+    },
+    {
+      at_ms: 1000,
+      event: {
+        source: "demo_script",
+        event_type: "patient_state_update",
+        patient_state: { adult_likely: true },
+        metadata: { scene_safe: true }
+      }
+    },
+    {
+      at_ms: 2000,
+      event: {
+        source: "stt",
+        event_type: "user_response",
+        user_input: {
+          stt_text: "他没有反应",
+          intent: "patient_unresponsive",
+          confidence: 0.9
+        },
+        patient_state: { adult_likely: true, responsive: false }
+      }
+    }
+  ];
+
+  const result = await runDemoPipeline({
+    script,
+    sessionId: "sess_breathing_guard",
+    useGemma: true,
+    gemmaRuntime: breathingJudgmentRuntime()
+  });
+
+  assert.equal(result.state.current_stage, AgentStage.S3_CHECK_BREATHING);
+  assert.equal(result.actions.at(-1).intent, "ask_breathing_check");
+  assert.equal(result.gemma.guidance.at(-1).source, "state_machine_critical");
 });

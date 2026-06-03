@@ -3,7 +3,7 @@ import test from "node:test";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { buildSttInvocation, resolveSttPlan, transcribeInput } from "../src/index.js";
+import { buildSttInvocation, inferIntent, resolveSttPlan, transcribeInput } from "../src/index.js";
 
 const STT_ENV_KEYS = [
   "SHERPA_ONNX_STT_COMMAND",
@@ -19,6 +19,33 @@ const STT_ENV_KEYS = [
   "SPEECH_MODE",
   "VOICE_STT_TIMEOUT_MS",
 ];
+
+test("inferIntent recognizes common zh-CN emergency call confirmations", () => {
+  assert.equal(inferIntent("我已经拨打120了"), "emergency_called");
+  assert.equal(inferIntent("120已经接通了"), "emergency_called");
+  assert.equal(inferIntent("急救电话打通了"), "emergency_called");
+});
+
+test("inferIntent recognizes common zh-CN handover arrival phrases", () => {
+  assert.equal(inferIntent("救护车到了"), "paramedics_arrived");
+  assert.equal(inferIntent("救货车到了。"), "paramedics_arrived");
+  assert.equal(inferIntent("医生来了"), "paramedics_arrived");
+  assert.equal(inferIntent("急救人员到了"), "paramedics_arrived");
+  assert.equal(inferIntent("医护人员赶到了"), "paramedics_arrived");
+});
+
+test("inferIntent recognizes CPR live question intents", () => {
+  assert.equal(inferIntent("我按得对吗"), "ask_cpr_quality");
+  assert.equal(inferIntent("我爱你的对吗？"), "ask_cpr_quality");
+  assert.equal(inferIntent("我能不能停"), "ask_can_stop");
+  assert.equal(inferIntent("我能不能听？"), "ask_can_stop");
+  assert.equal(inferIntent("AED 来了怎么办"), "ask_aed_help");
+  assert.equal(inferIntent("说颤姨来了怎么办？"), "ask_aed_help");
+  assert.equal(inferIntent("出差一来了怎么办？"), "ask_aed_help");
+  assert.equal(inferIntent("出差疑来了怎么办？"), "ask_aed_help");
+  assert.equal(inferIntent("现在怎么办"), "ask_next_step");
+  assert.equal(inferIntent("要不要打120"), "ask_emergency_call");
+});
 
 // Keep these tests hermetic regardless of the developer/CI shell environment.
 async function withCleanSttEnv(fn) {
@@ -47,7 +74,7 @@ test("resolveSttPlan defaults to bundled python sherpa_stt.py and honors explici
     assert.match(plan.command, /python3?$/);
     assert.match(plan.script, /scripts[\\/]speech[\\/]sherpa_stt\.py$/);
     assert.match(plan.modelDir, /models[\\/]speech[\\/]stt$/);
-    assert.equal(plan.language, "zh");
+    assert.equal(plan.language, "auto");
     assert.equal(plan.numThreads, 2);
     assert.equal(plan.timeoutMs, 20000);
 
@@ -78,11 +105,11 @@ test("buildSttInvocation constructs the python argv and honors a command templat
 
   assert.equal(scriptInvocation.command, "python");
   assert.deepEqual(scriptInvocation.args, [
-    "/opt/scripts/sherpa_stt.py",
+    path.resolve("/opt/scripts/sherpa_stt.py"),
     "--model-dir",
     path.resolve("/models/stt"),
     "--audio",
-    "/tmp/clip.wav",
+    path.resolve("/tmp/clip.wav"),
     "--language",
     "zh",
     "--num-threads",
@@ -102,13 +129,13 @@ test("buildSttInvocation constructs the python argv and honors a command templat
 
   assert.deepEqual(commandInvocation.args, [
     "--wave",
-    "/tmp/clip.wav",
+    path.resolve("/tmp/clip.wav"),
     "--model",
     path.resolve("/models/stt"),
     "--lang",
     "en",
     "--out",
-    "/tmp/clip.txt",
+    path.resolve("/tmp/clip.txt"),
   ]);
 });
 
@@ -161,6 +188,59 @@ test("STT adapter builds and runs the real sherpa command path (mocked engine) a
       assert.equal(args[5], "zh");
       assert.equal(args[6], "--num-threads");
       assert.equal(args[7], "2");
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+test("STT adapter retries with auto language when sherpa rejects a fixed language", async () => {
+  await withCleanSttEnv(async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "firstaid-stt-retry-"));
+    try {
+      await fs.writeFile(path.join(tmpDir, "model.int8.onnx"), "");
+      await fs.writeFile(path.join(tmpDir, "tokens.txt"), "");
+
+      const argvOutPath = path.join(tmpDir, "recorded-argv.jsonl");
+      const fixturePath = path.join(tmpDir, "fake-sherpa-stt-retry.cjs");
+      const fixtureSource =
+        'const fs = require("node:fs");\n' +
+        `fs.appendFileSync(${JSON.stringify(argvOutPath)}, JSON.stringify(process.argv) + "\\n", "utf8");\n` +
+        'const language = process.argv[process.argv.indexOf("--language") + 1];\n' +
+        'if (language === "zh") { process.stderr.write("invalid unordered_map<K, T> key"); process.exit(1); }\n' +
+        'process.stdout.write(Buffer.from(JSON.stringify({ text: "还没有反应。" }), "utf8"));\n';
+      await fs.writeFile(fixturePath, fixtureSource, "utf8");
+
+      const result = await transcribeInput(
+        {
+          audioBase64: Buffer.from("RIFF....fake wav bytes", "utf8").toString("base64"),
+          mimeType: "audio/wav",
+        },
+        {
+          provider: "sherpa",
+          python: process.execPath,
+          script: fixturePath,
+          modelDir: tmpDir,
+          language: "zh",
+          numThreads: 2,
+        }
+      );
+
+      assert.equal(result.ok, true);
+      assert.equal(result.provider, "sherpa-onnx");
+      assert.equal(result.source, "sherpa_onnx_stt");
+      assert.equal(result.transcript, "还没有反应。");
+      assert.equal(result.intent, "patient_unresponsive");
+      assert.equal(result.language_retry, "auto");
+
+      const invocations = (await fs.readFile(argvOutPath, "utf8"))
+        .trim()
+        .split(/\r?\n/)
+        .map((line) => JSON.parse(line));
+      assert.equal(invocations.length, 2);
+      assert.equal(invocations[0].at(-2), "--num-threads");
+      assert.ok(invocations[0].includes("zh"));
+      assert.ok(invocations[1].includes("auto"));
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }

@@ -2,6 +2,7 @@ export { UiSink, createUiSink, hasRenderableUi } from "./uiSink.js";
 export { TtsSink, createTtsSink, hasSpeech } from "./ttsSink.js";
 export { HapticSink, createHapticSink } from "./hapticSink.js";
 export { ToolSink, createToolSink } from "./toolSink.js";
+export * from "./emergencyCallDemoTool.js";
 export * from "./toolPolicy.js";
 
 import { createUiSink } from "./uiSink.js";

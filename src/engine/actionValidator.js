@@ -20,6 +20,8 @@ const DEFAULT_ALLOWED_TOOL_TYPES_BY_STAGE = Object.freeze({
   ],
   S6_CPR_READY: ["start_haptic_metronome"],
   S7_CPR_LOOP: ["start_haptic_metronome", "update_haptic_metronome", "stop_haptic_metronome"],
+  MONITOR_RESPONSE: ["emergency_call", "mock_emergency_call", "attach_gps", "attach_gps_location"],
+  MONITOR_BREATHING: ["emergency_call", "mock_emergency_call", "attach_gps", "attach_gps_location"],
   S9_HANDOVER: [
     "generate_handover_report",
     "request_share_report",
