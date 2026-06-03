@@ -56,6 +56,18 @@ The debug APK is generated at `android/app/build/outputs/apk/debug/app-debug.apk
 
 Local setup success does not change safety behavior: Demo builds must not automatically dial real 120, sharing or deletion still requires explicit user confirmation, and mock-only passes are not strict real readiness.
 
+## Live CPR Coach Demo
+
+The launcher activity now opens the Live CPR Coach screen by default. The older fixture dispatcher remains available from the `旧 Fixture` debug button inside the Live screen.
+
+Live demo expectations:
+
+- Start the Node voice server from the repository root with `npm run voice:serve`, then run the Android debug app. The emulator default target is `http://10.0.2.2:8787`; on a real device use `adb reverse tcp:8787 tcp:8787` or point the transport at a LAN host in code.
+- The Camera toggle only controls the background camera preview. It does not imply real CPR recognition. Scripted/demo injection is labeled `演示数据`; real microphone/camera capture without a real perception model is labeled `仅录制/采集`; only a future `real_perception` event source should be labeled `实时识别`.
+- CameraX is preview-only in this phase. It requests runtime `CAMERA` permission and falls back to a mock background if permission or hardware is unavailable.
+- CPR haptics use a single Android vibrator metronome instance at the requested BPM, defaulting to 110 bpm for CPR fallback. The app must never auto-dial real 120.
+- When `/api/turn` is unreachable or times out during S7/S8, Android keeps the last quality score, shows `继续按压`, enables the 110 bpm haptic metronome, and surfaces an honest offline fallback message. HTTP, parse, and application errors remain errors.
+
 ## Fixtures
 
 GuidanceAction fixtures live in:
@@ -108,6 +120,21 @@ npm run scenario
 ```
 
 `npm run demo:dispatcher` prints representative validated actions and the channels that receive them. `node --test test/dispatcher.test.js` verifies dispatcher guardrails. `npm run scenario` runs the scripted CPR loop through Agent output and dispatcher delivery.
+
+## Phase 2 Live Voice Thin Client
+
+Before starting Android Live voice work, confirm the target route:
+
+- Thin client first: Android captures audio and endpoints speech locally, then posts 16 kHz mono WAV turns to the existing Node `/api/turn` endpoint.
+- Fully offline later: Android embeds on-device sherpa-onnx STT/TTS/VAD and keeps the same `GuidanceAction` adapter boundary.
+
+The recommended first implementation is the thin client because it reuses the browser Live backend, including the Node speech daemon and the existing Agent safety gates. Minimum Android scope:
+
+- Add `RECORD_AUDIO` permission and a visible foreground service for continuous microphone capture.
+- Use `AudioRecord` with local VAD endpoint detection to buffer one phrase at a time and encode it as 16 kHz mono WAV.
+- POST each completed phrase to `/api/turn` with the current session and patient state fields already used by the browser demo.
+- Keep half-duplex behavior: pause or ignore capture while Android TTS/server WAV playback is active, then resume listening on playback completion.
+- Preserve adapter safety rules: no automatic real 120 dialing, and sharing/sending/deleting still requires explicit visible confirmation.
 
 ## Safety Rules
 

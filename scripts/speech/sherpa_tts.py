@@ -11,13 +11,14 @@ writes a 16-bit PCM wav to the requested output path.
 """
 import argparse
 import glob
+import json
 import os
 import sys
 import wave
 
 import numpy as np
 
-for _stream in (sys.stdout, sys.stderr):
+for _stream in (sys.stdin, sys.stdout, sys.stderr):
     try:
         _stream.reconfigure(encoding="utf-8")
     except Exception:  # noqa: BLE001 - older Python or non-reconfigurable stream
@@ -52,20 +53,35 @@ def collect_rule_fsts(model_dir):
     for name in names:
         path = find_first(model_dir, [name])
         if path:
-            found.append(path)
+            found.append(to_process_path(path))
     return ",".join(found)
+
+
+def to_process_path(target_path):
+    if not target_path:
+        return target_path
+
+    abs_path = os.path.abspath(target_path)
+    try:
+        rel_path = os.path.relpath(abs_path, os.getcwd())
+    except ValueError:
+        return abs_path
+
+    if rel_path and not rel_path.startswith("..") and not os.path.isabs(rel_path):
+        return rel_path
+    return abs_path
 
 
 def build_tts(model_dir, num_threads):
     import sherpa_onnx
 
-    model = find_first(model_dir, ["model.onnx", "*.onnx"])
-    tokens = find_first(model_dir, ["tokens.txt"])
-    lexicon = find_first(model_dir, ["lexicon.txt"]) or ""
+    model = to_process_path(find_first(model_dir, ["model.onnx", "*.onnx"]))
+    tokens = to_process_path(find_first(model_dir, ["tokens.txt"]))
+    lexicon = to_process_path(find_first(model_dir, ["lexicon.txt"]) or "")
     if not model or not tokens:
         raise FileNotFoundError(f"could not find VITS model/tokens under {model_dir}.")
 
-    dict_dir = find_dict_dir(model_dir)
+    dict_dir = to_process_path(find_dict_dir(model_dir))
     rule_fsts = collect_rule_fsts(model_dir)
 
     log(f"model={model}")
@@ -106,27 +122,78 @@ def write_wave(path, samples, sample_rate):
         wav.writeframes(pcm.tobytes())
 
 
+def synthesize_to_file(tts, text, output, sid, speed):
+    audio = tts.generate(text, sid=sid, speed=speed)
+    if audio is None or len(audio.samples) == 0:
+        raise RuntimeError("TTS produced no samples.")
+    write_wave(output, np.asarray(audio.samples, dtype=np.float32), audio.sample_rate)
+    return audio
+
+
+def serve_tts(args):
+    try:
+        tts = build_tts(args.model_dir, args.num_threads)
+    except Exception as error:  # noqa: BLE001 - startup errors should fail the daemon
+        log(f"startup failed: {error}")
+        return 1
+
+    log("serve mode ready")
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+
+        try:
+            request = json.loads(line)
+            text = (request.get("text") or "").strip()
+            output = request.get("out") or request.get("output") or request.get("path")
+            if not text:
+                raise ValueError("missing text")
+            if not output:
+                raise ValueError("missing out")
+
+            audio = synthesize_to_file(tts, text, output, args.sid, args.speed)
+            response = {
+                "ok": True,
+                "path": output,
+                "sample_rate": audio.sample_rate,
+                "samples": len(audio.samples),
+            }
+            log(f"wrote {output} ({audio.sample_rate} Hz, {len(audio.samples)} samples)")
+        except Exception as error:  # noqa: BLE001 - keep daemon alive for later requests
+            log(f"synthesis failed: {error}")
+            response = {"ok": False, "error": str(error)}
+
+        print(json.dumps(response, ensure_ascii=False), flush=True)
+
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-dir", required=True)
-    parser.add_argument("--output", required=True)
-    parser.add_argument("--text", required=True)
+    parser.add_argument("--output")
+    parser.add_argument("--text")
     parser.add_argument("--sid", type=int, default=0)
     parser.add_argument("--speed", type=float, default=1.0)
     parser.add_argument("--num-threads", type=int, default=2)
+    parser.add_argument("--serve", action="store_true")
     args = parser.parse_args()
+
+    if args.serve:
+        return serve_tts(args)
 
     text = (args.text or "").strip()
     if not text:
         log("empty text; nothing to synthesize")
         return 2
+    if not args.output:
+        log("missing --output")
+        return 2
 
     try:
         tts = build_tts(args.model_dir, args.num_threads)
-        audio = tts.generate(text, sid=args.sid, speed=args.speed)
-        if audio is None or len(audio.samples) == 0:
-            raise RuntimeError("TTS produced no samples.")
-        write_wave(args.output, np.asarray(audio.samples, dtype=np.float32), audio.sample_rate)
+        audio = synthesize_to_file(tts, text, args.output, args.sid, args.speed)
     except Exception as error:  # noqa: BLE001 - surface a clean error to the adapter
         log(f"synthesis failed: {error}")
         return 1

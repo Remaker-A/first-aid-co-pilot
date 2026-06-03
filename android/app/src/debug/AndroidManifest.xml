@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Debug-only overlay. Manifest merging adds android:networkSecurityConfig to the
+    <application> only for debug builds, so release builds keep Android's secure
+    (no-cleartext) defaults and never need this resource.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application android:networkSecurityConfig="@xml/network_security_config" />
+
+</manifest>

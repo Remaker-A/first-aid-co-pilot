@@ -15,6 +15,7 @@ import {
 
 const DEFAULT_VOICE_EVENT_TTL_MS = 30 * 60 * 1000;
 const DEFAULT_GEMMA_LIVE_TIMEOUT_MS = 1200;
+const DEFAULT_GEMMA_TURN_TIMEOUT_MS = 1000;
 
 export function createVoiceDemoService(options = {}) {
   const sessions = new Map();
@@ -255,7 +256,9 @@ function planGemmaSupplement(stateAction, stt, context = {}) {
     run: true,
     reason: null,
     live: cprLive,
-    timeoutMs: cprLive ? resolveGemmaLiveTimeoutMs(context.options) : null,
+    timeoutMs: cprLive
+      ? resolveGemmaLiveTimeoutMs(context.options)
+      : resolveGemmaTurnTimeoutMs(context.options),
   };
 }
 
@@ -284,7 +287,11 @@ async function generateGemmaPatch(runtime, frame, plan = {}) {
     return runtime.generatePatch(frame);
   }
 
-  return withTimeout(runtime.generatePatch(frame), plan.timeoutMs, "gemma_live_timeout");
+  return withTimeout(
+    runtime.generatePatch(frame),
+    plan.timeoutMs,
+    plan.live ? "gemma_live_timeout" : "gemma_turn_timeout"
+  );
 }
 
 async function withTimeout(promise, timeoutMs, reason) {
@@ -359,7 +366,9 @@ function isCriticalRuleCorrection(action) {
 function isCprLiveContext(state = {}, event = null) {
   return (
     state.current_stage === AgentStage.S7_CPR_LOOP ||
+    state.current_stage === AgentStage.S8_ASSISTANCE ||
     event?.stage_hint === AgentStage.S7_CPR_LOOP ||
+    event?.stage_hint === AgentStage.S8_ASSISTANCE ||
     isCprVisionEvent(event)
   );
 }
@@ -373,6 +382,13 @@ function resolveGemmaLiveTimeoutMs(options = {}) {
   return Number.isFinite(value) && value > 0
     ? Math.floor(value)
     : DEFAULT_GEMMA_LIVE_TIMEOUT_MS;
+}
+
+export function resolveGemmaTurnTimeoutMs(options = {}) {
+  const value = Number(options.gemmaTurnTimeoutMs ?? options.gemma_turn_timeout_ms ?? process.env.GEMMA_TURN_TIMEOUT_MS);
+  return Number.isFinite(value) && value > 0
+    ? Math.floor(value)
+    : DEFAULT_GEMMA_TURN_TIMEOUT_MS;
 }
 
 function toGuidanceCandidate(patch, state, sessionId) {

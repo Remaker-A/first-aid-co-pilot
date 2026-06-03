@@ -4,6 +4,7 @@ import path from "node:path";
 import { buildGemmaMessages, buildGemmaPrompt } from "./promptBuilder.js";
 import { parseGemmaResponse } from "./responseParser.js";
 import { createGemmaFallbackPatch } from "./fallbackPolicy.js";
+import { requestGemma } from "./gemmaServer.js";
 import {
   DEFAULT_GEMMA_MODEL_FILE_PATTERN,
   GEMMA_PLACEHOLDER_MIN_BYTES,
@@ -16,6 +17,7 @@ export class GemmaRuntime {
   constructor(options = {}) {
     this.options = options.config ? { ...options.config, ...options } : options;
     this.runner = options.runner || spawnLiteRtLm;
+    this.serverRunner = options.serverRunner || requestGemma;
   }
 
   async generatePatch(frame) {
@@ -43,21 +45,37 @@ export class GemmaRuntime {
       prompt
     });
 
-    let result;
-    try {
-      result = await this.runner({
-        command: config.command,
-        args,
-        timeoutMs: config.timeoutMs,
-        cwd: config.cwd,
-        env: config.env,
-        messages,
-        prompt,
-        modelFile,
-        backend: config.backend
-      });
-    } catch (error) {
-      return createFallbackResult(frame, classifyRunnerError(error), error);
+    let result = null;
+    if (config.daemon) {
+      try {
+        result = await this.serverRunner({
+          config,
+          messages,
+          prompt,
+          modelFile,
+          timeoutMs: config.serveRequestTimeoutMs,
+        });
+      } catch {
+        result = null;
+      }
+    }
+
+    if (!result) {
+      try {
+        result = await this.runner({
+          command: config.command,
+          args,
+          timeoutMs: config.timeoutMs,
+          cwd: config.cwd,
+          env: config.env,
+          messages,
+          prompt,
+          modelFile,
+          backend: config.backend
+        });
+      } catch (error) {
+        return createFallbackResult(frame, classifyRunnerError(error), error);
+      }
     }
 
     if (result?.timedOut) {

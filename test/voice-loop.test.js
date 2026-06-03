@@ -178,6 +178,35 @@ test("voice service sends Gemma patch through ActionValidator before TTS", async
   assert.equal(typeof result.timings.total_ms, "number");
 });
 
+test("voice service times out slow Gemma within the turn budget and speaks state action", async () => {
+  const service = createVoiceDemoService({
+    runtime: {
+      async generatePatch() {
+        return new Promise(() => {});
+      }
+    },
+    tts: { provider: "mock" },
+    gemmaTurnTimeoutMs: 5,
+    now: () => new Date().toISOString()
+  });
+
+  const result = await service.handleTurn({
+    sessionId: "sess_voice_service_slow_gemma",
+    text: "现场安全了",
+    patientState: { scene_safe: true }
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.gemma.skipped, true);
+  assert.equal(result.gemma.skipReason, "gemma_turn_timeout");
+  assert.equal(result.gemma_live.stale, true);
+  assert.equal(result.gemma_live.timeout_ms, 5);
+  assert.equal(result.guidance_source, "state_machine");
+  assert.equal(result.guidance_action.intent, result.state_action.intent);
+  assert.equal(result.tts.text, result.state_action.tts.text);
+  assert.ok(result.timings.gemma_ms < 250);
+});
+
 test("voice service can carry mock vision facts alongside spoken input", async () => {
   const service = createVoiceDemoService({
     runtime: {
@@ -239,6 +268,77 @@ test("voice service keeps pure mock vision turns state-machine driven when Gemma
   assert.equal(result.guidance_action.intent, "ask_response_check");
   assert.equal(result.gemma.skipped, true);
   assert.equal(result.gemma.skipReason, "no_user_input");
+});
+
+test("voice service treats combined safety confirmation and next-step request as a scene-safe flow fact", async () => {
+  const service = createVoiceDemoService({
+    runtime: neverResolvingAnyRuntime(),
+    tts: { provider: "mock" },
+    gemmaTurnTimeoutMs: 5,
+    now: () => new Date().toISOString()
+  });
+
+  const result = await service.handleTurn({
+    sessionId: "sess_scene_safe_next_step",
+    text: "我已确认周围安全，并在患者身边，请告诉我接下来怎么做。"
+  });
+
+  assert.equal(result.event.user_input.intent, "scene_safe");
+  assert.equal(result.state.current_stage, AgentStage.S2_CHECK_RESPONSE);
+  assert.equal(result.guidance_action.intent, "ask_response_check");
+  assert.equal(result.guidance_source, "state_machine");
+  assert.equal(result.response_type, "flow_instruction");
+  assert.match(result.guidance_action.tts.text, /轻拍双肩/);
+  assert.doesNotMatch(result.guidance_action.tts.text, /还没进入胸外按压/);
+});
+
+test("voice service follows the design demo mainline from one-key start through suspected arrest", async () => {
+  const service = createVoiceDemoService({
+    runtime: neverResolvingAnyRuntime(),
+    tts: { provider: "mock" },
+    gemmaTurnTimeoutMs: 5,
+    now: () => new Date().toISOString()
+  });
+  const sessionId = "sess_design_demo_mainline";
+
+  const started = await service.handleTurn({
+    sessionId,
+    eventSource: "demo_script",
+    eventType: "session_started",
+    deviceState: {
+      camera_available: true,
+      mic_available: true,
+      gps_available: true,
+      recording: true,
+      emergency_call_started: false,
+      network: "offline"
+    },
+    metadata: { adult_likely: true, recording: true }
+  });
+  assert.equal(started.state.current_stage, AgentStage.S1_SCENE_SAFE);
+  assert.equal(started.guidance_action.intent, "ensure_scene_safe");
+  assert.match(started.guidance_action.tts.text, /开始录制/);
+  assert.match(started.guidance_action.tts.text, /确认周围安全/);
+
+  const sceneSafe = await service.handleTurn({ sessionId, text: "周围安全，我在患者身边。" });
+  assert.equal(sceneSafe.event.user_input.intent, "scene_safe");
+  assert.equal(sceneSafe.state.current_stage, AgentStage.S2_CHECK_RESPONSE);
+  assert.equal(sceneSafe.guidance_action.intent, "ask_response_check");
+
+  const unresponsive = await service.handleTurn({ sessionId, text: "他没有反应" });
+  assert.equal(unresponsive.state.current_stage, AgentStage.S3_CHECK_BREATHING);
+  assert.equal(unresponsive.guidance_action.intent, "ask_breathing_check");
+
+  const abnormalBreathing = await service.handleTurn({
+    sessionId,
+    text: "好像没有呼吸，偶尔喘一下"
+  });
+  assert.equal(abnormalBreathing.event.user_input.intent, "agonal_breathing");
+  assert.equal(abnormalBreathing.state.current_stage, AgentStage.S4_SUSPECTED_ARREST);
+  assert.equal(abnormalBreathing.state.confirmed_facts.normal_breathing, false);
+  assert.equal(abnormalBreathing.state.confirmed_facts.agonal_breathing, true);
+  assert.equal(abnormalBreathing.guidance_action.intent, "state_suspected_arrest_handling");
+  assert.match(abnormalBreathing.guidance_action.tts.text, /疑似心脏骤停/);
 });
 
 test("voice service uses validator fallback when Gemma text is unsafe", async () => {
@@ -416,6 +516,71 @@ test("CPR live AED question gives immediate AED support guidance", async () => {
   assert.match(result.guidance_action.tts.text, /继续按压/);
   assert.match(result.guidance_action.tts.text, /AED/);
   assert.match(result.guidance_action.tts.text, /设备提示/);
+});
+
+test("CPR live AED question with AED vision event stays fast-path in assistance stage", async () => {
+  const service = createVoiceDemoService({
+    runtime: neverResolvingRuntime(),
+    tts: { provider: "mock" },
+    gemmaLiveTimeoutMs: 5,
+  });
+  const sessionId = "live_aed_question_with_vision";
+  await advanceVoiceSessionToCpr(service, sessionId);
+
+  const result = await service.handleTurn({
+    sessionId,
+    text: "AED 来了怎么办",
+    eventSource: "vision_patient",
+    eventType: "patient_state_update",
+    metadata: {
+      aed_available: true,
+      helper_arrived: true,
+    }
+  });
+
+  assert.equal(result.state.current_stage, AgentStage.S8_ASSISTANCE);
+  assert.equal(result.event.user_input.intent, "ask_aed_help");
+  assert.equal(result.response_type, "question_answer");
+  assert.equal(result.guidance_source, "rule_fast_path");
+  assert.equal(result.live_driver_source, "rule_fast_path");
+  assert.equal(result.gemma.skipReason, "live_fast_path_selected");
+  assert.equal(result.guidance_action.intent, "explain_aed_support");
+  assert.match(result.guidance_action.tts.text, /继续按压/);
+  assert.match(result.guidance_action.tts.text, /AED/);
+  assert.match(result.guidance_action.tts.text, /设备提示/);
+});
+
+test("assistance-stage stop question remains immediate fast path", async () => {
+  const service = createVoiceDemoService({
+    runtime: neverResolvingRuntime(),
+    tts: { provider: "mock" },
+    gemmaLiveTimeoutMs: 5,
+  });
+  const sessionId = "assistance_stop_question";
+  await advanceVoiceSessionToCpr(service, sessionId);
+  await service.handleTurn({
+    sessionId,
+    eventSource: "vision_patient",
+    eventType: "patient_state_update",
+    metadata: {
+      aed_available: true,
+      helper_arrived: true,
+    }
+  });
+
+  const result = await service.handleTurn({
+    sessionId,
+    text: "我能不能停"
+  });
+
+  assert.equal(result.state.current_stage, AgentStage.S8_ASSISTANCE);
+  assert.equal(result.event.user_input.intent, "ask_can_stop");
+  assert.equal(result.response_type, "question_answer");
+  assert.equal(result.guidance_source, "rule_fast_path");
+  assert.equal(result.live_driver_source, "rule_fast_path");
+  assert.equal(result.gemma.skipReason, "live_fast_path_selected");
+  assert.match(result.guidance_action.tts.text, /不要停/);
+  assert.match(result.guidance_action.tts.text, /继续按压/);
 });
 
 test("early AED mock is acknowledged without skipping the required response check", async () => {
@@ -758,6 +923,14 @@ function neverResolvingRuntime() {
       if (frame.current_stage !== AgentStage.S7_CPR_LOOP) {
         return fallback.generatePatch(frame);
       }
+      return new Promise(() => {});
+    }
+  };
+}
+
+function neverResolvingAnyRuntime() {
+  return {
+    async generatePatch() {
       return new Promise(() => {});
     }
   };

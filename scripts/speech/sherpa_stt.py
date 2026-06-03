@@ -116,13 +116,76 @@ def build_recognizer(model_dir, num_threads, language):
     )
 
 
+def transcribe_audio(recognizer, audio_path):
+    samples, sample_rate = read_wave_any(audio_path)
+    stream = recognizer.create_stream()
+    stream.accept_waveform(sample_rate, samples)
+    recognizer.decode_stream(stream)
+    return (stream.result.text or "").strip()
+
+
+def parse_serve_request(line):
+    text = line.strip()
+    if not text:
+        return ""
+    if not text.startswith("{"):
+        return text
+
+    try:
+        request = json.loads(text)
+    except json.JSONDecodeError:
+        return text
+    if not isinstance(request, dict):
+        return ""
+    return request.get("audio") or request.get("audio_path") or request.get("audioPath") or request.get("path") or ""
+
+
+def serve_stt(args):
+    try:
+        recognizer = build_recognizer(args.model_dir, args.num_threads, args.language)
+    except Exception as error:  # noqa: BLE001 - startup errors should fail the daemon
+        log(f"startup failed: {error}")
+        return 1
+
+    log("serve mode ready; reading audio paths from stdin")
+    for line in sys.stdin:
+        audio_path = parse_serve_request(line)
+        if not audio_path:
+            print(json.dumps({"ok": False, "text": "", "error": "missing_audio"}, ensure_ascii=False), flush=True)
+            continue
+
+        try:
+            if not os.path.isfile(audio_path):
+                log(f"audio file not found: {audio_path}")
+                print(json.dumps({"ok": False, "text": "", "error": "audio_not_found"}, ensure_ascii=False), flush=True)
+                continue
+
+            text = transcribe_audio(recognizer, audio_path)
+            response = {"ok": True, "text": text}
+            log(f"transcript={text!r}")
+        except Exception as error:  # noqa: BLE001 - keep daemon alive for later requests
+            log(f"recognition failed: {error}")
+            response = {"ok": False, "text": "", "error": str(error)}
+
+        print(json.dumps(response, ensure_ascii=False), flush=True)
+
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-dir", required=True)
-    parser.add_argument("--audio", required=True)
+    parser.add_argument("--audio")
     parser.add_argument("--language", default="auto")
     parser.add_argument("--num-threads", type=int, default=2)
+    parser.add_argument("--serve", action="store_true")
     args = parser.parse_args()
+
+    if args.serve:
+        return serve_stt(args)
+
+    if not args.audio:
+        parser.error("--audio is required unless --serve is used")
 
     if not os.path.isfile(args.audio):
         log(f"audio file not found: {args.audio}")
@@ -131,11 +194,7 @@ def main():
 
     try:
         recognizer = build_recognizer(args.model_dir, args.num_threads, args.language)
-        samples, sample_rate = read_wave_any(args.audio)
-        stream = recognizer.create_stream()
-        stream.accept_waveform(sample_rate, samples)
-        recognizer.decode_stream(stream)
-        text = (stream.result.text or "").strip()
+        text = transcribe_audio(recognizer, args.audio)
     except Exception as error:  # noqa: BLE001 - surface a clean error to the adapter
         log(f"recognition failed: {error}")
         print(json.dumps({"text": "", "error": str(error)}))

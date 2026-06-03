@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { canUseSpeechDaemon, requestSttDaemon } from "./speechDaemon.js";
 import { getRuntimeDir } from "./tts.js";
 
 const VOICE_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -23,12 +24,14 @@ const RECOMMENDED_STT_URL =
 
 const INTENT_RULES = [
   {
-    intent: "scene_safe",
-    pattern: /(scene\s+safe|safe now|现场.*安全|安全了|可以靠近)/i,
+    intent: "scene_unsafe",
+    pattern:
+      /(unsafe|danger|不安全|不可以靠近|不能靠近|别靠近|不要靠近|不要接近|(?:现场|周围|环境|这里|附近)(?:有|存在|很|比较)?危险|(?:^|[，。,.！!\s])有危险(?:物|品)?|存在危险|有触电|有火|有车流|有泄漏)/i,
   },
   {
-    intent: "scene_unsafe",
-    pattern: /(unsafe|danger|危险|不安全|别靠近)/i,
+    intent: "scene_safe",
+    pattern:
+      /(scene\s+safe|safe now|现场.*安全|周围.*安全|环境.*安全|已.*确认.*安全|已经.*确认.*安全|确认.*安全|安全了|可以.*(?:靠近|接近)|能够.*(?:靠近|接近)|能.*(?:靠近|接近)|(?:没有|无).*危险|靠近患者|接近患者|在患者身边|到患者身边)/i,
   },
   {
     intent: "patient_unresponsive",
@@ -39,8 +42,12 @@ const INTENT_RULES = [
     pattern: /(responsive|responding|有反应|醒了|会回应)/i,
   },
   {
+    intent: "agonal_breathing",
+    pattern: /(gasping|agonal|喘息|濒死呼吸|喘一下|偶尔喘|只是?喘|只有.*喘|一阵一阵喘)/i,
+  },
+  {
     intent: "no_normal_breathing",
-    pattern: /(not breathing|no breathing|abnormal breathing|gasping|没有正常呼吸|没呼吸|无呼吸|喘息|濒死呼吸)/i,
+    pattern: /(not breathing|no breathing|abnormal breathing|没有正常呼吸|没有呼吸|没呼吸|无呼吸|呼吸不正常|不正常呼吸)/i,
   },
   {
     intent: "normal_breathing",
@@ -56,7 +63,7 @@ const INTENT_RULES = [
   },
   {
     intent: "ask_aed_help",
-    pattern: /(aed|a e d|除颤仪|自动体外除颤|电击|[说需]?[除出]?颤[仪姨]|出差[一姨仪疑]).*?(来了|到了|怎么办|怎么用|要怎么做)|(?:来了|到了).*?(aed|除颤仪|[说需]?[除出]?颤[仪姨]|出差[一姨仪疑])/i,
+    pattern: /(aed|a e d|除颤仪|自动体外除颤|电击|[说需]?[除出]?颤[仪姨]|出差[一姨仪疑]|说?差[一姨仪疑]).*?(来了|到了|怎么办|怎么用|要怎么做)|(?:来了|到了).*?(aed|除颤仪|[说需]?[除出]?颤[仪姨]|出差[一姨仪疑]|说?差[一姨仪疑])/i,
   },
   {
     intent: "ask_next_step",
@@ -68,7 +75,7 @@ const INTENT_RULES = [
   },
   {
     intent: "emergency_called",
-    pattern: /(called|call connected|120.*(已打|打了|拨打|已拨|接通)|(?:已|已经)?(?:拨打|拨通|打了?|呼叫)120|急救电话.*(通|打))/i,
+    pattern: /(called|call connected|120.*(已打|打了|拨打|已拨|接通|多打)|(?:已|已经)?(?:拨打|拨通|打了?|呼叫|多打)120|急救电话.*(通|打))/i,
   },
   {
     intent: "continue_cpr",
@@ -173,17 +180,32 @@ export function resolveSttPlan(options = {}) {
   const modelDir = firstNonEmpty(options.modelDir, process.env.SPEECH_STT_MODEL_DIR) || DEFAULT_MODEL_DIR;
   const language = firstNonEmpty(options.language, process.env.SPEECH_LANGUAGE) || "auto";
   const timeoutMs = positiveNumber(options.timeoutMs, process.env.VOICE_STT_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
+  const numThreads = positiveNumber(options.numThreads, process.env.SPEECH_STT_NUM_THREADS, 2);
 
   const explicitCommand = firstNonEmpty(
     options.sherpaCommand,
     process.env.SHERPA_ONNX_STT_COMMAND,
     process.env.SPEECH_STT_COMMAND
   );
+  const explicitArgs = firstNonEmpty(options.sherpaArgs, process.env.SHERPA_ONNX_STT_ARGS);
   if (explicitCommand) {
+    const wrapperScript = resolveBundledWrapperScript(explicitArgs, "sherpa_stt.py");
+    if (wrapperScript) {
+      return {
+        mode: "script",
+        command: explicitCommand,
+        script: wrapperScript,
+        modelDir,
+        language,
+        numThreads,
+        timeoutMs,
+      };
+    }
+
     return {
       mode: "command",
       command: explicitCommand,
-      argsTemplate: firstNonEmpty(options.sherpaArgs, process.env.SHERPA_ONNX_STT_ARGS),
+      argsTemplate: explicitArgs,
       modelDir,
       language,
       timeoutMs,
@@ -193,7 +215,6 @@ export function resolveSttPlan(options = {}) {
   const python =
     firstNonEmpty(options.python, process.env.SPEECH_STT_PYTHON, process.env.SPEECH_PYTHON) || DEFAULT_PYTHON;
   const script = firstNonEmpty(options.script, process.env.SPEECH_STT_SCRIPT) || DEFAULT_STT_SCRIPT;
-  const numThreads = positiveNumber(options.numThreads, process.env.SPEECH_STT_NUM_THREADS, 2);
 
   return {
     mode: "script",
@@ -246,6 +267,31 @@ async function transcribeWithSherpa(audioBase64, audio, plan) {
   await fs.writeFile(audioPath, Buffer.from(audioBase64, "base64"));
 
   try {
+    if (canUseSpeechDaemon(plan)) {
+      try {
+        const response = await requestSttDaemon(plan, { audioPath });
+        const transcript = normalizeText(response.text || response.transcript || response.result);
+        if (!transcript) {
+          throw new Error("sherpa-onnx STT daemon did not produce transcript text.");
+        }
+
+        return {
+          ...createTranscriptResult({
+            transcript,
+            source: "sherpa_onnx_stt",
+            confidence: 0.72,
+            audio,
+          }),
+          ok: true,
+          provider: "sherpa-onnx",
+          daemon: true,
+        };
+      } catch {
+        // Fall through to the one-shot CLI path so daemon startup/crash/timeout
+        // never makes real STT less reliable than the previous behavior.
+      }
+    }
+
     const { command, args } = buildSttInvocation(plan, { audioPath, outputPath });
     const result = await runCommand(command, args, plan.timeoutMs);
 
@@ -290,6 +336,14 @@ function buildCommandArgs(template, { audioPath, outputPath, modelDir, language 
       .replaceAll("{model_dir}", toChildProcessPath(path.resolve(modelDir)))
       .replaceAll("{language}", language)
   );
+}
+
+function resolveBundledWrapperScript(template, scriptName) {
+  const match = splitArgs(template).find((item) =>
+    item.replace(/\\/g, "/").toLowerCase().endsWith(`/scripts/speech/${scriptName}`) ||
+    item.replace(/\\/g, "/").toLowerCase().endsWith(scriptName)
+  );
+  return match ? path.resolve(match) : "";
 }
 
 function toChildProcessPath(targetPath) {

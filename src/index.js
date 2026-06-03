@@ -13,6 +13,7 @@ export * from "./gemma/modelConfig.js";
 export * from "./gemma/promptBuilder.js";
 export * from "./gemma/responseParser.js";
 export * from "./gemma/runtime.js";
+export * from "./gemma/gemmaServer.js";
 export * from "./knowledge/knowledgeBase.js";
 export * from "./dispatch/index.js";
 export * from "./report/handoverReportGenerator.js";

@@ -190,8 +190,23 @@ function renderDemoPage() {
     .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     .field { flex: 1 1 300px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+    .start-panel { display: grid; grid-template-columns: minmax(220px, 1fr) auto; gap: 12px; align-items: center; margin-top: 10px; padding: 12px; border: 1px solid #bdd3c8; border-radius: 8px; background: #f5fbf7; }
+    .start-panel button { font-weight: 700; padding-inline: 18px; }
     .quick-panel { display: grid; grid-template-columns: minmax(180px, 1fr) auto; gap: 12px; align-items: center; margin-top: 10px; padding: 12px; border: 1px solid #cbd8cf; border-radius: 8px; background: #f8fbf8; }
     .quick-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+    .live-panel { display: grid; grid-template-columns: minmax(220px, 1fr) auto; gap: 12px; align-items: center; margin-top: 10px; padding: 12px; border: 1px solid #c7d3df; border-radius: 8px; background: #f7fbff; }
+    .live-controls { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; align-items: center; }
+    .live-toggle { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; color: #1f3f55; }
+    .live-state { display: inline-flex; gap: 6px; align-items: center; min-width: 118px; padding: 6px 9px; border-radius: 999px; background: #e8eef5; color: #1f3f55; font-size: 14px; }
+    .live-dot { width: 9px; height: 9px; border-radius: 999px; background: #8292a3; }
+    .live-state[data-state="Listening"] .live-dot { background: #2e8b57; }
+    .live-state[data-state="Capturing"] .live-dot { background: #d87916; }
+    .live-state[data-state="Uploading"], .live-state[data-state="Thinking"] { background: #fff3d9; color: #74480d; }
+    .live-state[data-state="Uploading"] .live-dot, .live-state[data-state="Thinking"] .live-dot { background: #d8911b; }
+    .live-state[data-state="Speaking"] { background: #e7e4ff; color: #393174; }
+    .live-state[data-state="Speaking"] .live-dot { background: #6657d8; }
+    .live-state[data-state="Error"], .live-state[data-state="Off"] { background: #f5e8e6; color: #8b3027; }
+    .live-state[data-state="Error"] .live-dot, .live-state[data-state="Off"] .live-dot { background: #b84636; }
     .label { color: #59615a; font-size: 13px; margin-bottom: 4px; }
     .value { font-size: 18px; min-height: 28px; }
     .summary { color: #59615a; font-size: 14px; min-height: 22px; }
@@ -201,8 +216,11 @@ function renderDemoPage() {
     pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; background: #202622; color: #eef5ed; border-radius: 8px; padding: 12px; max-height: 360px; overflow: auto; }
     audio { width: 100%; }
     @media (max-width: 720px) {
+      .start-panel { grid-template-columns: 1fr; }
       .quick-panel { grid-template-columns: 1fr; }
+      .live-panel { grid-template-columns: 1fr; }
       .quick-actions { justify-content: flex-start; }
+      .live-controls { justify-content: flex-start; }
     }
   </style>
 </head>
@@ -215,16 +233,34 @@ function renderDemoPage() {
     <form id="turnForm">
       <div class="label">输入文本，或录一段音频走 STT</div>
       <textarea id="text" placeholder="例如：现场安全了 / 他没有反应 / 没有正常呼吸 / 120 已经拨打 / 急救员到了"></textarea>
+      <div class="start-panel">
+        <div>
+          <div class="label">Demo 主线</div>
+          <div class="summary">从安全确认开始，再按反应、呼吸、120 和 CPR 的设计流程推进。</div>
+        </div>
+        <button id="startEmergency" type="button">一键急救</button>
+      </div>
       <div class="quick-panel">
         <div>
-          <div class="label">Live CPR 测试</div>
-          <div class="summary">先进入 S7_CPR_LOOP，再连续测试视觉纠正和语音问题。</div>
+          <div class="label">调试入口</div>
+          <div class="summary">跳到 S7_CPR_LOOP 后，测试视觉纠正和语音问题。</div>
         </div>
         <div class="quick-actions">
-          <button id="runCprSetup" class="secondary" type="button">进入 CPR 测试状态</button>
+          <button id="runCprSetup" class="secondary" type="button">跳到 CPR 调试状态</button>
           <button id="quickQuality" class="secondary" type="button">手位偏左 + 我按得对吗</button>
           <button id="quickStop" class="secondary" type="button">能不能停</button>
           <button id="quickAed" class="secondary" type="button">AED 来了怎么办</button>
+        </div>
+      </div>
+      <div class="live-panel">
+        <div>
+          <div class="label">Live 语音模式</div>
+          <div id="liveHint" class="summary">点击“一键急救”后请求麦克风；说完后自动识别、决策和播报。</div>
+        </div>
+        <div class="live-controls">
+          <label class="live-toggle"><input id="liveToggle" type="checkbox"> Live 开</label>
+          <span id="liveState" class="live-state" data-state="Idle"><span class="live-dot"></span><span id="liveStateText">准备中</span></span>
+          <span id="liveMeter" class="summary"></span>
         </div>
       </div>
       <div class="row" style="margin-top: 10px;">
@@ -236,7 +272,7 @@ function renderDemoPage() {
         <span id="mockSummary" class="summary"></span>
       </div>
       <div class="row" style="margin-top: 10px;">
-        <button id="send" type="submit">发送回合</button>
+        <button id="send" type="submit">发送文本 + Mock</button>
         <button id="record" class="secondary" type="button">录音</button>
         <button id="pickAudio" class="secondary" type="button">选择音频</button>
         <input id="audioFile" type="file" accept="audio/*" style="display: none;">
@@ -275,11 +311,18 @@ function renderDemoPage() {
     const audioFile = document.querySelector("#audioFile");
     const mockVision = document.querySelector("#mockVision");
     const injectMock = document.querySelector("#injectMock");
+    const startEmergency = document.querySelector("#startEmergency");
     const runCprSetup = document.querySelector("#runCprSetup");
     const quickQuality = document.querySelector("#quickQuality");
     const quickStop = document.querySelector("#quickStop");
     const quickAed = document.querySelector("#quickAed");
     const mockSummary = document.querySelector("#mockSummary");
+    const liveToggle = document.querySelector("#liveToggle");
+    const liveState = document.querySelector("#liveState");
+    const liveStateText = document.querySelector("#liveStateText");
+    const liveHint = document.querySelector("#liveHint");
+    const liveMeter = document.querySelector("#liveMeter");
+    const audio = document.querySelector("#audio");
     let recordedAudio = null;
     let mediaRecorder = null;
     let chunks = [];
@@ -525,7 +568,7 @@ function renderDemoPage() {
       {
         id: "aed_arrived",
         label: "AED arrived",
-        summary: "建议在 CPR 中测试：vision_patient aed_available=true",
+        summary: "CPR 中的视觉 AED 到达事件：会进入 S8_ASSISTANCE，TTS 应继续按压并听设备提示",
         bestAfterCprSetup: true,
         payload: {
           eventSource: "vision_patient",
@@ -571,6 +614,17 @@ function renderDemoPage() {
     ];
 
     populateMockVision();
+    const liveController = createLiveController();
+    liveToggle.addEventListener("change", () => {
+      if (liveToggle.checked) {
+        liveController.startIfEnabled();
+      } else {
+        liveController.stop();
+      }
+    });
+    audio.addEventListener("ended", () => liveController.onPlaybackEnd());
+    audio.addEventListener("error", () => liveController.onPlaybackEnd());
+    queueMicrotask(() => liveController.startIfEnabled());
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -587,6 +641,38 @@ function renderDemoPage() {
       await sendTurn(payload);
     });
 
+    startEmergency.addEventListener("click", async () => {
+      setQuickButtonsDisabled(true);
+      liveController.stop();
+      try {
+        await resetSession();
+        const started = await sendTurn({
+          eventSource: "demo_script",
+          eventType: "session_started",
+          deviceState: {
+            camera_available: true,
+            mic_available: true,
+            gps_available: true,
+            recording: true,
+            emergency_call_started: false,
+            network: "offline"
+          },
+          metadata: {
+            adult_likely: true,
+            recording: true,
+            scene_note: "one_key_first_aid"
+          }
+        });
+        if (started.ok) {
+          liveToggle.checked = true;
+          liveController.startIfEnabled();
+          setStatus("急救流程已开始");
+        }
+      } finally {
+        setQuickButtonsDisabled(false);
+      }
+    });
+
     runCprSetup.addEventListener("click", async () => {
       await runCprSetupSequence();
     });
@@ -600,12 +686,19 @@ function renderDemoPage() {
     });
 
     quickAed.addEventListener("click", async () => {
-      await runLiveCprQuestion("aed_arrived", "AED 来了怎么办");
+      await runLiveCprQuestion("none", "AED 来了怎么办");
     });
 
     mockVision.addEventListener("change", updateMockSummary);
 
     document.querySelector("#reset").addEventListener("click", async () => {
+      liveController.stop();
+      liveToggle.checked = false;
+      await resetSession();
+      setStatus("reset");
+    });
+
+    async function resetSession() {
       await fetch("/api/reset", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -613,9 +706,9 @@ function renderDemoPage() {
       });
       render({});
       currentStage = "";
+      recordedAudio = null;
       updateMockSummary();
-      setStatus("reset");
-    });
+    }
 
     record.addEventListener("click", async () => {
       if (mediaRecorder?.state === "recording") {
@@ -625,6 +718,7 @@ function renderDemoPage() {
         return;
       }
 
+      liveController.pauseForManualInput();
       setStatus("正在请求麦克风权限...");
       record.disabled = true;
 
@@ -649,6 +743,7 @@ function renderDemoPage() {
         };
         mediaRecorder.onerror = (event) => {
           stream.getTracks().forEach((track) => track.stop());
+          liveController.resumeAfterManualInput();
           setStatus("录音失败：" + (event.error?.message || "浏览器录音错误"), true);
           record.textContent = "录音";
           record.disabled = false;
@@ -665,13 +760,14 @@ function renderDemoPage() {
               audioBase64: await blobToBase64(blob),
               mimeType: blob.type || "audio/webm"
             };
-            setStatus("录音已准备好，点“发送回合”进行 STT");
+            setStatus("录音已准备好，点“发送文本 + Mock”进行 STT");
           } catch (error) {
             setStatus(error.message || "录音处理失败", true);
           } finally {
             record.textContent = "录音";
             record.disabled = false;
             mediaRecorder = null;
+            liveController.resumeAfterManualInput();
           }
         };
         mediaRecorder.start();
@@ -681,6 +777,7 @@ function renderDemoPage() {
       } catch (error) {
         record.textContent = "录音";
         record.disabled = false;
+        liveController.resumeAfterManualInput();
         setStatus(normalizeMediaError(error), true);
       }
     });
@@ -700,7 +797,7 @@ function renderDemoPage() {
           audioBase64: await blobToBase64(file),
           mimeType: file.type || "application/octet-stream"
         };
-        setStatus("音频已准备好，点“发送回合”进行 STT");
+        setStatus("音频已准备好，点“发送文本 + Mock”进行 STT");
       } catch (error) {
         setStatus(error.message || "音频文件读取失败", true);
       } finally {
@@ -709,6 +806,9 @@ function renderDemoPage() {
     });
 
     async function sendTurn(payload, options = {}) {
+      if (options.live) {
+        liveController.setState("Thinking", "正在识别和生成回复...");
+      }
       setStatus("sending...");
       const response = await fetch("/api/turn", {
         method: "POST",
@@ -718,6 +818,9 @@ function renderDemoPage() {
       const json = await response.json();
       render(json, options);
       setStatus(json.ok ? "ok" : "error", !json.ok);
+      if (options.live && !json.ok) {
+        liveController.onPlaybackEnd();
+      }
       return json;
     }
 
@@ -745,11 +848,388 @@ function renderDemoPage() {
         ? "total " + timings.total_ms + "ms / gemma " + (timings.gemma_ms ?? 0) + "ms / stt " + (timings.stt_ms ?? 0) + "ms / tts " + (timings.tts_ms ?? 0) + "ms"
         : "";
       document.querySelector("#ttsText").textContent = json.guidance_action?.tts?.text || json.state_action?.tts?.text || "";
-      const audio = document.querySelector("#audio");
-      audio.src = json.tts?.audio?.url || json.tts?.audio?.data_url || "";
-      if (audio.src && options.playAudio !== false) audio.play().catch(() => {});
+      const audioSrc = json.tts?.audio?.url || json.tts?.audio?.data_url || "";
+      audio.src = audioSrc;
+      if (audioSrc && options.playAudio !== false) {
+        liveController.onPlaybackStart();
+        audio.play().catch(() => liveController.onPlaybackEnd());
+      } else if (options.live) {
+        liveController.onPlaybackEnd();
+      }
       document.querySelector("#raw").textContent = JSON.stringify(json, null, 2);
       updateMockSummary();
+    }
+
+    function createLiveController() {
+      const config = {
+        targetSampleRate: 16000,
+        minSpeechMs: 300,
+        endSilenceMs: 600,
+        maxSpeechMs: 15000,
+        preRollMs: 250,
+        minRms: 0.014,
+        noiseMultiplier: 3.2
+      };
+      let stream = null;
+      let audioContext = null;
+      let source = null;
+      let processor = null;
+      let workletUrl = "";
+      let state = "Idle";
+      let manualPaused = false;
+      let captureFrames = [];
+      let preRollFrames = [];
+      let captureMs = 0;
+      let speechMs = 0;
+      let silenceMs = 0;
+      let noiseFloor = 0.004;
+      let flushing = false;
+
+      return {
+        startIfEnabled,
+        stop,
+        setState,
+        onPlaybackStart,
+        onPlaybackEnd,
+        pauseForManualInput,
+        resumeAfterManualInput
+      };
+
+      async function startIfEnabled() {
+        if (!liveToggle.checked || stream) {
+          return;
+        }
+
+        if (!navigator.mediaDevices?.getUserMedia) {
+          setState("Error", "当前浏览器不支持 getUserMedia，请使用手动录音或上传音频。");
+          return;
+        }
+
+        try {
+          setState("Idle", "正在请求麦克风权限...");
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              channelCount: 1,
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true
+            }
+          });
+          const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+          audioContext = new AudioContextCtor();
+          source = audioContext.createMediaStreamSource(stream);
+          await attachProcessor();
+          await resumeAudioContext();
+          setState("Listening", "聆听中，说完后会自动提交。");
+          window.addEventListener("pointerdown", resumeAudioContext, { once: true });
+          window.addEventListener("keydown", resumeAudioContext, { once: true });
+        } catch (error) {
+          cleanupAudio();
+          setState("Error", normalizeMediaError(error));
+        }
+      }
+
+      function stop() {
+        liveToggle.checked = false;
+        resetCapture();
+        cleanupAudio();
+        setState("Off", "Live 已关闭，可使用手动录音或选择音频。");
+      }
+
+      async function attachProcessor() {
+        if (audioContext.audioWorklet) {
+          const workletCode = [
+            "class LivePcmProcessor extends AudioWorkletProcessor {",
+            "  process(inputs, outputs) {",
+            "    const input = inputs[0] && inputs[0][0];",
+            "    const output = outputs[0] && outputs[0][0];",
+            "    if (output) output.fill(0);",
+            "    if (input) this.port.postMessage(input.slice(0));",
+            "    return true;",
+            "  }",
+            "}",
+            "registerProcessor('live-pcm-processor', LivePcmProcessor);"
+          ].join("\\n");
+          workletUrl = URL.createObjectURL(new Blob([workletCode], { type: "text/javascript" }));
+          await audioContext.audioWorklet.addModule(workletUrl);
+          processor = new AudioWorkletNode(audioContext, "live-pcm-processor", {
+            numberOfInputs: 1,
+            numberOfOutputs: 1,
+            outputChannelCount: [1]
+          });
+          processor.port.onmessage = (event) => processFrame(event.data);
+          source.connect(processor);
+          processor.connect(audioContext.destination);
+          return;
+        }
+
+        processor = audioContext.createScriptProcessor(2048, 1, 1);
+        processor.onaudioprocess = (event) => {
+          const input = event.inputBuffer.getChannelData(0);
+          event.outputBuffer.getChannelData(0).fill(0);
+          processFrame(new Float32Array(input));
+        };
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+      }
+
+      async function resumeAudioContext() {
+        if (audioContext?.state === "suspended") {
+          await audioContext.resume().catch(() => {});
+        }
+      }
+
+      function processFrame(frame) {
+        if (!liveToggle.checked || manualPaused || flushing || state === "Uploading" || state === "Thinking" || state === "Speaking") {
+          return;
+        }
+
+        const pcm = frame instanceof Float32Array ? frame : new Float32Array(frame);
+        const frameMs = (pcm.length / audioContext.sampleRate) * 1000;
+        const level = rms(pcm);
+        const threshold = Math.max(config.minRms, noiseFloor * config.noiseMultiplier);
+        const voiced = level >= threshold;
+        updateMeter(level, threshold);
+
+        if (state !== "Capturing") {
+          noiseFloor = noiseFloor * 0.97 + Math.min(level, 0.05) * 0.03;
+          pushPreRoll(pcm);
+          if (voiced) {
+            captureFrames = preRollFrames.map((item) => item.slice(0));
+            captureFrames.push(pcm.slice(0));
+            captureMs = captureDurationMs(captureFrames);
+            speechMs = frameMs;
+            silenceMs = 0;
+            setState("Capturing", "检测到语音，正在收声...");
+          } else if (state !== "Listening") {
+            setState("Listening", "聆听中，说完后会自动提交。");
+          }
+          return;
+        }
+
+        captureFrames.push(pcm.slice(0));
+        captureMs += frameMs;
+        if (voiced) {
+          speechMs += frameMs;
+          silenceMs = 0;
+        } else {
+          silenceMs += frameMs;
+        }
+
+        if (speechMs < config.minSpeechMs && silenceMs >= config.endSilenceMs) {
+          resetCapture();
+          setState("Listening", "语音过短，继续聆听。");
+          return;
+        }
+
+        if (captureMs >= config.maxSpeechMs || (speechMs >= config.minSpeechMs && silenceMs >= config.endSilenceMs)) {
+          flushCapture();
+        }
+      }
+
+      async function flushCapture() {
+        if (flushing) {
+          return;
+        }
+        flushing = true;
+        const frames = captureFrames;
+        const speechDuration = speechMs;
+        resetCapture();
+
+        if (speechDuration < config.minSpeechMs) {
+          flushing = false;
+          setState("Listening", "语音过短，继续聆听。");
+          return;
+        }
+
+        try {
+          setState("Uploading", "正在编码 16k WAV 并提交...");
+          await nextFrame();
+          const pcm = flattenFrames(frames);
+          const downsampled = downsamplePcm(pcm, audioContext.sampleRate, config.targetSampleRate);
+          const audioBase64 = encodeWavBase64(downsampled, config.targetSampleRate);
+          await sendTurn({
+            ...selectedMockPayload(),
+            audioBase64,
+            mimeType: "audio/wav"
+          }, { live: true });
+        } catch (error) {
+          setStatus(error?.message || "Live 语音提交失败", true);
+          setState("Listening", "提交失败，继续聆听。");
+        } finally {
+          flushing = false;
+        }
+      }
+
+      function onPlaybackStart() {
+        if (!liveToggle.checked) {
+          return;
+        }
+        resetCapture();
+        setState("Speaking", "正在播报，已暂停收声。");
+      }
+
+      function onPlaybackEnd() {
+        if (!liveToggle.checked) {
+          return;
+        }
+        resetCapture();
+        setState("Listening", "播报结束，继续聆听。");
+      }
+
+      function pauseForManualInput() {
+        manualPaused = true;
+        resetCapture();
+        if (liveToggle.checked) {
+          setState("Off", "手动录音中，Live 暂停。");
+        }
+      }
+
+      function resumeAfterManualInput() {
+        manualPaused = false;
+        if (liveToggle.checked && stream) {
+          setState("Listening", "手动录音结束，Live 继续聆听。");
+        }
+      }
+
+      function setState(nextState, hint) {
+        state = nextState;
+        liveState.dataset.state = nextState;
+        liveStateText.textContent = nextState;
+        if (hint) {
+          liveHint.textContent = hint;
+        }
+      }
+
+      function resetCapture() {
+        captureFrames = [];
+        captureMs = 0;
+        speechMs = 0;
+        silenceMs = 0;
+      }
+
+      function pushPreRoll(frame) {
+        preRollFrames.push(frame.slice(0));
+        const maxSamples = Math.ceil((audioContext.sampleRate * config.preRollMs) / 1000);
+        let total = preRollFrames.reduce((sum, item) => sum + item.length, 0);
+        while (total > maxSamples && preRollFrames.length > 1) {
+          total -= preRollFrames.shift().length;
+        }
+      }
+
+      function cleanupAudio() {
+        if (processor) {
+          processor.disconnect?.();
+          processor.port && (processor.port.onmessage = null);
+          processor.onaudioprocess = null;
+        }
+        source?.disconnect?.();
+        stream?.getTracks().forEach((track) => track.stop());
+        audioContext?.close?.();
+        if (workletUrl) {
+          URL.revokeObjectURL(workletUrl);
+        }
+        stream = null;
+        audioContext = null;
+        source = null;
+        processor = null;
+        workletUrl = "";
+        liveMeter.textContent = "";
+      }
+
+      function updateMeter(level, threshold) {
+        liveMeter.textContent = "RMS " + level.toFixed(3) + " / 阈值 " + threshold.toFixed(3);
+      }
+
+      function rms(frame) {
+        let sum = 0;
+        for (let i = 0; i < frame.length; i += 1) {
+          sum += frame[i] * frame[i];
+        }
+        return Math.sqrt(sum / Math.max(frame.length, 1));
+      }
+
+      function captureDurationMs(frames) {
+        const samples = frames.reduce((sum, item) => sum + item.length, 0);
+        return (samples / audioContext.sampleRate) * 1000;
+      }
+    }
+
+    function flattenFrames(frames) {
+      const length = frames.reduce((sum, frame) => sum + frame.length, 0);
+      const out = new Float32Array(length);
+      let offset = 0;
+      for (const frame of frames) {
+        out.set(frame, offset);
+        offset += frame.length;
+      }
+      return out;
+    }
+
+    function downsamplePcm(input, sourceRate, targetRate) {
+      if (sourceRate === targetRate) {
+        return input;
+      }
+      const ratio = sourceRate / targetRate;
+      const outputLength = Math.max(1, Math.floor(input.length / ratio));
+      const output = new Float32Array(outputLength);
+      for (let i = 0; i < outputLength; i += 1) {
+        const start = Math.floor(i * ratio);
+        const end = Math.min(input.length, Math.floor((i + 1) * ratio));
+        let sum = 0;
+        let count = 0;
+        for (let j = start; j < end; j += 1) {
+          sum += input[j];
+          count += 1;
+        }
+        output[i] = count ? sum / count : input[start] || 0;
+      }
+      return output;
+    }
+
+    function encodeWavBase64(samples, sampleRate) {
+      const buffer = new ArrayBuffer(44 + samples.length * 2);
+      const view = new DataView(buffer);
+      writeAscii(view, 0, "RIFF");
+      view.setUint32(4, 36 + samples.length * 2, true);
+      writeAscii(view, 8, "WAVE");
+      writeAscii(view, 12, "fmt ");
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeAscii(view, 36, "data");
+      view.setUint32(40, samples.length * 2, true);
+      let offset = 44;
+      for (let i = 0; i < samples.length; i += 1) {
+        const sample = Math.max(-1, Math.min(1, samples[i]));
+        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+        offset += 2;
+      }
+      return arrayBufferToBase64(buffer);
+    }
+
+    function writeAscii(view, offset, value) {
+      for (let i = 0; i < value.length; i += 1) {
+        view.setUint8(offset + i, value.charCodeAt(i));
+      }
+    }
+
+    function arrayBufferToBase64(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let binary = "";
+      const chunkSize = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+      }
+      return btoa(binary);
+    }
+
+    function nextFrame() {
+      return new Promise((resolve) => requestAnimationFrame(resolve));
     }
 
     async function runCprSetupSequence(options = {}) {
@@ -829,6 +1309,7 @@ function renderDemoPage() {
     }
 
     function setQuickButtonsDisabled(disabled) {
+      startEmergency.disabled = disabled;
       runCprSetup.disabled = disabled;
       quickQuality.disabled = disabled;
       quickStop.disabled = disabled;

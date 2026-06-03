@@ -15,6 +15,7 @@ const STT_ENV_KEYS = [
   "SPEECH_STT_MODEL_DIR",
   "SPEECH_STT_NUM_THREADS",
   "SPEECH_LANGUAGE",
+  "SPEECH_DAEMON",
   "VOICE_STT_PROVIDER",
   "SPEECH_MODE",
   "VOICE_STT_TIMEOUT_MS",
@@ -23,6 +24,7 @@ const STT_ENV_KEYS = [
 test("inferIntent recognizes common zh-CN emergency call confirmations", () => {
   assert.equal(inferIntent("我已经拨打120了"), "emergency_called");
   assert.equal(inferIntent("120已经接通了"), "emergency_called");
+  assert.equal(inferIntent("120已经多打。"), "emergency_called");
   assert.equal(inferIntent("急救电话打通了"), "emergency_called");
 });
 
@@ -43,8 +45,27 @@ test("inferIntent recognizes CPR live question intents", () => {
   assert.equal(inferIntent("说颤姨来了怎么办？"), "ask_aed_help");
   assert.equal(inferIntent("出差一来了怎么办？"), "ask_aed_help");
   assert.equal(inferIntent("出差疑来了怎么办？"), "ask_aed_help");
+  assert.equal(inferIntent("说差姨来了怎么办？"), "ask_aed_help");
   assert.equal(inferIntent("现在怎么办"), "ask_next_step");
   assert.equal(inferIntent("要不要打120"), "ask_emergency_call");
+});
+
+test("inferIntent treats scene-safety facts as flow facts before generic next-step questions", () => {
+  assert.equal(inferIntent("周围安全"), "scene_safe");
+  assert.equal(inferIntent("环境安全，可以靠近患者了"), "scene_safe");
+  assert.equal(inferIntent("我已确认周围安全，并在患者身边，请告诉我接下来怎么做。"), "scene_safe");
+  assert.equal(inferIntent("周围没有危险，我可以靠近他。"), "scene_safe");
+});
+
+test("inferIntent keeps unsafe-scene phrases from being mistaken as scene_safe", () => {
+  assert.equal(inferIntent("周围不安全，别靠近"), "scene_unsafe");
+  assert.equal(inferIntent("现场有危险，不可以靠近"), "scene_unsafe");
+});
+
+test("inferIntent recognizes design-script abnormal breathing and agonal phrasing", () => {
+  assert.equal(inferIntent("没有正常呼吸"), "no_normal_breathing");
+  assert.equal(inferIntent("好像没有呼吸，偶尔喘一下"), "agonal_breathing");
+  assert.equal(inferIntent("他只有偶尔喘息"), "agonal_breathing");
 });
 
 // Keep these tests hermetic regardless of the developer/CI shell environment.

@@ -54,11 +54,16 @@ export function createLiveDriverProposal(input = {}) {
     return preCprQuestion;
   }
 
+  const intent = input.latestUserUtterance?.intent_hint || input.latestUserUtterance?.intent || null;
+  const assistanceQuestion = createAssistanceQuestionProposal(input, intent);
+  if (assistanceQuestion) {
+    return assistanceQuestion;
+  }
+
   if (input.activeMedicalStage !== AgentStage.S7_CPR_LOOP) {
     return null;
   }
 
-  const intent = input.latestUserUtterance?.intent_hint || input.latestUserUtterance?.intent || null;
   if (!QUESTION_INTENTS.has(intent)) {
     return null;
   }
@@ -81,7 +86,7 @@ export function createLiveDriverProposal(input = {}) {
       return proposal({
         responseType: LiveResponseType.QUESTION_ANSWER,
         intent: "answer_current_cpr_question",
-        ttsText: "继续按压。让旁边的人打开 AED，按设备语音提示贴电极；设备提示分析时再暂停。",
+        ttsText: "继续按压。打开 AED，贴电极；设备提示分析时暂停。",
         priority: "high",
         reasonCodes: ["user_asked_aed_help"],
         uiMainText: "AED 协助",
@@ -219,7 +224,7 @@ function answerCprQuality(input) {
   return proposal({
     responseType: LiveResponseType.QUESTION_ANSWER,
     intent: "answer_current_cpr_question",
-    ttsText: "现在按压可以，继续保持这个节奏，目标是 100 到 120 次每分钟。",
+    ttsText: "按压可以，继续保持 100 到 120 次每分钟。",
     priority: "normal",
     reasonCodes: ["user_asked_cpr_quality", "cpr_quality_ok"],
     uiMainText: "继续保持",
@@ -329,6 +334,39 @@ function createPreCprQuestionProposal(input) {
     uiSecondaryText: "进入按压后我会实时看位置和节奏",
     statusTags: ["未到按压", "当前步骤"],
   });
+}
+
+function createAssistanceQuestionProposal(input, intent) {
+  if (input.activeMedicalStage !== AgentStage.S8_ASSISTANCE) {
+    return null;
+  }
+
+  switch (intent) {
+    case "ask_aed_help":
+      return proposal({
+        responseType: LiveResponseType.QUESTION_ANSWER,
+        intent: "explain_aed_support",
+        ttsText: "继续按压。打开 AED，贴电极；设备提示分析时暂停。",
+        priority: "high",
+        reasonCodes: ["user_asked_aed_help", "assistance_stage"],
+        uiMainText: "AED 协助",
+        uiSecondaryText: "继续按压，听设备提示",
+        statusTags: ["AED", "继续按压"],
+      });
+    case "ask_can_stop":
+      return proposal({
+        responseType: LiveResponseType.QUESTION_ANSWER,
+        intent: "continue_cpr",
+        ttsText: "不要停，继续按压；只有 AED 提示分析、急救人员接手，或他恢复正常呼吸时再暂停。",
+        priority: "high",
+        reasonCodes: ["user_asked_can_stop", "assistance_stage"],
+        uiMainText: "不要停",
+        uiSecondaryText: "继续胸外按压",
+        statusTags: ["不要停", "继续按压"],
+      });
+    default:
+      return null;
+  }
 }
 
 function preCprQuestionPrefix(intent) {

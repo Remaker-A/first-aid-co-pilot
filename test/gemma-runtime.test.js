@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import test from "node:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -6,8 +7,10 @@ import { tmpdir } from "node:os";
 import {
   GemmaRuntime,
   GEMMA_SYSTEM_PROMPT,
+  buildGemmaServeArgs,
   buildGemmaPrompt,
   buildLiteRtLmArgs,
+  createGemmaServerRunner,
   evaluateGemmaModelCheck,
   findGemmaModelFile,
   parseGemmaResponse,
@@ -155,6 +158,79 @@ test("buildLiteRtLmArgs includes model, backend, and timeout inputs", () => {
   assert.ok(args.some((arg) => String(arg).includes("cpu")));
 });
 
+test("buildGemmaServeArgs starts the OpenAI-compatible server without run-only flags", () => {
+  const args = buildGemmaServeArgs({
+    modelFile: "D:\\models\\gemma\\gemma-4-E2B-it-q4_k_m.litertlm",
+    backend: "gpu",
+    serveHost: "127.0.0.1",
+    servePort: 8788,
+    serveApi: "openai",
+    commandPrefixArgs: ["-m", "litert_lm_cli.main"],
+  });
+
+  assert.deepEqual(args.slice(0, 3), ["-m", "litert_lm_cli.main", "serve"]);
+  assert.ok(args.includes("--api"));
+  assert.ok(args.includes("openai"));
+  assert.ok(args.includes("--host"));
+  assert.ok(args.includes("127.0.0.1"));
+  assert.ok(args.includes("--port"));
+  assert.ok(args.includes("8788"));
+  assert.equal(args.some((arg) => String(arg).includes("gemma-4-E2B-it-q4_k_m.litertlm")), false);
+  assert.equal(args.includes("--backend=gpu"), false);
+});
+
+test("Gemma server runner posts OpenAI-compatible chat requests with mock fetch", async () => {
+  await withMockModelFile(async (modelFile) => {
+    const requests = [];
+    const runner = createGemmaServerRunner({
+      spawnImpl: createFakeSpawn(),
+      fetchImpl: async (url, init = {}) => {
+        requests.push({ url, init });
+        if (init.method === "GET") {
+          return { ok: true, status: 200, json: async () => ({ data: [] }), text: async () => "" };
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            choices: [{ message: { content: JSON.stringify(VALID_PATCH) } }],
+          }),
+          text: async () => "",
+        };
+      },
+    });
+
+    const result = await runner({
+      config: {
+        ...resolveGemmaConfig({
+          env: {
+            GEMMA_DAEMON: "1",
+            GEMMA_BACKEND: "gpu",
+            GEMMA_SERVE_PORT: "8799",
+          },
+          cwd: "D:\\test-workspace",
+        }),
+        modelFile,
+        serveReadyTimeoutMs: 50,
+      },
+      modelFile,
+      messages: [{ role: "user", content: "hello" }],
+      timeoutMs: 50,
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.daemon, true);
+    assert.equal(result.stdout, JSON.stringify(VALID_PATCH));
+    assert.equal(requests.some((request) => String(request.url).endsWith("/v1/models")), true);
+    const post = requests.find((request) => request.init.method === "POST");
+    assert.ok(post);
+    const body = JSON.parse(post.init.body);
+    assert.equal(body.messages[0].content, "hello");
+    assert.equal(body.model, "gemma-4-E2B-it-q4_k_m");
+    assert.equal(body.model.includes(".litertlm"), false);
+  });
+});
+
 test("GemmaRuntime parses a valid mock runner JSON patch", async () => {
   await withMockModelFile(async (modelFile) => {
     const runtime = new GemmaRuntime({
@@ -180,6 +256,45 @@ test("GemmaRuntime parses a valid mock runner JSON patch", async () => {
     assert.equal(result.fallback ?? false, false);
     assert.equal(result.patch.intent, "parse_response_answer");
     assert.equal(result.patch.tts.text, "Check if they respond.");
+  });
+});
+
+test("GemmaRuntime falls back to one-shot runner when daemon runner fails", async () => {
+  await withMockModelFile(async (modelFile) => {
+    let serverCalls = 0;
+    let spawnCalls = 0;
+    const runtime = new GemmaRuntime({
+      config: {
+        ...resolveGemmaConfig({
+          env: {
+            GEMMA_DAEMON: "1",
+            GEMMA_BACKEND: "gpu",
+          },
+          cwd: "D:\\test-workspace",
+        }),
+        modelFile
+      },
+      serverRunner: async () => {
+        serverCalls += 1;
+        throw new Error("daemon unavailable");
+      },
+      runner: async ({ backend }) => {
+        spawnCalls += 1;
+        assert.equal(backend, "gpu");
+        return {
+          stdout: JSON.stringify(VALID_PATCH),
+          stderr: "",
+          exitCode: 0
+        };
+      }
+    });
+
+    const result = await runtime.generatePatch(DECISION_FRAME);
+
+    assert.equal(result.ok, true);
+    assert.equal(result.patch.intent, "parse_response_answer");
+    assert.equal(serverCalls, 1);
+    assert.equal(spawnCalls, 1);
   });
 });
 
@@ -371,4 +486,21 @@ async function withMockModelFile(callback) {
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
+}
+
+function createFakeSpawn() {
+  return () => {
+    const child = new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.stdout.setEncoding = () => {};
+    child.stderr.setEncoding = () => {};
+    child.stdout.unref = () => {};
+    child.stderr.unref = () => {};
+    child.unref = () => {};
+    child.kill = () => {
+      queueMicrotask(() => child.emit("close", 0, null));
+    };
+    return child;
+  };
 }

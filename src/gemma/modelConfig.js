@@ -6,6 +6,11 @@ export const DEFAULT_GEMMA_BACKEND = "cpu";
 export const DEFAULT_GEMMA_TIMEOUT_MS = 120000;
 export const DEFAULT_GEMMA_COMMAND = "litert-lm";
 export const DEFAULT_GEMMA_MODEL_FILE_PATTERN = /^gemma-4-E2B-it.*\.litertlm$/i;
+export const DEFAULT_GEMMA_SERVE_HOST = "127.0.0.1";
+export const DEFAULT_GEMMA_SERVE_PORT = 8791;
+export const DEFAULT_GEMMA_SERVE_API = "openai";
+export const DEFAULT_GEMMA_SERVE_READY_TIMEOUT_MS = 30000;
+export const DEFAULT_GEMMA_SERVE_REQUEST_TIMEOUT_MS = 30000;
 
 // A genuine Gemma 4 E2B `.litertlm` artifact is ~2.6 GB. Anything dramatically
 // smaller (an empty placeholder, a `.metadata` stub, a partial/aborted download)
@@ -41,6 +46,20 @@ export function resolveGemmaConfig(options = {}) {
       env.GEMMA_COMMAND_PREFIX_ARGS ??
       env.LITERT_LM_COMMAND_PREFIX_ARGS
     ),
+    daemon: parseBoolean(options.daemon ?? env.GEMMA_DAEMON),
+    serveHost: options.serveHost || env.GEMMA_SERVE_HOST || DEFAULT_GEMMA_SERVE_HOST,
+    servePort: normalizePort(options.servePort ?? env.GEMMA_SERVE_PORT),
+    serveApi: options.serveApi || env.GEMMA_SERVE_API || DEFAULT_GEMMA_SERVE_API,
+    serveModelId: options.serveModelId || env.GEMMA_SERVE_MODEL_ID || "",
+    serveReadyTimeoutMs: normalizeTimeoutValue(
+      options.serveReadyTimeoutMs ?? env.GEMMA_SERVE_READY_TIMEOUT_MS,
+      DEFAULT_GEMMA_SERVE_READY_TIMEOUT_MS
+    ),
+    serveRequestTimeoutMs: normalizeTimeoutValue(
+      options.serveRequestTimeoutMs ?? env.GEMMA_SERVE_REQUEST_TIMEOUT_MS,
+      DEFAULT_GEMMA_SERVE_REQUEST_TIMEOUT_MS
+    ),
+    serveExtraArgs: normalizeExtraArgs(options.serveExtraArgs ?? env.GEMMA_SERVE_EXTRA_ARGS),
     supportsMessages: parseBoolean(options.supportsMessages ?? env.GEMMA_SUPPORTS_MESSAGES),
     promptArg: options.promptArg || env.GEMMA_PROMPT_ARG || "--prompt",
     extraArgs: normalizeExtraArgs(options.extraArgs ?? env.GEMMA_EXTRA_ARGS),
@@ -118,12 +137,25 @@ export function normalizeBackend(value) {
 }
 
 export function normalizeTimeout(value) {
+  return normalizeTimeoutValue(value, DEFAULT_GEMMA_TIMEOUT_MS);
+}
+
+function normalizeTimeoutValue(value, fallback) {
   const timeout = Number(value);
   if (!Number.isFinite(timeout) || timeout <= 0) {
-    return DEFAULT_GEMMA_TIMEOUT_MS;
+    return fallback;
   }
 
   return Math.floor(timeout);
+}
+
+function normalizePort(value) {
+  const port = Number(value);
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+    return DEFAULT_GEMMA_SERVE_PORT;
+  }
+
+  return port;
 }
 
 export function parseBoolean(value) {

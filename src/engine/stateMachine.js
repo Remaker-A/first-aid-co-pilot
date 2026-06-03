@@ -121,6 +121,9 @@ function buildStateAction(state, currentStage, nextStage, decision, event) {
 
   switch (nextStage) {
     case AgentStage.S1_SCENE_SAFE:
+      const sceneSafeText = currentStage === AgentStage.S0_INIT || event?.event_type === "session_started"
+        ? "开始录制，先确认周围安全；安全后靠近患者。"
+        : "先确认周围安全，再靠近患者。";
       return action(state, {
         stage: nextStage,
         intent: state.scope?.scene_safe === false ? "warn_scene_unsafe" : "ensure_scene_safe",
@@ -129,7 +132,7 @@ function buildStateAction(state, currentStage, nextStage, decision, event) {
         tts: {
           text: state.scope?.scene_safe === false
             ? "先保证自身安全，请呼叫 120。"
-            : "先确认周围安全，再靠近患者。",
+            : sceneSafeText,
           tone: "calm_firm",
         },
         ui: {

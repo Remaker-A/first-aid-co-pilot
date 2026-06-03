@@ -228,6 +228,7 @@ async function checkSpeechReadiness() {
 }
 
 async function checkVoiceSmoke() {
+  const gemmaConfig = resolveGemmaConfig();
   const service = createVoiceDemoService({
     stt: {
       provider: requireRealSpeech ? "sherpa" : "mock",
@@ -235,11 +236,19 @@ async function checkVoiceSmoke() {
     tts: {
       provider: requireRealSpeech ? "sherpa" : "mock",
     },
+    gemmaTurnTimeoutMs: requireRealGemma ? gemmaConfig.timeoutMs : undefined,
+    gemmaLiveTimeoutMs: requireRealGemma ? gemmaConfig.timeoutMs : undefined,
     now: () => new Date().toISOString(),
   });
 
+  let sceneSafeResult;
   let result;
   try {
+    sceneSafeResult = await service.handleTurn({
+      sessionId: "verify_local_loop",
+      text: "周围安全",
+      patientState: { scene_safe: true },
+    });
     result = await service.handleTurn(await createVoiceSmokeInput());
   } catch (error) {
     addCheck("voice.smoke", "fail", error.message || "voice smoke failed");
@@ -252,16 +261,25 @@ async function checkVoiceSmoke() {
       result.stt?.source === "sherpa_onnx_stt"
     : result.transcript === "他没有反应";
   addCheck("voice.transcript", transcriptOk ? "pass" : "fail", transcriptDetail);
-  addCheck("voice.stage", result.state?.current_stage === "S2_CHECK_RESPONSE" ? "pass" : "warn", result.state?.current_stage || "<none>");
+  addCheck(
+    "voice.scene_safe_stage",
+    sceneSafeResult.state?.current_stage === "S2_CHECK_RESPONSE" ? "pass" : "fail",
+    sceneSafeResult.state?.current_stage || "<none>"
+  );
+  addCheck("voice.stage", result.state?.current_stage === "S3_CHECK_BREATHING" ? "pass" : "fail", result.state?.current_stage || "<none>");
+  const gemmaPatchOk = Boolean(sceneSafeResult.gemma?.patch) &&
+    !sceneSafeResult.gemma?.fallback &&
+    !sceneSafeResult.gemma?.skipped &&
+    !sceneSafeResult.gemma?.stale;
   addCheck(
     "voice.gemma",
-    result.gemma?.fallback && requireRealGemma ? "fail" : "pass",
-    result.gemma?.fallback ? `fallback: ${result.gemma.fallbackReason || result.gemma.reason}` : "Gemma patch parsed.",
-    "Real Gemma verification requires a local model file and callable litert-lm."
+    gemmaPatchOk ? "pass" : requireRealGemma ? "fail" : "warn",
+    describeGemmaSmokeResult(sceneSafeResult.gemma),
+    "Real Gemma verification requires a local model file, callable litert-lm, and a non-stale GuidanceActionPatch."
   );
   addCheck(
-    "voice.validator",
-    result.gemma_validation?.ok ? "pass" : "fail",
+    "voice.guidance",
+    result.guidance_action?.intent === "ask_breathing_check" ? "pass" : "fail",
     result.guidance_action?.intent || "<no guidance_action>"
   );
   addCheck(
@@ -271,10 +289,22 @@ async function checkVoiceSmoke() {
   );
 }
 
+function describeGemmaSmokeResult(gemma = {}) {
+  if (gemma.patch && !gemma.fallback && !gemma.skipped && !gemma.stale) {
+    return "Gemma patch parsed.";
+  }
+  if (gemma.fallback) {
+    return `fallback: ${gemma.fallbackReason || gemma.reason || "unknown"}`;
+  }
+  if (gemma.skipped || gemma.stale) {
+    return `skipped: ${gemma.skipReason || "unknown"}${gemma.timeout_ms ? ` (${gemma.timeout_ms}ms)` : ""}`;
+  }
+  return "Gemma did not return a patch.";
+}
+
 async function createVoiceSmokeInput() {
   const baseInput = {
     sessionId: "verify_local_loop",
-    patientState: { scene_safe: true },
   };
 
   if (!requireRealSpeech) {
@@ -320,7 +350,7 @@ async function createVoiceSmokeInput() {
     ...baseInput,
     audioBase64: sttAudio.toString("base64"),
     mimeType: "audio/wav",
-    patientState: { scene_safe: true, responsive: false },
+    patientState: { responsive: false },
   };
 }
 

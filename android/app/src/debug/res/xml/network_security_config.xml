@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Debug-only network security config for the Live CPR Coach agent transport.
+
+    Permits cleartext HTTP only to the local agent server hosts used during
+    development. This file lives in src/debug/res, so it is never bundled into
+    release builds. Production transports must use HTTPS.
+
+    LAN testing on a real device: replace the placeholder 192.168.x.x entry below
+    with your dev machine's LAN IP (the one running `npm run voice:serve`), or run
+    `adb reverse tcp:8787 tcp:8787` and point the transport at 127.0.0.1:8787.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Standard Android emulator loopback to the host machine (127.0.0.1). -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <!-- Genymotion emulator loopback to the host machine. -->
+        <domain includeSubdomains="false">10.0.3.2</domain>
+        <!-- Localhost / adb reverse tunnel. -->
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+        <!-- Configurable LAN host for real-device testing (edit to your dev IP). -->
+        <domain includeSubdomains="true">192.168.1.100</domain>
+    </domain-config>
+</network-security-config>

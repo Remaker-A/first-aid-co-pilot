@@ -34,6 +34,8 @@ The Gemma runtime is expected to use:
 - Default backend: `cpu`
 - Override backend: `GEMMA_BACKEND=gpu`
 - Default timeout: `GEMMA_TIMEOUT_MS=120000`
+- Voice turn budget: `GEMMA_TURN_TIMEOUT_MS=1000`
+- Optional daemon: `GEMMA_DAEMON=1` with `litert-lm serve`
 
 Set `HF_TOKEN` before downloading the model. The token must come from an account
 that has accepted the Gemma model terms on Hugging Face.
@@ -68,6 +70,21 @@ directly. Otherwise it tries uv package candidates, preferring
 Do not commit downloaded model files. The entire `models/` tree is local runtime
 state and should stay out of source control.
 
+For low-latency voice runs, Gemma is bounded per turn. `GEMMA_TURN_TIMEOUT_MS`
+applies to normal voice turns and `GEMMA_LIVE_TIMEOUT_MS` applies to CPR live
+turns; if Gemma exceeds the budget, the voice service speaks the deterministic
+state-machine or LiveDriver guidance immediately. Medical flow control remains
+rule driven; Gemma only supplements wording after `ActionValidator`.
+
+`GEMMA_DAEMON=1` makes `GemmaRuntime` try a local `litert-lm serve` process
+before the existing one-shot `litert-lm run` path. The daemon uses
+`GEMMA_SERVE_HOST`, `GEMMA_SERVE_PORT`, `GEMMA_SERVE_API`, optional
+`GEMMA_SERVE_MODEL_ID`, and `GEMMA_SERVE_EXTRA_ARGS`. Current `litert-lm serve`
+loads models from the local `litert-lm import` registry rather than from a model
+file argument; `GEMMA_BACKEND=gpu` remains a one-shot `litert-lm run` fallback
+setting. The default is off, and any daemon startup, HTTP, timeout, or crash
+failure falls back to the old one-shot runner.
+
 ## Speech Runtime
 
 STT and TTS are configured separately from Gemma. The intended local loop is:
@@ -97,10 +114,17 @@ Without real speech assets, `npm run voice:serve` uses mock STT/TTS so the local
 browser loop still exercises STT text, GemmaRuntime fallback/patch handling,
 ActionValidator, and audio playback.
 
+Live voice mode is intended to keep the browser in a half-duplex loop: capture
+microphone audio, endpoint a phrase with VAD, POST the 16 kHz WAV to
+`/api/turn`, play the returned TTS audio, then resume listening after playback.
+The HTTP contract stays the same as the manual voice demo so text input,
+uploaded audio, and mock speech remain available as fallbacks.
+
 The speech adapters can be switched independently with environment variables:
 
 - `VOICE_STT_PROVIDER=mock|sherpa-onnx|auto`
 - `VOICE_TTS_PROVIDER=mock|sherpa-onnx|auto`
+- `SPEECH_DAEMON=0|1`
 - `SHERPA_ONNX_STT_COMMAND` and `SHERPA_ONNX_STT_ARGS`
 - `SHERPA_ONNX_TTS_COMMAND` and `SHERPA_ONNX_TTS_ARGS`
 
@@ -108,6 +132,25 @@ The speech adapters can be switched independently with environment variables:
 `{language}` placeholders. `SHERPA_ONNX_TTS_ARGS` supports `{text}`, `{out}`,
 and `{model_dir}` placeholders because sherpa-onnx model packages vary in their
 required flags.
+
+Set `SPEECH_DAEMON=1` only for real sherpa-onnx mode when using the bundled
+Python wrappers. The Node adapter keeps one STT and one TTS process alive,
+sends one JSON request per line, and falls back to the previous one-shot spawn
+path if the daemon crashes, times out, or cannot start. Leave it at `0` for the
+most conservative rollback path; mock STT/TTS ignores the switch.
+
+For the fast local voice loop, copy `.env.speech.example` to `.env`, switch to
+real sherpa providers, then enable:
+
+```powershell
+SPEECH_DAEMON=1
+GEMMA_DAEMON=1
+GEMMA_BACKEND=gpu
+GEMMA_TURN_TIMEOUT_MS=1000
+```
+
+Mock mode stays compatible with these variables because mock STT/TTS ignores
+`SPEECH_DAEMON`, and Gemma daemon mode remains behind `GEMMA_DAEMON`.
 
 ## Commands
 
