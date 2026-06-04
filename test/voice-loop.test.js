@@ -145,12 +145,15 @@ test("voice loop rejects disallowed Gemma patch fields before ActionValidator", 
   assert.equal(result.action.intent, "fallback_template");
 });
 
-test("voice service sends Gemma patch through ActionValidator before TTS", async () => {
+test("voice service answers diagnostic turns immediately from the state machine (no Gemma supplement)", async () => {
+  // 方案①：S1/S2 等诊断/流程轮不为 Gemma 润色阻塞，直接用确定性状态机话术，
+  // 因此 generatePatch 不应被调用。Gemma patch 经 ActionValidator 采用的通用
+  // 路径由 gemma-pipeline.test.js 覆盖；CPR-live 轮的 Gemma 由专门用例覆盖。
+  let gemmaCalls = 0;
   const service = createVoiceDemoService({
     runtime: {
-      async generatePatch(frame) {
-        assert.equal(frame.user_input.stt_text, "现场安全了");
-        assert.ok(frame.allowed_intents.includes("ask_response_check"));
+      async generatePatch() {
+        gemmaCalls += 1;
         return {
           ok: true,
           patch: VALID_ASK_RESPONSE_PATCH,
@@ -170,15 +173,23 @@ test("voice service sends Gemma patch through ActionValidator before TTS", async
 
   assert.equal(result.ok, true);
   assert.equal(result.transcript, "现场安全了");
-  assert.equal(result.gemma_validation.ok, true);
+  assert.equal(result.state.current_stage, AgentStage.S2_CHECK_RESPONSE);
   assert.equal(result.guidance_action.intent, "ask_response_check");
-  assert.equal(result.guidance_source, "gemma_agent");
+  assert.equal(result.guidance_source, "state_machine");
+  assert.equal(result.gemma.skipped, true);
+  assert.equal(result.gemma.skipReason, "diagnostic_fast_path");
+  assert.equal(gemmaCalls, 0);
+  assert.match(result.guidance_action.tts.text, /轻拍双肩/);
   assert.equal(result.tts.provider, "mock");
   assert.match(result.tts.audio.data_url, /^data:audio\/wav;base64,/);
   assert.equal(typeof result.timings.total_ms, "number");
 });
 
-test("voice service times out slow Gemma within the turn budget and speaks state action", async () => {
+test("voice service times out slow Gemma on an assistance turn and speaks the state action", async () => {
+  // 方案①后诊断轮不调 Gemma；慢 Gemma 的超时回退机制改在仍会咨询 Gemma 润色的
+  // 非关键 CPR-live 轮（S8 协助：施救者疲劳）验证。S7 按压轮自带节拍器工具属
+  // critical-flow，会直接走状态机而不咨询 Gemma；S8 协助为普通优先级、无工具，才是
+  // Gemma 真正参与润色的轮。该轮同时携带文本+疲劳，单轮完成转场并触发 Gemma 超时。
   const service = createVoiceDemoService({
     runtime: {
       async generatePatch() {
@@ -186,19 +197,22 @@ test("voice service times out slow Gemma within the turn budget and speaks state
       }
     },
     tts: { provider: "mock" },
-    gemmaTurnTimeoutMs: 5,
+    gemmaLiveTimeoutMs: 5,
     now: () => new Date().toISOString()
   });
+  const sessionId = "sess_voice_service_slow_gemma";
+  await advanceVoiceSessionToCpr(service, sessionId);
 
   const result = await service.handleTurn({
-    sessionId: "sess_voice_service_slow_gemma",
-    text: "现场安全了",
-    patientState: { scene_safe: true }
+    sessionId,
+    text: "我有点紧张",
+    rescuerState: { fatigue_level: "high" }
   });
 
   assert.equal(result.ok, true);
+  assert.equal(result.state.current_stage, AgentStage.S8_ASSISTANCE);
   assert.equal(result.gemma.skipped, true);
-  assert.equal(result.gemma.skipReason, "gemma_turn_timeout");
+  assert.equal(result.gemma.skipReason, "gemma_live_timeout");
   assert.equal(result.gemma_live.stale, true);
   assert.equal(result.gemma_live.timeout_ms, 5);
   assert.equal(result.guidance_source, "state_machine");
@@ -363,10 +377,15 @@ test("voice service uses validator fallback when Gemma text is unsafe", async ()
     now: () => new Date().toISOString()
   });
 
+  const sessionId = "sess_voice_service_unsafe";
+  await advanceVoiceSessionToCpr(service, sessionId);
+
+  // 方案①后诊断轮不调 Gemma；越界话术被 ActionValidator 拦截改 fallback 的安全机制
+  // 在仍会咨询 Gemma 的非关键 CPR-live 轮（S8 协助）验证。
   const result = await service.handleTurn({
-    sessionId: "sess_voice_service_unsafe",
-    text: "他没有反应",
-    patientState: { scene_safe: true }
+    sessionId,
+    text: "好的",
+    rescuerState: { fatigue_level: "high" }
   });
 
   assert.equal(result.gemma_validation.ok, false);
@@ -436,7 +455,8 @@ test("voice service keeps critical flow state-machine-driven even when Gemma ret
   assert.notEqual(result.guidance_action.intent, VALID_GEMMA_PATCH.intent);
   assert.equal(result.gemma.skipped, true);
   assert.equal(result.gemma.skipReason, "critical_or_tool_state_action");
-  assert.equal(gemmaCalls, 1);
+  // 方案①后诊断轮（S2）也不再调用 Gemma 润色，整条诊断 + critical 链路一次都不调。
+  assert.equal(gemmaCalls, 0);
 });
 
 test("CPR live quality question uses mock vision correction instead of repeating emergency call", async () => {
@@ -515,7 +535,8 @@ test("CPR live AED question gives immediate AED support guidance", async () => {
   assert.equal(result.guidance_source, "rule_fast_path");
   assert.match(result.guidance_action.tts.text, /继续按压/);
   assert.match(result.guidance_action.tts.text, /AED/);
-  assert.match(result.guidance_action.tts.text, /设备提示/);
+  // AED 只引导：跟着它的语音做，不再口述贴电极/设备提示分析时暂停。
+  assert.match(result.guidance_action.tts.text, /跟着它的语音/);
 });
 
 test("CPR live AED question with AED vision event stays fast-path in assistance stage", async () => {
@@ -547,7 +568,8 @@ test("CPR live AED question with AED vision event stays fast-path in assistance 
   assert.equal(result.guidance_action.intent, "explain_aed_support");
   assert.match(result.guidance_action.tts.text, /继续按压/);
   assert.match(result.guidance_action.tts.text, /AED/);
-  assert.match(result.guidance_action.tts.text, /设备提示/);
+  // AED 只引导：跟着它的语音做，不再口述贴电极/设备提示分析时暂停。
+  assert.match(result.guidance_action.tts.text, /跟着它的语音/);
 });
 
 test("assistance-stage stop question remains immediate fast path", async () => {

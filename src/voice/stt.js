@@ -53,6 +53,18 @@ const INTENT_RULES = [
     intent: "normal_breathing",
     pattern: /(normal breathing|breathing normally|正常呼吸|有正常呼吸)/i,
   },
+  // Return of signs of life / ROSC during CPR ("他动了/他在喘气了/又有呼吸了/恢复了").
+  // Placed after the explicit responsive/breathing intents so shared phrases like
+  // "清醒了"/"有反应了" still resolve to those; these only own the genuinely new
+  // wording. The state machine (S7) uses them to stop compressions and monitor.
+  {
+    intent: "patient_recovered",
+    pattern: /(醒过来了?|苏醒了?|清醒了?|缓过来了?|缓过神|恢复了?(?:意识|知觉|过来)?|活过来了?|有意识了)/,
+  },
+  {
+    intent: "signs_of_life",
+    pattern: /(?:他|她)?(?:又|开始|现在)?(?:动了|动一下|动了一下|有动静|睁眼了?|睁开眼了?|有反应了|有脉搏|脉搏回来|心跳(?:回来|恢复)了?|又有呼吸|又能呼吸|有呼吸了|开始呼吸了?|在喘气|喘气了|会动了)/,
+  },
   {
     intent: "ask_cpr_quality",
     pattern: /(按得对|按的对|这样.*(可以|对吗|行吗)|我.*按.*(对吗|可以吗|行吗)|我爱你的对吗|位置.*对吗|节奏.*对吗|质量.*怎么样)/i,
@@ -84,6 +96,19 @@ const INTENT_RULES = [
   {
     intent: "paramedics_arrived",
     pattern: /(paramedics|ems arrived|ambulance arrived|急救员.*(到|来)|急救人员.*(到|来|大佬)|救[护货]车.*(到|来)|医生.*(到|来)|医护.*(到|来|赶到)|救援.*(到|来))/i,
+  },
+  // "你说我做" CPR coach feedback intents. Placed last so they only win when no
+  // existing flow intent matches (ties resolve to lower rule_index). Note:
+  // compressions_reported must NOT match continue_cpr phrases ("开始按"/"继续按"),
+  // and step_done must NOT match "准备好了" because S6 readiness is handled by
+  // service.js with a stage-gated continue_cpr fast path.
+  {
+    intent: "compressions_reported",
+    pattern: /(按了\s*\d+\s*[次下]?|压了\s*\d+\s*[次下]?|按了三十|压了三十|已经按了|已经在按|在按了|按完了|压完了|按了|压了)/,
+  },
+  {
+    intent: "step_done",
+    pattern: /(放好了|摆好了|做好了|弄好了|放好啦|明白了?|懂了|知道了|可以了|完成了|搞定了?|好啦|(?<!准备)好了)/,
   },
 ];
 
@@ -163,14 +188,45 @@ export async function mockTranscribeInput(input = {}) {
   });
 }
 
-export function inferIntent(transcript = "") {
-  for (const rule of INTENT_RULES) {
-    if (rule.pattern.test(transcript)) {
-      return rule.intent;
+export function classifyIntent(transcript = "") {
+  const text = normalizeText(transcript);
+  if (!text) {
+    return {
+      intent: null,
+      score: 0,
+      candidates: []
+    };
+  }
+
+  const candidates = [];
+  for (const [index, rule] of INTENT_RULES.entries()) {
+    rule.pattern.lastIndex = 0;
+    if (rule.pattern.test(text)) {
+      candidates.push({
+        intent: rule.intent,
+        score: normalizeIntentRuleScore(rule.score),
+        rule_index: index
+      });
     }
   }
 
-  return null;
+  candidates.sort((left, right) => {
+    if (right.score !== left.score) {
+      return right.score - left.score;
+    }
+    return left.rule_index - right.rule_index;
+  });
+
+  const best = candidates[0] || null;
+  return {
+    intent: best?.intent || null,
+    score: best?.score || 0,
+    candidates
+  };
+}
+
+export function inferIntent(transcript = "") {
+  return classifyIntent(transcript).intent;
 }
 
 // Resolve how to invoke the real STT engine. An explicit command (set by an
@@ -514,14 +570,15 @@ function mockAudioFallback(audio, { error, hint } = {}) {
 }
 
 function createTranscriptResult({ transcript, source, confidence, audio }) {
-  const intent = inferIntent(transcript);
+  const intentClassification = classifyIntent(transcript);
 
   return {
     transcript,
-    intent,
+    intent: intentClassification.intent,
     confidence,
     source,
     audio,
+    intent_classification: intentClassification,
   };
 }
 
@@ -546,6 +603,14 @@ function shouldRetryWithAutoLanguage(plan, error) {
 
 function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeIntentRuleScore(value) {
+  const score = Number(value);
+  if (!Number.isFinite(score) || score <= 0) {
+    return 0.9;
+  }
+  return Math.min(1, score);
 }
 
 function firstNonEmpty(...values) {

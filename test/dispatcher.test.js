@@ -72,7 +72,7 @@ test("haptic is driven by action.haptic + haptic tool, never by toolSink", () =>
     makeAction({
       intent: "start_cpr_loop",
       priority: "critical",
-      tts: { text: "跟着震动按。", tone: "calm_firm", speed: "normal", interrupt_policy: "interrupt_lower_priority" },
+      tts: { text: "跟着节拍按。", tone: "calm_firm", speed: "normal", interrupt_policy: "interrupt_lower_priority" },
       ui: { main_text: "开始按压", secondary_text: "", status_tags: [], quality_score: 40, primary_button: null },
       haptic: { enabled: true, pattern: "metronome", bpm: 110 },
       tool_actions: [{ type: "start_haptic_metronome", bpm: 110, requires_user_confirmation: false }],
@@ -322,7 +322,7 @@ test("dispatchAll over the full demo pipeline never swallows a non-silent action
     );
   }
 
-  // 主线 demo 必然出现拨打 120 与节拍器震动。
+  // 主线 demo 必然出现拨打 120 与节拍器启动（单声音节拍，不再震动）。
   const hadEmergency = results.some((result) =>
     (toolDeliveryOf(result)?.payload?.tools ?? []).some(
       (tool) => tool.type === "emergency_call" && tool.outcome === "executed"

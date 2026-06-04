@@ -66,6 +66,7 @@ dependencies {
     implementation("androidx.camera:camera-camera2:$cameraxVersion")
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
+    implementation("com.google.mediapipe:tasks-vision:0.10.29")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")

@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createVoiceDemoService } from "./service.js";
 import { getRuntimeDir } from "./tts.js";
+import { attachVoiceWsGateway } from "./wsGateway.js";
 
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 8787;
@@ -12,7 +13,7 @@ const MAX_BODY_BYTES = 12 * 1024 * 1024;
 export function createVoiceServer(options = {}) {
   const service = options.service || createVoiceDemoService(options.serviceOptions || {});
 
-  return http.createServer(async (req, res) => {
+  const server = http.createServer(async (req, res) => {
     try {
       await routeRequest(req, res, service);
     } catch (error) {
@@ -25,6 +26,12 @@ export function createVoiceServer(options = {}) {
       });
     }
   });
+  attachVoiceWsGateway(server, {
+    ...(options.ws || {}),
+    service,
+    ttsOptions: options.serviceOptions?.tts || options.tts || {},
+  });
+  return server;
 }
 
 export async function startVoiceServer(options = {}) {
@@ -65,8 +72,14 @@ async function routeRequest(req, res, service) {
     sendJson(res, 200, {
       ok: true,
       service: "firstaid-voice-server",
+      live_ws_path: "/ws/live",
       tts_provider: process.env.SHERPA_ONNX_TTS_COMMAND ? "sherpa-onnx" : "mock",
     });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/vision/cprMetrics.js") {
+    await sendCprMetricsModule(res);
     return;
   }
 
@@ -88,7 +101,31 @@ async function routeRequest(req, res, service) {
     return;
   }
 
+  if ((req.method === "GET" || req.method === "HEAD") && url.pathname.startsWith("/vision-test-assets/")) {
+    await sendVisionTestAsset(req, res, decodeURIComponent(url.pathname.slice("/vision-test-assets/".length)));
+    return;
+  }
+
   sendJson(res, 404, { ok: false, error: { message: "Not found." } });
+}
+
+async function sendCprMetricsModule(res) {
+  const modulePath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../vision/cprMetrics.js");
+  sendCorsHeaders(res);
+  res.writeHead(200, {
+    "content-type": "application/javascript; charset=utf-8",
+    "cache-control": "no-store",
+  });
+
+  try {
+    res.end(await fs.readFile(modulePath, "utf8"));
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      res.end('throw new Error("src/vision/cprMetrics.js is not available yet.");\n');
+      return;
+    }
+    throw error;
+  }
 }
 
 function readJsonBody(req) {
@@ -138,6 +175,53 @@ async function sendRuntimeAudio(res, fileName) {
   res.end(data);
 }
 
+async function sendVisionTestAsset(req, res, fileName) {
+  if (!/^[\w.-]+\.(mp4|mov|webm)$/i.test(fileName)) {
+    sendJson(res, 400, { ok: false, error: { message: "Invalid vision test asset name." } });
+    return;
+  }
+
+  const assetDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../artifacts/vision-tests");
+  const fullPath = path.join(assetDir, fileName);
+  const stat = await fs.stat(fullPath);
+  const ext = path.extname(fileName).toLowerCase();
+  const contentType = ext === ".mp4"
+    ? "video/mp4"
+    : ext === ".mov"
+      ? "video/quicktime"
+      : "video/webm";
+  const range = parseRangeHeader(req.headers.range, stat.size);
+  const start = range?.start ?? 0;
+  const end = range?.end ?? stat.size - 1;
+  const data = req.method === "HEAD" ? null : (await fs.readFile(fullPath)).subarray(start, end + 1);
+  sendCorsHeaders(res);
+  res.writeHead(range ? 206 : 200, {
+    "content-type": contentType,
+    "content-length": range ? end - start + 1 : stat.size,
+    "accept-ranges": "bytes",
+    ...(range ? { "content-range": `bytes ${start}-${end}/${stat.size}` } : {}),
+    "cache-control": "no-store",
+  });
+  res.end(data);
+}
+
+function parseRangeHeader(value, size) {
+  if (!value || typeof value !== "string") {
+    return null;
+  }
+  const match = value.match(/^bytes=(\d*)-(\d*)$/);
+  if (!match) {
+    return null;
+  }
+  const [, rawStart, rawEnd] = match;
+  const start = rawStart === "" ? 0 : Number(rawStart);
+  const end = rawEnd === "" ? size - 1 : Number(rawEnd);
+  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || start >= size) {
+    return null;
+  }
+  return { start, end: Math.min(end, size - 1) };
+}
+
 function sendJson(res, statusCode, value) {
   sendCorsHeaders(res);
   res.writeHead(statusCode, {
@@ -168,7 +252,7 @@ function sendCorsHeaders(res) {
   res.setHeader("access-control-allow-headers", "content-type");
 }
 
-function renderDemoPage() {
+export function renderDemoPage() {
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -207,6 +291,21 @@ function renderDemoPage() {
     .live-state[data-state="Speaking"] .live-dot { background: #6657d8; }
     .live-state[data-state="Error"], .live-state[data-state="Off"] { background: #f5e8e6; color: #8b3027; }
     .live-state[data-state="Error"] .live-dot, .live-state[data-state="Off"] .live-dot { background: #b84636; }
+    .vision-panel { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(180px, 240px); gap: 12px; align-items: center; margin-top: 10px; padding: 12px; border: 1px solid #d7c7a8; border-radius: 8px; background: #fffaf0; }
+    .vision-controls { display: grid; gap: 8px; justify-items: start; }
+    .vision-toggle { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; color: #5f4314; }
+    .vision-state { display: inline-flex; gap: 6px; align-items: center; min-width: 134px; padding: 6px 9px; border-radius: 999px; background: #f0e6d6; color: #5f4314; font-size: 14px; }
+    .vision-dot { width: 9px; height: 9px; border-radius: 999px; background: #9b825d; }
+    .vision-state[data-state="Running"] { background: #e6f3e8; color: #275a34; }
+    .vision-state[data-state="Running"] .vision-dot { background: #2e8b57; }
+    .vision-state[data-state="Loading"] { background: #fff3d9; color: #74480d; }
+    .vision-state[data-state="Loading"] .vision-dot { background: #d8911b; }
+    .vision-state[data-state="Paused"] { background: #e9eef5; color: #35445a; }
+    .vision-state[data-state="Paused"] .vision-dot { background: #65758b; }
+    .vision-state[data-state="Error"], .vision-state[data-state="Off"] { background: #f5e8e6; color: #8b3027; }
+    .vision-state[data-state="Error"] .vision-dot, .vision-state[data-state="Off"] .vision-dot { background: #b84636; }
+    #realVisionVideo { width: 100%; max-height: 160px; border-radius: 8px; background: #222; object-fit: cover; }
+    #realVisionVideo[data-source="camera"] { transform: scaleX(-1); }
     .label { color: #59615a; font-size: 13px; margin-bottom: 4px; }
     .value { font-size: 18px; min-height: 28px; }
     .summary { color: #59615a; font-size: 14px; min-height: 22px; }
@@ -219,6 +318,7 @@ function renderDemoPage() {
       .start-panel { grid-template-columns: 1fr; }
       .quick-panel { grid-template-columns: 1fr; }
       .live-panel { grid-template-columns: 1fr; }
+      .vision-panel { grid-template-columns: 1fr; }
       .quick-actions { justify-content: flex-start; }
       .live-controls { justify-content: flex-start; }
     }
@@ -262,6 +362,21 @@ function renderDemoPage() {
           <span id="liveState" class="live-state" data-state="Idle"><span class="live-dot"></span><span id="liveStateText">准备中</span></span>
           <span id="liveMeter" class="summary"></span>
         </div>
+      </div>
+      <div class="vision-panel">
+        <div>
+          <div class="label">Real Vision（实验）</div>
+          <div id="realVisionHint" class="summary">使用浏览器摄像头 + MediaPipe Pose，仅在 S6/S7 且置信度足够时上报 CPR 质量；失败时继续用 Mock Vision。</div>
+          <div class="vision-controls" style="margin-top: 8px;">
+            <label class="vision-toggle"><input id="realVisionToggle" type="checkbox"> 真实视觉开</label>
+            <button id="pickVisionVideo" class="secondary" type="button">选择测试视频</button>
+            <input id="realVisionVideoFile" type="file" accept="video/*" style="display: none;">
+            <span id="realVisionState" class="vision-state" data-state="Off"><span class="vision-dot"></span><span id="realVisionStateText">Off</span></span>
+            <span id="realVisionSource" class="summary">来源：摄像头</span>
+            <span id="realVisionStatus" class="summary">未启用</span>
+          </div>
+        </div>
+        <video id="realVisionVideo" playsinline muted></video>
       </div>
       <div class="row" style="margin-top: 10px;">
         <label class="field">
@@ -322,11 +437,22 @@ function renderDemoPage() {
     const liveStateText = document.querySelector("#liveStateText");
     const liveHint = document.querySelector("#liveHint");
     const liveMeter = document.querySelector("#liveMeter");
+    const realVisionToggle = document.querySelector("#realVisionToggle");
+    const pickVisionVideo = document.querySelector("#pickVisionVideo");
+    const realVisionVideoFile = document.querySelector("#realVisionVideoFile");
+    const realVisionState = document.querySelector("#realVisionState");
+    const realVisionStateText = document.querySelector("#realVisionStateText");
+    const realVisionSource = document.querySelector("#realVisionSource");
+    const realVisionStatus = document.querySelector("#realVisionStatus");
+    const realVisionHint = document.querySelector("#realVisionHint");
+    const realVisionVideo = document.querySelector("#realVisionVideo");
     const audio = document.querySelector("#audio");
     let recordedAudio = null;
     let mediaRecorder = null;
     let chunks = [];
     let currentStage = "";
+    let selectedVisionVideoUrl = null;
+    let selectedVisionVideoName = "";
 
     const MOCK_PRESETS = [
       {
@@ -615,6 +741,8 @@ function renderDemoPage() {
 
     populateMockVision();
     const liveController = createLiveController();
+    const realVisionController = createRealVisionController();
+    hydrateVisionVideoFromQuery();
     liveToggle.addEventListener("change", () => {
       if (liveToggle.checked) {
         liveController.startIfEnabled();
@@ -622,6 +750,31 @@ function renderDemoPage() {
         liveController.stop();
       }
     });
+    realVisionToggle.addEventListener("change", () => {
+      if (realVisionToggle.checked) {
+        realVisionController.startIfEnabled();
+      } else {
+        realVisionController.stop();
+      }
+    });
+    pickVisionVideo.addEventListener("click", () => realVisionVideoFile.click());
+    realVisionVideoFile.addEventListener("change", () => {
+      const file = realVisionVideoFile.files?.[0];
+      if (!file) {
+        return;
+      }
+      if (selectedVisionVideoUrl) {
+        URL.revokeObjectURL(selectedVisionVideoUrl);
+      }
+      selectedVisionVideoUrl = URL.createObjectURL(file);
+      selectedVisionVideoName = file.name;
+      realVisionSource.textContent = "来源：测试视频 · " + file.name;
+      realVisionController.stop({ keepSelection: true });
+      realVisionToggle.checked = true;
+      realVisionController.startIfEnabled();
+    });
+    realVisionVideo.addEventListener("play", () => realVisionController.onVideoPlaybackResumed());
+    realVisionVideo.addEventListener("pause", () => realVisionController.onVideoPlaybackPaused());
     audio.addEventListener("ended", () => liveController.onPlaybackEnd());
     audio.addEventListener("error", () => liveController.onPlaybackEnd());
     queueMicrotask(() => liveController.startIfEnabled());
@@ -666,6 +819,7 @@ function renderDemoPage() {
         if (started.ok) {
           liveToggle.checked = true;
           liveController.startIfEnabled();
+          realVisionController.updateContext();
           setStatus("急救流程已开始");
         }
       } finally {
@@ -689,11 +843,17 @@ function renderDemoPage() {
       await runLiveCprQuestion("none", "AED 来了怎么办");
     });
 
-    mockVision.addEventListener("change", updateMockSummary);
+    mockVision.addEventListener("change", () => {
+      updateMockSummary();
+      liveController.updateContext();
+      realVisionController.updateContext();
+    });
 
     document.querySelector("#reset").addEventListener("click", async () => {
       liveController.stop();
       liveToggle.checked = false;
+      realVisionController.stop();
+      realVisionToggle.checked = false;
       await resetSession();
       setStatus("reset");
     });
@@ -708,6 +868,7 @@ function renderDemoPage() {
       currentStage = "";
       recordedAudio = null;
       updateMockSummary();
+      realVisionController.updateContext();
     }
 
     record.addEventListener("click", async () => {
@@ -858,32 +1019,47 @@ function renderDemoPage() {
       }
       document.querySelector("#raw").textContent = JSON.stringify(json, null, 2);
       updateMockSummary();
+      realVisionController.updateContext();
     }
 
     function createLiveController() {
       const config = {
         targetSampleRate: 16000,
-        minSpeechMs: 300,
-        endSilenceMs: 600,
-        maxSpeechMs: 15000,
-        preRollMs: 250,
         minRms: 0.014,
-        noiseMultiplier: 3.2
+        noiseMultiplier: 3.2,
+        // Barge-in must clear a clearly higher, *sustained* energy than plain
+        // listening so the assistant's own playback echo or a brief noise can no
+        // longer cut its own prompt off (issue: 收音太敏感).
+        bargeInMinRms: 0.15,
+        bargeInNoiseMultiplier: 8,
+        bargeInSpeechMs: 600,
+        contextRefreshMs: 500,
+        // Endpoint after a longer pause so a mid-sentence breath no longer commits
+        // half an utterance, and require a minimum amount of real speech before a
+        // commit so stray noise never fires a spurious turn (issue: 录音太短).
+        commitSilenceMs: 1200,
+        minUtteranceMs: 250
       };
       let stream = null;
       let audioContext = null;
+      let playbackContext = null;
       let source = null;
       let processor = null;
       let workletUrl = "";
+      let ws = null;
       let state = "Idle";
       let manualPaused = false;
-      let captureFrames = [];
-      let preRollFrames = [];
-      let captureMs = 0;
-      let speechMs = 0;
-      let silenceMs = 0;
       let noiseFloor = 0.004;
-      let flushing = false;
+      let lastContextAt = 0;
+      let bargeInSent = false;
+      let bargeInVoicedMs = 0;
+      let playbackCursor = 0;
+      let playbackSources = [];
+      let playbackEndTimer = 0;
+      let pendingAudio = null;
+      let utteranceActive = false;
+      let lastVoiceAt = 0;
+      let voicedMsInUtterance = 0;
 
       return {
         startIfEnabled,
@@ -892,7 +1068,8 @@ function renderDemoPage() {
         onPlaybackStart,
         onPlaybackEnd,
         pauseForManualInput,
-        resumeAfterManualInput
+        resumeAfterManualInput,
+        updateContext
       };
 
       async function startIfEnabled() {
@@ -906,6 +1083,8 @@ function renderDemoPage() {
         }
 
         try {
+          setState("Idle", "正在连接 Live WebSocket...");
+          connectWebSocket();
           setState("Idle", "正在请求麦克风权限...");
           stream = await navigator.mediaDevices.getUserMedia({
             audio: {
@@ -920,20 +1099,67 @@ function renderDemoPage() {
           source = audioContext.createMediaStreamSource(stream);
           await attachProcessor();
           await resumeAudioContext();
-          setState("Listening", "聆听中，说完后会自动提交。");
+          updateContext(true);
+          setState("Listening", "Live 流式聆听中，可在播报时直接打断。");
           window.addEventListener("pointerdown", resumeAudioContext, { once: true });
           window.addEventListener("keydown", resumeAudioContext, { once: true });
         } catch (error) {
           cleanupAudio();
+          closeWebSocket();
           setState("Error", normalizeMediaError(error));
         }
       }
 
       function stop() {
         liveToggle.checked = false;
-        resetCapture();
+        stopPlayback();
         cleanupAudio();
+        closeWebSocket();
         setState("Off", "Live 已关闭，可使用手动录音或选择音频。");
+      }
+
+      function connectWebSocket() {
+        if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+          return;
+        }
+        const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+        ws = new WebSocket(protocol + "//" + location.host + "/ws/live");
+        ws.binaryType = "arraybuffer";
+        ws.addEventListener("open", () => {
+          sendControl({ type: "start", sessionId, mode: "demo_assisted", context: selectedMockPayload() });
+          setState("Listening", "Live 已连接，正在流式聆听。");
+        });
+        ws.addEventListener("message", handleWsMessage);
+        ws.addEventListener("close", () => {
+          if (liveToggle.checked) {
+            setState("Error", "Live WebSocket 已断开，可关闭后重试或使用旧按钮回退。");
+          }
+        });
+        ws.addEventListener("error", () => {
+          setState("Error", "Live WebSocket 连接失败，可使用手动录音或文本回退。");
+        });
+      }
+
+      function closeWebSocket() {
+        if (ws) {
+          ws.close();
+        }
+        ws = null;
+      }
+
+      function sendControl(payload) {
+        if (ws?.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify(payload));
+        }
+      }
+
+      function updateContext(force = false) {
+        const now = performance.now();
+        if (!force && now - lastContextAt < config.contextRefreshMs) {
+          return;
+        }
+        lastContextAt = now;
+        sendControl({ type: "context", payload: selectedMockPayload() });
       }
 
       async function attachProcessor() {
@@ -980,84 +1206,145 @@ function renderDemoPage() {
       }
 
       function processFrame(frame) {
-        if (!liveToggle.checked || manualPaused || flushing || state === "Uploading" || state === "Thinking" || state === "Speaking") {
+        if (!liveToggle.checked || manualPaused) {
           return;
         }
 
         const pcm = frame instanceof Float32Array ? frame : new Float32Array(frame);
-        const frameMs = (pcm.length / audioContext.sampleRate) * 1000;
         const level = rms(pcm);
-        const threshold = Math.max(config.minRms, noiseFloor * config.noiseMultiplier);
-        const voiced = level >= threshold;
-        updateMeter(level, threshold);
+        const sampleRate = audioContext?.sampleRate || config.targetSampleRate;
+        const frameMs = (pcm.length / sampleRate) * 1000;
+        const listenThreshold = Math.max(config.minRms, noiseFloor * config.noiseMultiplier);
+        const bargeThreshold = Math.max(config.bargeInMinRms, noiseFloor * config.bargeInNoiseMultiplier);
+        const voiced = level >= listenThreshold;
+        updateMeter(level, state === "Speaking" ? bargeThreshold : listenThreshold);
+        updateContext();
 
-        if (state !== "Capturing") {
+        if (state !== "Speaking") {
           noiseFloor = noiseFloor * 0.97 + Math.min(level, 0.05) * 0.03;
-          pushPreRoll(pcm);
+        }
+
+        if (state === "Speaking") {
+          // Only treat playback-time input as a real barge-in once it stays clearly
+          // above the higher threshold for a sustained window; a single sub-threshold
+          // frame resets it so echo transients can no longer self-interrupt.
+          if (level >= bargeThreshold) {
+            bargeInVoicedMs += frameMs;
+          } else {
+            bargeInVoicedMs = 0;
+          }
+          if (bargeInVoicedMs >= config.bargeInSpeechMs && !bargeInSent) {
+            bargeInSent = true;
+            bargeInVoicedMs = 0;
+            sendControl({ type: "barge_in" });
+            stopPlayback();
+            setState("Capturing", "检测到持续说话，已停止播报并继续聆听。");
+          }
+        } else {
+          if (voiced && state !== "Capturing") {
+            setState("Capturing", "检测到语音，正在流式上传...");
+          } else if (!voiced && state === "Capturing") {
+            setState("Listening", "等待 final 识别结果...");
+          }
+
+          const nowMs = performance.now();
           if (voiced) {
-            captureFrames = preRollFrames.map((item) => item.slice(0));
-            captureFrames.push(pcm.slice(0));
-            captureMs = captureDurationMs(captureFrames);
-            speechMs = frameMs;
-            silenceMs = 0;
-            setState("Capturing", "检测到语音，正在收声...");
-          } else if (state !== "Listening") {
-            setState("Listening", "聆听中，说完后会自动提交。");
+            utteranceActive = true;
+            lastVoiceAt = nowMs;
+            voicedMsInUtterance += frameMs;
+          } else if (utteranceActive && nowMs - lastVoiceAt >= config.commitSilenceMs) {
+            const hadEnoughSpeech = voicedMsInUtterance >= config.minUtteranceMs;
+            utteranceActive = false;
+            voicedMsInUtterance = 0;
+            // Drop sub-threshold blips silently; only commit a real utterance.
+            if (hadEnoughSpeech) {
+              sendControl({ type: "commit" });
+            }
+          }
+        }
+
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          return;
+        }
+        const downsampled = downsamplePcm(pcm, audioContext.sampleRate, config.targetSampleRate);
+        const pcm16 = floatToPcm16(downsampled);
+        if (pcm16.byteLength > 0) {
+          ws.send(pcm16);
+        }
+      }
+
+      async function handleWsMessage(event) {
+        if (event.data instanceof ArrayBuffer) {
+          playPcmChunk(event.data, pendingAudio);
+          return;
+        }
+
+        let message = null;
+        try {
+          message = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+
+        if (message.type === "partial") {
+          document.querySelector("#transcript").textContent = message.text || "";
+          if (message.text) {
+            setState("Capturing", "实时字幕：" + message.text);
           }
           return;
         }
 
-        captureFrames.push(pcm.slice(0));
-        captureMs += frameMs;
-        if (voiced) {
-          speechMs += frameMs;
-          silenceMs = 0;
-        } else {
-          silenceMs += frameMs;
-        }
-
-        if (speechMs < config.minSpeechMs && silenceMs >= config.endSilenceMs) {
-          resetCapture();
-          setState("Listening", "语音过短，继续聆听。");
+        if (message.type === "final") {
+          document.querySelector("#transcript").textContent = message.text || "";
+          document.querySelector("#sttIntent").textContent = message.intent || "";
+          setState("Thinking", "final 已提交，正在生成指导...");
           return;
         }
 
-        if (captureMs >= config.maxSpeechMs || (speechMs >= config.minSpeechMs && silenceMs >= config.endSilenceMs)) {
-          flushCapture();
-        }
-      }
-
-      async function flushCapture() {
-        if (flushing) {
-          return;
-        }
-        flushing = true;
-        const frames = captureFrames;
-        const speechDuration = speechMs;
-        resetCapture();
-
-        if (speechDuration < config.minSpeechMs) {
-          flushing = false;
-          setState("Listening", "语音过短，继续聆听。");
+        if (message.type === "guidance") {
+          const action = message.action || {};
+          document.querySelector("#intent").textContent = action.intent || "";
+          document.querySelector("#guidanceSource").textContent = message.source || "";
+          document.querySelector("#responseType").textContent = message.response_type || "";
+          document.querySelector("#liveDriverSource").textContent = message.source || "";
+          document.querySelector("#ttsText").textContent = action.tts?.text || "";
+          document.querySelector("#raw").textContent = JSON.stringify(message, null, 2);
+          setStatus("live ok");
           return;
         }
 
-        try {
-          setState("Uploading", "正在编码 16k WAV 并提交...");
-          await nextFrame();
-          const pcm = flattenFrames(frames);
-          const downsampled = downsamplePcm(pcm, audioContext.sampleRate, config.targetSampleRate);
-          const audioBase64 = encodeWavBase64(downsampled, config.targetSampleRate);
-          await sendTurn({
-            ...selectedMockPayload(),
-            audioBase64,
-            mimeType: "audio/wav"
-          }, { live: true });
-        } catch (error) {
-          setStatus(error?.message || "Live 语音提交失败", true);
-          setState("Listening", "提交失败，继续聆听。");
-        } finally {
-          flushing = false;
+        if (message.type === "state") {
+          if (message.current_stage !== undefined) {
+            currentStage = message.current_stage || "";
+            document.querySelector("#stage").textContent = currentStage;
+            updateMockSummary();
+          }
+          return;
+        }
+
+        if (message.type === "audio_begin") {
+          pendingAudio = {
+            actionId: message.action_id || message.actionId,
+            sampleRate: message.sample_rate || message.sampleRate || config.targetSampleRate,
+            channels: message.channels || 1
+          };
+          onPlaybackStart();
+          return;
+        }
+
+        if (message.type === "audio_end") {
+          schedulePlaybackEnd();
+          return;
+        }
+
+        if (message.type === "audio_cancel") {
+          stopPlayback();
+          return;
+        }
+
+        if (message.type === "error") {
+          setStatus(message.error?.message || "Live error", true);
+          setState("Error", message.error?.message || "Live error");
         }
       }
 
@@ -1065,16 +1352,25 @@ function renderDemoPage() {
         if (!liveToggle.checked) {
           return;
         }
-        resetCapture();
-        setState("Speaking", "正在播报，已暂停收声。");
+        bargeInSent = false;
+        bargeInVoicedMs = 0;
+        setState("Speaking", "正在播报，麦克风保持开启，可直接打断。");
       }
 
       function onPlaybackEnd() {
         if (!liveToggle.checked) {
           return;
         }
+        pendingAudio = null;
         resetCapture();
-        setState("Listening", "播报结束，继续聆听。");
+        setState("Listening", "播报结束，继续流式聆听。");
+      }
+
+      function resetCapture() {
+        bargeInSent = false;
+        bargeInVoicedMs = 0;
+        utteranceActive = false;
+        voicedMsInUtterance = 0;
       }
 
       function pauseForManualInput() {
@@ -1101,22 +1397,6 @@ function renderDemoPage() {
         }
       }
 
-      function resetCapture() {
-        captureFrames = [];
-        captureMs = 0;
-        speechMs = 0;
-        silenceMs = 0;
-      }
-
-      function pushPreRoll(frame) {
-        preRollFrames.push(frame.slice(0));
-        const maxSamples = Math.ceil((audioContext.sampleRate * config.preRollMs) / 1000);
-        let total = preRollFrames.reduce((sum, item) => sum + item.length, 0);
-        while (total > maxSamples && preRollFrames.length > 1) {
-          total -= preRollFrames.shift().length;
-        }
-      }
-
       function cleanupAudio() {
         if (processor) {
           processor.disconnect?.();
@@ -1137,6 +1417,70 @@ function renderDemoPage() {
         liveMeter.textContent = "";
       }
 
+      function ensurePlaybackContext(sampleRate) {
+        if (!playbackContext) {
+          const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+          playbackContext = new AudioContextCtor({ sampleRate });
+        }
+        if (playbackContext.state === "suspended") {
+          playbackContext.resume().catch(() => {});
+        }
+        if (!playbackCursor || playbackCursor < playbackContext.currentTime + 0.02) {
+          playbackCursor = playbackContext.currentTime + 0.02;
+        }
+        return playbackContext;
+      }
+
+      function playPcmChunk(arrayBuffer, audioMeta) {
+        const meta = audioMeta || { sampleRate: config.targetSampleRate, channels: 1 };
+        const ctx = ensurePlaybackContext(meta.sampleRate);
+        const pcm16 = new Int16Array(arrayBuffer);
+        const channels = Math.max(1, meta.channels || 1);
+        const frames = Math.floor(pcm16.length / channels);
+        if (frames <= 0) {
+          return;
+        }
+
+        const audioBuffer = ctx.createBuffer(channels, frames, meta.sampleRate);
+        for (let channel = 0; channel < channels; channel += 1) {
+          const out = audioBuffer.getChannelData(channel);
+          for (let i = 0; i < frames; i += 1) {
+            out[i] = pcm16[i * channels + channel] / 0x8000;
+          }
+        }
+
+        const node = ctx.createBufferSource();
+        node.buffer = audioBuffer;
+        node.connect(ctx.destination);
+        node.start(playbackCursor);
+        playbackCursor += audioBuffer.duration;
+        playbackSources.push(node);
+      }
+
+      function schedulePlaybackEnd() {
+        clearTimeout(playbackEndTimer);
+        const delayMs = playbackContext
+          ? Math.max(0, (playbackCursor - playbackContext.currentTime) * 1000 + 40)
+          : 0;
+        playbackEndTimer = window.setTimeout(() => {
+          playbackSources = [];
+          onPlaybackEnd();
+        }, delayMs);
+      }
+
+      function stopPlayback() {
+        clearTimeout(playbackEndTimer);
+        playbackSources.forEach((node) => {
+          try { node.stop(); } catch {}
+        });
+        playbackSources = [];
+        pendingAudio = null;
+        playbackCursor = playbackContext?.currentTime || 0;
+        if (liveToggle.checked) {
+          setState("Listening", "已停止播报，继续流式聆听。");
+        }
+      }
+
       function updateMeter(level, threshold) {
         liveMeter.textContent = "RMS " + level.toFixed(3) + " / 阈值 " + threshold.toFixed(3);
       }
@@ -1153,6 +1497,524 @@ function renderDemoPage() {
         const samples = frames.reduce((sum, item) => sum + item.length, 0);
         return (samples / audioContext.sampleRate) * 1000;
       }
+
+      function floatToPcm16(samples) {
+        const buffer = new ArrayBuffer(samples.length * 2);
+        const view = new DataView(buffer);
+        for (let i = 0; i < samples.length; i += 1) {
+          const sample = Math.max(-1, Math.min(1, samples[i]));
+          view.setInt16(i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+        }
+        return buffer;
+      }
+    }
+
+    function createRealVisionController() {
+      const config = {
+        minConfidence: 0.75,
+        minPostIntervalMs: 900,
+        inferenceIntervalMs: 100,
+        readinessDropGraceMs: 2500,
+        recordingOnlyDelayMs: 5000,
+        modelUrl: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task",
+        wasmUrl: "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm",
+        tasksVisionUrl: "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35"
+      };
+      let stream = null;
+      let poseLandmarker = null;
+      let metricsTracker = null;
+      let animationId = 0;
+      let lastInferenceAt = 0;
+      let lastPostAt = 0;
+      let lastLiveRecognitionAt = 0;
+      let readinessFailureStartedAt = 0;
+      let lastVideoFrameTime = null;
+      let lastVideoFrameTimestampMs = null;
+      let posting = false;
+      let started = false;
+      let inputSource = "camera";
+
+      return {
+        startIfEnabled,
+        stop,
+        updateContext,
+        onVideoPlaybackResumed,
+        onVideoPlaybackPaused
+      };
+
+      async function startIfEnabled() {
+        if (!realVisionToggle.checked || started) {
+          return;
+        }
+        inputSource = selectedVisionVideoUrl ? "video_file" : "camera";
+        if (inputSource === "camera" && !navigator.mediaDevices?.getUserMedia) {
+          setState("Error", "当前浏览器不支持摄像头 getUserMedia，请继续使用 Mock Vision。");
+          return;
+        }
+
+        started = true;
+        try {
+          setState("Loading", "正在加载 MediaPipe Pose 和 CPR 指标模块...");
+          const [{ FilesetResolver, PoseLandmarker }, metricsModule] = await Promise.all([
+            import(config.tasksVisionUrl),
+            import("/vision/cprMetrics.js")
+          ]);
+          if (typeof metricsModule.createCprMetricsTracker !== "function") {
+            throw new Error("cprMetrics 模块缺少 createCprMetricsTracker(options) 导出。");
+          }
+          const vision = await FilesetResolver.forVisionTasks(config.wasmUrl);
+          poseLandmarker = await createPoseLandmarker(PoseLandmarker, vision);
+          metricsTracker = metricsModule.createCprMetricsTracker({
+            minConfidence: config.minConfidence,
+            source: "web_mediapipe_pose",
+            mirrorX: inputSource === "camera",
+            handPositionReference: "calibrated"
+          });
+
+          if (inputSource === "video_file") {
+            setState("Loading", "正在加载测试视频：" + selectedVisionVideoName);
+            stream = null;
+            realVisionVideo.srcObject = null;
+            realVisionVideo.muted = true;
+            realVisionVideo.playsInline = true;
+            realVisionVideo.autoplay = true;
+            realVisionVideo.preload = "auto";
+            realVisionVideo.src = selectedVisionVideoUrl;
+            realVisionVideo.loop = true;
+            realVisionVideo.controls = true;
+            realVisionVideo.dataset.source = "video";
+            realVisionVideo.load();
+          } else {
+            setState("Loading", "正在请求摄像头权限...");
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                facingMode: "user",
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+              },
+              audio: false
+            });
+            realVisionVideo.removeAttribute("src");
+            realVisionVideo.srcObject = stream;
+            realVisionVideo.controls = false;
+            realVisionVideo.dataset.source = "camera";
+          }
+          const playbackReady = inputSource === "video_file"
+            ? await startTestVideoPlayback()
+            : await startCameraPlayback();
+          if (!started) {
+            return;
+          }
+          setState(playbackReady ? "Running" : "Paused", playbackReady
+            ? isRealVisionStage()
+              ? runningMessage()
+              : "真实视觉已就绪，等待流程进入 S6/S7。"
+            : pausedVideoMessage());
+          scheduleLoop();
+        } catch (error) {
+          stop();
+          setState("Error", normalizeRealVisionError(error));
+        }
+      }
+
+      function stop(options = {}) {
+        started = false;
+        if (animationId) {
+          cancelAnimationFrame(animationId);
+        }
+        animationId = 0;
+        stream?.getTracks().forEach((track) => track.stop());
+        stream = null;
+        realVisionVideo.pause();
+        if (!options.keepSelection) {
+          realVisionVideo.removeAttribute("src");
+        }
+        realVisionVideo.srcObject = null;
+        realVisionVideo.removeAttribute("data-source");
+        poseLandmarker?.close?.();
+        poseLandmarker = null;
+        metricsTracker = null;
+        lastLiveRecognitionAt = 0;
+        readinessFailureStartedAt = 0;
+        lastVideoFrameTime = null;
+        lastVideoFrameTimestampMs = null;
+        posting = false;
+        if (!realVisionToggle.checked) {
+          setState("Off", "真实视觉已关闭，Mock Vision 仍可使用。");
+        }
+      }
+
+      function updateContext() {
+        if (!started) {
+          return;
+        }
+        if (isRealVisionStage()) {
+          setState(inputSource === "video_file" && realVisionVideo.paused ? "Paused" : "Running",
+            inputSource === "video_file" && realVisionVideo.paused ? pausedVideoMessage() : runningMessage());
+        } else {
+          setState(inputSource === "video_file" && realVisionVideo.paused ? "Paused" : "Running",
+            inputSource === "video_file" && realVisionVideo.paused
+              ? pausedVideoMessage()
+              : "真实视觉已就绪，等待流程进入 S6/S7。");
+        }
+      }
+
+      function onVideoPlaybackResumed() {
+        if (!started || inputSource !== "video_file") {
+          return;
+        }
+        setState("Running", isRealVisionStage()
+          ? runningMessage()
+          : "测试视频已恢复播放，真实视觉已就绪，等待流程进入 S6/S7。");
+      }
+
+      function onVideoPlaybackPaused() {
+        if (!started || inputSource !== "video_file" || realVisionVideo.ended) {
+          return;
+        }
+        setState("Paused", pausedVideoMessage());
+      }
+
+      function runningMessage() {
+        return inputSource === "video_file"
+          ? "测试视频回放中，正在用 MediaPipe 分析 CPR 姿态。"
+          : "真实视觉运行中，正在分析 CPR 姿态。";
+      }
+
+      function pausedVideoMessage() {
+        return "测试视频已加载，但浏览器暂停了自动播放；可点视频播放继续动态回放，当前仍会分析已加载帧。";
+      }
+
+      function scheduleLoop() {
+        animationId = requestAnimationFrame(loop);
+      }
+
+      async function loop(timestampMs) {
+        if (!started || !poseLandmarker || !metricsTracker) {
+          return;
+        }
+        try {
+          syncVideoPlaybackStateBadge();
+          if (isRealVisionStage() && realVisionVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+            await maybeProcessFrame(timestampMs);
+          }
+        } catch (error) {
+          setState("Error", normalizeRealVisionError(error));
+        } finally {
+          if (started) {
+            scheduleLoop();
+          }
+        }
+      }
+
+      function syncVideoPlaybackStateBadge() {
+        if (inputSource !== "video_file") {
+          return;
+        }
+        const nextState = realVisionVideo.paused ? "Paused" : "Running";
+        if (realVisionStateText.textContent !== nextState) {
+          realVisionState.dataset.state = nextState;
+          realVisionStateText.textContent = nextState;
+        }
+      }
+
+      async function startCameraPlayback() {
+        await realVisionVideo.play();
+        return true;
+      }
+
+      async function startTestVideoPlayback() {
+        await waitForVideoReady();
+        try {
+          await realVisionVideo.play();
+          return !realVisionVideo.paused;
+        } catch (error) {
+          console.warn("Real Vision test video autoplay was blocked; continuing with loaded frames.", error);
+          return false;
+        }
+      }
+
+      function waitForVideoReady(timeoutMs = 3500) {
+        if (realVisionVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+          return Promise.resolve();
+        }
+        return new Promise((resolve, reject) => {
+          let timeoutId = 0;
+          const cleanup = () => {
+            clearTimeout(timeoutId);
+            realVisionVideo.removeEventListener("loadeddata", onReady);
+            realVisionVideo.removeEventListener("canplay", onReady);
+            realVisionVideo.removeEventListener("error", onError);
+          };
+          const onReady = () => {
+            cleanup();
+            resolve();
+          };
+          const onError = () => {
+            cleanup();
+            reject(realVisionVideo.error || new Error("测试视频加载失败。"));
+          };
+          timeoutId = setTimeout(() => {
+            cleanup();
+            reject(new Error("测试视频加载超时。"));
+          }, timeoutMs);
+          realVisionVideo.addEventListener("loadeddata", onReady, { once: true });
+          realVisionVideo.addEventListener("canplay", onReady, { once: true });
+          realVisionVideo.addEventListener("error", onError, { once: true });
+        });
+      }
+
+      async function maybeProcessFrame(timestampMs) {
+        if (timestampMs - lastInferenceAt < config.inferenceIntervalMs) {
+          return;
+        }
+        lastInferenceAt = timestampMs;
+        resetVideoMetricsOnTimelineJump(timestampMs);
+
+        const result = poseLandmarker.detectForVideo(realVisionVideo, timestampMs);
+        const landmarks = result?.landmarks?.[0] || null;
+        if (!landmarks?.length) {
+          setCaptureContinuousStatus(timestampMs, null, "未检测到人体姿态；请让上半身和双臂进入画面。");
+          return;
+        }
+
+        const rawQuality = metricsTracker.update(landmarks, timestampMs);
+        const cprQuality = normalizeCprQualityForEvent(rawQuality);
+        const confidence = firstNumber(cprQuality.confidence, estimatePoseConfidence(landmarks));
+        cprQuality.confidence = confidence;
+
+        if (confidence < config.minConfidence) {
+          setCaptureContinuousStatus(timestampMs, { confidence }, "姿态置信度低 " + confidence.toFixed(2) + "，暂不上报。");
+          return;
+        }
+        if (cprQuality.vision_ready !== true) {
+          setCaptureContinuousStatus(timestampMs, cprQuality, summarizeVisionReadiness(cprQuality));
+          return;
+        }
+        if (!hasUsefulCprQuality(cprQuality)) {
+          markLiveRecognition(timestampMs);
+          realVisionStatus.textContent = "采集持续：姿态已识别，等待 CPR 质量指标稳定。";
+          return;
+        }
+        markLiveRecognition(timestampMs);
+        if (posting || timestampMs - lastPostAt < config.minPostIntervalMs) {
+          realVisionStatus.textContent = summarizeCprQuality(cprQuality, "已识别");
+          return;
+        }
+
+        posting = true;
+        lastPostAt = timestampMs;
+        try {
+          realVisionStatus.textContent = summarizeCprQuality(cprQuality, "上报中");
+          const response = await sendTurn({
+            eventSource: "vision_cpr",
+            eventType: "cpr_quality_update",
+            cprQuality,
+            metadata: {
+              perception_mode: "real_perception",
+              perception_provider: "mediapipe_tasks_vision",
+              model: "pose_landmarker_lite",
+              model_asset: "cdn",
+              stage_at_capture: currentStage,
+              vision_input_source: inputSource,
+              camera_facing: inputSource === "camera" ? "front" : "unknown",
+              camera_mount: inputSource === "camera" ? "side_fixed" : "unknown",
+              mirrored: inputSource === "camera",
+              vision_ready: cprQuality.vision_ready,
+              pose_coverage: cprQuality.pose_coverage,
+              frame_stability: cprQuality.frame_stability,
+              observed_window_ms: cprQuality.observed_window_ms
+            }
+          }, { vision: true });
+          realVisionStatus.textContent = summarizeCprQuality(cprQuality, response.ok ? "已上报" : "上报失败");
+        } finally {
+          posting = false;
+        }
+      }
+
+      function resetVideoMetricsOnTimelineJump(timestampMs) {
+        if (inputSource !== "video_file") {
+          return;
+        }
+        const currentTime = realVisionVideo.currentTime;
+        if (!Number.isFinite(currentTime)) {
+          return;
+        }
+        let hasTimelineJump = false;
+        if (lastVideoFrameTime !== null) {
+          const videoDelta = currentTime - lastVideoFrameTime;
+          const wallDelta = Number.isFinite(timestampMs) && lastVideoFrameTimestampMs !== null
+            ? Math.max(0, (timestampMs - lastVideoFrameTimestampMs) / 1000)
+            : 0;
+          hasTimelineJump =
+            videoDelta < -0.25 ||
+            videoDelta > Math.max(4, wallDelta + 2.5);
+        }
+        if (hasTimelineJump) {
+          metricsTracker?.reset?.();
+          lastPostAt = 0;
+          posting = false;
+        }
+        lastVideoFrameTime = currentTime;
+        lastVideoFrameTimestampMs = Number.isFinite(timestampMs) ? timestampMs : null;
+      }
+
+      function markLiveRecognition(timestampMs) {
+        lastLiveRecognitionAt = Number.isFinite(timestampMs) ? timestampMs : performance.now();
+        readinessFailureStartedAt = 0;
+      }
+
+      function setCaptureContinuousStatus(timestampMs, cprQuality, detail) {
+        const now = Number.isFinite(timestampMs) ? timestampMs : performance.now();
+        const hasRecentLive =
+          lastLiveRecognitionAt > 0 &&
+          now - lastLiveRecognitionAt <= config.readinessDropGraceMs;
+        if (hasRecentLive) {
+          realVisionStatus.textContent = "采集持续：识别信号短暂波动，暂不切换模式。 " + detail;
+          return;
+        }
+
+        if (!readinessFailureStartedAt) {
+          readinessFailureStartedAt = now;
+        }
+        const failedForMs = now - readinessFailureStartedAt;
+        const prefix = failedForMs >= config.recordingOnlyDelayMs
+          ? "采集持续：实时识别暂未就绪，继续采集。 "
+          : "采集持续：正在等待画面稳定。 ";
+        realVisionStatus.textContent = prefix + detail;
+      }
+
+      function setState(nextState, message) {
+        realVisionState.dataset.state = nextState;
+        realVisionStateText.textContent = nextState;
+        realVisionStatus.textContent = message;
+        realVisionHint.textContent = message;
+      }
+
+      function isRealVisionStage() {
+        return currentStage === "S6_CPR_READY" || currentStage === "S7_CPR_LOOP";
+      }
+
+      function normalizeCprQualityForEvent(rawQuality) {
+        const source = rawQuality?.cprQuality && typeof rawQuality.cprQuality === "object"
+          ? rawQuality.cprQuality
+          : rawQuality && typeof rawQuality === "object"
+            ? rawQuality
+            : {};
+        const compressionRate = firstNumber(source.compression_rate, source.compressionRate, source.current_rate, source.currentRate, source.rate);
+        const interruptionSeconds = firstNumber(source.interruption_seconds, source.interruptionSeconds, source.last_interruption_seconds);
+        const handPosition = source.hand_position ?? source.handPosition ?? null;
+        const armStraight = source.arm_straight ?? source.armStraight ?? source.arms_straight ?? null;
+        const totalCompressions = firstNumber(source.total_compressions, source.totalCompressions, source.compression_count, source.compressions);
+        const qualityScore = firstNumber(source.quality_score, source.qualityScore, source.score);
+        const averageRate = firstNumber(source.average_rate, source.averageRate, source.avg_rate);
+        const compressionsStarted = source.compressions_started ?? source.compressionsStarted ?? source.started;
+
+        return removeUndefined({
+          ...source,
+          compressions_started: compressionsStarted,
+          compression_rate: compressionRate,
+          current_rate: compressionRate,
+          average_rate: averageRate,
+          quality_score: qualityScore,
+          hand_position: handPosition,
+          arm_straight: armStraight,
+          arm_posture: armStraight === false ? "bent" : armStraight === true ? "straight" : source.arm_posture,
+          interruption_seconds: interruptionSeconds,
+          total_compressions: totalCompressions,
+          vision_ready: source.vision_ready,
+          pose_coverage: firstNumber(source.pose_coverage, source.poseCoverage),
+          frame_stability: firstNumber(source.frame_stability, source.frameStability),
+          observed_window_ms: firstNumber(source.observed_window_ms, source.observedWindowMs),
+          confidence: firstNumber(source.confidence, source.pose_confidence, source.visibility)
+        });
+      }
+
+      function hasUsefulCprQuality(cprQuality) {
+        return (
+          cprQuality.compressions_started != null ||
+          cprQuality.compression_rate != null ||
+          cprQuality.interruption_seconds != null ||
+          cprQuality.hand_position != null ||
+          cprQuality.arm_straight != null ||
+          cprQuality.quality_score != null
+        );
+      }
+
+      async function createPoseLandmarker(PoseLandmarker, vision) {
+        const baseOptions = {
+          modelAssetPath: config.modelUrl
+        };
+        const commonOptions = {
+          runningMode: "VIDEO",
+          numPoses: 1,
+          minPoseDetectionConfidence: 0.5,
+          minPosePresenceConfidence: 0.5,
+          minTrackingConfidence: 0.5
+        };
+        try {
+          return await PoseLandmarker.createFromOptions(vision, {
+            baseOptions: { ...baseOptions, delegate: "GPU" },
+            ...commonOptions
+          });
+        } catch {
+          return PoseLandmarker.createFromOptions(vision, {
+            baseOptions,
+            ...commonOptions
+          });
+        }
+      }
+
+      function estimatePoseConfidence(landmarks) {
+        const indexes = [11, 12, 13, 14, 15, 16, 23, 24];
+        let sum = 0;
+        let count = 0;
+        for (const index of indexes) {
+          const landmark = landmarks[index];
+          const value = firstNumber(landmark?.visibility, landmark?.presence);
+          if (value !== null) {
+            sum += value;
+            count += 1;
+          }
+        }
+        return count ? sum / count : 0;
+      }
+
+      function summarizeCprQuality(cprQuality, prefix) {
+        const rate = firstNumber(cprQuality.compression_rate, cprQuality.current_rate);
+        const score = firstNumber(cprQuality.quality_score);
+        const confidence = firstNumber(cprQuality.confidence);
+        return prefix + ": rate " + (rate === null ? "-" : Math.round(rate)) +
+          " / hand " + (cprQuality.hand_position ?? "-") +
+          " / arm " + (cprQuality.arm_straight === false ? "bent" : cprQuality.arm_straight === true ? "straight" : "-") +
+          " / score " + (score === null ? "-" : Math.round(score)) +
+          " / conf " + (confidence === null ? "-" : confidence.toFixed(2));
+      }
+
+      function summarizeVisionReadiness(cprQuality) {
+        const coverage = firstNumber(cprQuality.pose_coverage);
+        const stability = firstNumber(cprQuality.frame_stability);
+        const observedMs = firstNumber(cprQuality.observed_window_ms);
+        return "coverage " + formatRatio(coverage) +
+          " / stability " + formatRatio(stability) +
+          " / window " + (observedMs === null ? "-" : Math.round(observedMs) + "ms") +
+          "，暂不上报实时识别。";
+      }
+    }
+
+    function hydrateVisionVideoFromQuery() {
+      const value = new URLSearchParams(location.search).get("vision_video");
+      if (!value) {
+        return;
+      }
+      const videoUrl = new URL(value, location.href);
+      if (videoUrl.origin !== location.origin || !videoUrl.pathname.startsWith("/vision-test-assets/")) {
+        realVisionSource.textContent = "来源：测试视频参数无效";
+        return;
+      }
+      selectedVisionVideoUrl = videoUrl.pathname + videoUrl.search;
+      selectedVisionVideoName = decodeURIComponent(videoUrl.pathname.split("/").pop() || "test-video");
+      realVisionSource.textContent = "来源：测试视频 · " + selectedVisionVideoName;
     }
 
     function flattenFrames(frames) {
@@ -1306,6 +2168,37 @@ function renderDemoPage() {
         return "麦克风正被其他应用占用，请关闭占用程序后重试。";
       }
       return error?.message || "无法开始录音，请检查浏览器麦克风权限。";
+    }
+
+    function normalizeRealVisionError(error) {
+      const name = error?.name || "";
+      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        return "摄像头权限被拒绝。真实视觉已回退，请使用 Mock Vision 下拉。";
+      }
+      if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+        return "没有找到摄像头。真实视觉已回退，请使用 Mock Vision 下拉。";
+      }
+      if (name === "NotReadableError" || name === "TrackStartError") {
+        return "摄像头正被其他应用占用。真实视觉已回退，请使用 Mock Vision 下拉。";
+      }
+      return (error?.message || "真实视觉加载失败") + "；请继续使用 Mock Vision 下拉。";
+    }
+
+    function firstNumber(...values) {
+      for (const value of values) {
+        if (typeof value === "number" && Number.isFinite(value)) {
+          return value;
+        }
+      }
+      return null;
+    }
+
+    function removeUndefined(value) {
+      return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined));
+    }
+
+    function formatRatio(value) {
+      return value === null ? "-" : value.toFixed(2);
     }
 
     function setQuickButtonsDisabled(disabled) {

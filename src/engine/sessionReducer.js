@@ -1,4 +1,5 @@
 import { AgentStage } from "../domain/stages.js";
+import { isActionableCprQualityEvent } from "./cprEventGuards.js";
 
 const DEFAULT_SCENARIO = "adult_suspected_cardiac_arrest_cpr";
 const UNKNOWN_SOURCE = "unknown";
@@ -66,9 +67,9 @@ export function createInitialSessionState(overrides = {}) {
         last_correction: null,
         hand_position: null,
         arm_straight: null,
-        quality_source: null,
-        quality_confidence: null,
-      },
+      quality_source: null,
+      quality_confidence: null,
+    },
       rescuer_state: {
         emotion: null,
         fatigue_level: null,
@@ -177,7 +178,7 @@ function reduceUserIntent(next, event, timestamp) {
     return;
   }
 
-  const source = getEventSource(event);
+  const source = getUserSource(event);
   const confidence = getUserConfidence(event);
 
   switch (intent) {
@@ -200,6 +201,17 @@ function reduceUserIntent(next, event, timestamp) {
     case "agonal_breathing":
       updateBreathingFact(next, "agonal_breathing", true, source, confidence, timestamp, event);
       updateBreathingFact(next, "normal_breathing", false, source, confidence, timestamp, event);
+      break;
+    case "signs_of_life":
+    case "patient_recovered":
+      // ROSC marker only. Deliberately does NOT flip responsive/normal_breathing:
+      // the S7 -> MONITOR_BREATHING re-entry is event-driven in the state machine
+      // (isSignsOfLifeEvent), and overwriting a confirmed boolean here could trip
+      // the conflict -> recheck guard and block the transition. decideCprStart
+      // ignores this marker, so it is safe and side-effect free for the funnel.
+      next.confirmed_facts.signs_of_life = true;
+      next.confirmed_facts.signs_of_life_source = source;
+      next.confirmed_facts.signs_of_life_at = timestamp;
       break;
     case "scene_safe":
       updateScopeFact(next, "scene_safe", true, source, confidence, timestamp, event);
@@ -227,69 +239,75 @@ function reducePatientState(next, event, timestamp) {
   const source = getEventSource(event);
 
   if (hasOwn(patient, "adult_likely")) {
+    const fieldSource = getPatientSource(patient, "adult_likely", event, source);
     updateScopeFact(
       next,
       "adult_likely",
       patient.adult_likely,
-      source,
-      getPatientConfidence(patient, "adult_likely"),
+      fieldSource,
+      getPatientConfidence(patient, "adult_likely", fieldSource),
       timestamp,
       event,
     );
   }
 
   if (hasOwn(patient, "scene_safe")) {
+    const fieldSource = getPatientSource(patient, "scene_safe", event, source);
     updateScopeFact(
       next,
       "scene_safe",
       patient.scene_safe,
-      source,
-      getPatientConfidence(patient, "scene_safe"),
+      fieldSource,
+      getPatientConfidence(patient, "scene_safe", fieldSource),
       timestamp,
       event,
     );
   }
 
   if (hasOwn(patient, "responsive")) {
+    const fieldSource = getPatientSource(patient, "responsive", event, source);
     updateConfirmedFact(
       next,
       "responsive",
       patient.responsive,
-      source,
-      getPatientConfidence(patient, "responsive"),
+      fieldSource,
+      getPatientConfidence(patient, "responsive", fieldSource),
       timestamp,
       event,
     );
   }
 
   if (hasOwn(patient, "normal_breathing")) {
+    const fieldSource = getPatientSource(patient, "normal_breathing", event, source);
     updateBreathingFact(
       next,
       "normal_breathing",
       patient.normal_breathing,
-      source,
-      getPatientConfidence(patient, "normal_breathing"),
+      fieldSource,
+      getPatientConfidence(patient, "normal_breathing", fieldSource),
       timestamp,
       event,
     );
   }
 
   if (hasOwn(patient, "agonal_breathing")) {
+    const fieldSource = getPatientSource(patient, "agonal_breathing", event, source);
     updateBreathingFact(
       next,
       "agonal_breathing",
       patient.agonal_breathing,
-      source,
-      getPatientConfidence(patient, "agonal_breathing"),
+      fieldSource,
+      getPatientConfidence(patient, "agonal_breathing", fieldSource),
       timestamp,
       event,
     );
   }
 
   if (hasOwn(patient, "chest_movement")) {
+    const fieldSource = getPatientSource(patient, "chest_movement", event, source);
     next.confirmed_facts.chest_movement = patient.chest_movement;
-    next.confirmed_facts.chest_movement_source = source;
-    next.confirmed_facts.chest_movement_confidence = getPatientConfidence(patient, "chest_movement");
+    next.confirmed_facts.chest_movement_source = fieldSource;
+    next.confirmed_facts.chest_movement_confidence = getPatientConfidence(patient, "chest_movement", fieldSource);
   }
 }
 
@@ -405,6 +423,9 @@ function reduceCprQuality(next, event, timestamp) {
   if (!quality || typeof quality !== "object") {
     return;
   }
+  if (!isActionableCprQualityEvent(event)) {
+    return;
+  }
 
   const source = getEventSource(event);
   const confidence = numberOrNull(quality.confidence);
@@ -514,6 +535,13 @@ function updateScopeFact(next, field, value, source, confidence, timestamp, even
     return;
   }
 
+  // A low-confidence "unknown" (null) observation must never erase an
+  // already-confirmed boolean fact; otherwise a fuzzy follow-up could undo a
+  // confirmed scene/age call and walk the state machine backwards.
+  if (value === null && typeof next.scope[field] === "boolean") {
+    return;
+  }
+
   const conflict = maybeRecordConflict(
     next,
     `scope.${field}`,
@@ -536,6 +564,12 @@ function updateScopeFact(next, field, value, source, confidence, timestamp, even
 
 function updateConfirmedFact(next, field, value, source, confidence, timestamp, event) {
   if (!isKnown(value)) {
+    return;
+  }
+
+  // Same guard as scope facts: an explicit unknown (null) does not overwrite a
+  // confirmed boolean fact (e.g. responsive=false stays put on a fuzzy turn).
+  if (value === null && typeof next.confirmed_facts[field] === "boolean") {
     return;
   }
 
@@ -573,6 +607,12 @@ function updateBreathingFact(next, field, value, source, confidence, timestamp, 
       next.confirmed_facts.breathing_confidence = confidence;
     }
     appendEvidence(next, field, value, source, confidence, timestamp, event);
+    return;
+  }
+
+  // Breathing is CPR-critical: a fuzzy/low-confidence turn that resolves to
+  // unknown (null) must not overwrite an already-confirmed breathing fact.
+  if (value === null && typeof next.confirmed_facts[field] === "boolean") {
     return;
   }
 
@@ -703,12 +743,28 @@ function getEventSource(event) {
   return event.source ?? UNKNOWN_SOURCE;
 }
 
-function getUserConfidence(event) {
-  return numberOrNull(event.user_input?.confidence);
+function getUserSource(event) {
+  return event.user_input?.source ?? getEventSource(event);
 }
 
-function getPatientConfidence(patient, field) {
-  return numberOrNull(patient[`${field}_confidence`] ?? patient.confidence);
+function getUserConfidence(event) {
+  const confidence = numberOrNull(event.user_input?.confidence);
+  if (confidence !== null) {
+    return confidence;
+  }
+  return getUserSource(event) === "gemma_nlu" ? STRONG_CONFIDENCE_FLOOR : null;
+}
+
+function getPatientSource(patient, field, event, fallbackSource = getEventSource(event)) {
+  return patient[`${field}_source`] ?? patient.source ?? fallbackSource ?? UNKNOWN_SOURCE;
+}
+
+function getPatientConfidence(patient, field, source = null) {
+  const confidence = numberOrNull(patient[`${field}_confidence`] ?? patient.confidence);
+  if (confidence !== null) {
+    return confidence;
+  }
+  return source === "gemma_nlu" ? STRONG_CONFIDENCE_FLOOR : null;
 }
 
 function normalizeConfidence(confidence) {

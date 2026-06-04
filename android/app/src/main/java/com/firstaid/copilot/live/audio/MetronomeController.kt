@@ -1,66 +1,233 @@
 package com.firstaid.copilot.live.audio
 
 import android.content.Context
+import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioRecord
+import android.media.AudioTrack
 import android.media.MediaRecorder
-import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.NoiseSuppressor
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
-import android.util.Base64
 import com.firstaid.copilot.live.HapticState
-import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.PI
+import kotlin.math.exp
+import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-class MetronomeController(context: Context) {
-    private val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        context.getSystemService(VibratorManager::class.java)?.defaultVibrator
-    } else {
-        @Suppress("DEPRECATION")
-        context.getSystemService(Vibrator::class.java)
-    }
+/**
+ * Audio metronome for the CPR loop. The cross-platform contract still calls this
+ * a "haptic" intent ([HapticState] / `start_haptic_metronome`), but the client is
+ * single-voice and **never vibrates**: we synthesize a short click every
+ * `60000 / bpm` ms on an independent sonification track that sits *under* TTS.
+ *
+ * Entry points consumed by `LiveCprCoachScreen` (signatures must stay stable):
+ *  - [apply] — start / re-tempo / stop the beat from `guidance_action.haptic`.
+ *  - [stop] — silence the metronome.
+ *  - [setDucked] — duck the click volume while TTS is speaking, restore on done.
+ *
+ * Once started the click loop is **locally self-sustaining**: it runs on its own
+ * coroutine timer and does not depend on per-turn server messages. A dropped
+ * connection during S7/S8 therefore never stops the beat — only an explicit
+ * disabled [HapticState] or [stop]/[release] does.
+ *
+ * The audio I/O is delegated to [MetronomeAudio] so the scheduling/ducking logic
+ * stays unit-testable without a real [AudioTrack].
+ */
+class MetronomeController internal constructor(
+    private val audio: MetronomeAudio,
+) {
+    constructor(context: Context) : this(AudioTrackMetronome())
 
     private var runningBpm: Int? = null
+    private var ducked = false
 
     fun apply(state: HapticState) {
-        val bpm = state.bpm ?: DEFAULT_BPM
         if (!state.enabled) {
             stop()
             return
         }
+        val bpm = (state.bpm ?: DEFAULT_BPM).coerceIn(MIN_BPM, MAX_BPM)
+        // Already ticking at this tempo: keep the local loop alive instead of
+        // restarting it, so re-delivered/offline-fallback states never hiccup.
         if (runningBpm == bpm) return
         runningBpm = bpm
-        val intervalMs = (60_000L / bpm).coerceAtLeast(250L)
-        val pulseMs = 70L
-        vibrator?.vibrate(
-            VibrationEffect.createWaveform(
-                longArrayOf(0L, pulseMs, (intervalMs - pulseMs).coerceAtLeast(1L)),
-                intArrayOf(0, 180, 0),
-                0,
-            ),
-        )
+        audio.start(bpm)
+        audio.setVolume(currentVolume())
+    }
+
+    /** Lower the click under TTS while it speaks; restore to full when it finishes. */
+    fun setDucked(ducked: Boolean) {
+        if (this.ducked == ducked) return
+        this.ducked = ducked
+        audio.setVolume(currentVolume())
     }
 
     fun stop() {
         runningBpm = null
-        vibrator?.cancel()
+        audio.stop()
+    }
+
+    /** Fully release the audio track + scheduler. Call from the screen's onDispose. */
+    fun release() {
+        runningBpm = null
+        audio.release()
+    }
+
+    private fun currentVolume(): Float = if (ducked) DUCKED_VOLUME else FULL_VOLUME
+
+    companion object {
+        const val DEFAULT_BPM = 110
+        const val MIN_BPM = 40
+        const val MAX_BPM = 200
+        const val FULL_VOLUME = 1.0f
+        const val DUCKED_VOLUME = 0.3f
+    }
+}
+
+/**
+ * Audio-output seam for [MetronomeController]. Production uses [AudioTrackMetronome];
+ * tests inject a fake to assert start/stop/tempo and ducking without Android audio.
+ */
+internal interface MetronomeAudio {
+    fun start(bpm: Int)
+
+    fun setVolume(volume: Float)
+
+    fun stop()
+
+    fun release()
+}
+
+/**
+ * Default [MetronomeAudio]: a coroutine click loop on an [AudioTrack] using
+ * `USAGE_ASSISTANCE_SONIFICATION` / `CONTENT_TYPE_SONIFICATION` so it layers
+ * beneath TTS. Each beat re-primes one short click into a streaming buffer that
+ * underruns to silence between beats; the schedule is anchored to a start time so
+ * tempo does not drift over a long CPR session.
+ */
+internal class AudioTrackMetronome(
+    private val sampleRate: Int = SAMPLE_RATE,
+) : MetronomeAudio {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    @Volatile
+    private var volumeLevel: Float = 1.0f
+    private var track: AudioTrack? = null
+    private var loopJob: Job? = null
+
+    override fun start(bpm: Int) {
+        stopLoop()
+        val intervalMs = (60_000L / bpm).coerceAtLeast(MIN_INTERVAL_MS)
+        val click = buildClickPcm(sampleRate)
+        val newTrack = runCatching { buildTrack(click.size) }.getOrNull() ?: return
+        track = newTrack
+        runCatching {
+            newTrack.setVolume(volumeLevel)
+            newTrack.play()
+        }
+        loopJob = scope.launch {
+            val intervalNanos = intervalMs * 1_000_000
+            val startNanos = System.nanoTime()
+            var beat = 0L
+            while (isActive) {
+                // Re-prime one click; the stream underruns to silence until the next beat.
+                runCatching { newTrack.write(click, 0, click.size) }
+                beat++
+                val targetNanos = startNanos + beat * intervalNanos
+                val sleepMs = (targetNanos - System.nanoTime()) / 1_000_000
+                if (sleepMs > 0) delay(sleepMs)
+            }
+        }
+    }
+
+    override fun setVolume(volume: Float) {
+        val clamped = volume.coerceIn(0f, 1f)
+        volumeLevel = clamped
+        runCatching { track?.setVolume(clamped) }
+    }
+
+    override fun stop() {
+        stopLoop()
+        val current = track
+        track = null
+        runCatching { current?.pause() }
+        runCatching { current?.flush() }
+        runCatching { current?.stop() }
+        runCatching { current?.release() }
+    }
+
+    override fun release() {
+        stop()
+        scope.cancel()
+    }
+
+    private fun stopLoop() {
+        loopJob?.cancel()
+        loopJob = null
+    }
+
+    private fun buildTrack(clickBytes: Int): AudioTrack {
+        val minBuffer = AudioTrack.getMinBufferSize(sampleRate, CHANNEL_CONFIG, PCM_FORMAT)
+            .coerceAtLeast(clickBytes * 2)
+        return AudioTrack.Builder()
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build(),
+            )
+            .setAudioFormat(
+                AudioFormat.Builder()
+                    .setEncoding(PCM_FORMAT)
+                    .setSampleRate(sampleRate)
+                    .setChannelMask(CHANNEL_CONFIG)
+                    .build(),
+            )
+            .setBufferSizeInBytes(minBuffer)
+            .setTransferMode(AudioTrack.MODE_STREAM)
+            .build()
     }
 
     companion object {
-        private const val DEFAULT_BPM = 110
+        private const val SAMPLE_RATE = 44_100
+        private const val CHANNEL_CONFIG = AudioFormat.CHANNEL_OUT_MONO
+        private const val PCM_FORMAT = AudioFormat.ENCODING_PCM_16BIT
+        private const val CLICK_MS = 40
+        private const val MIN_INTERVAL_MS = 250L
+        private const val CLICK_FREQ_HZ = 2_000.0
+        private const val CLICK_DECAY = 5.0
+        private const val CLICK_GAIN = 0.6
+
+        private fun buildClickPcm(sampleRate: Int): ByteArray {
+            val samples = (sampleRate * CLICK_MS / 1000).coerceAtLeast(1)
+            val pcm = ByteArray(samples * 2)
+            val buffer = ByteBuffer.wrap(pcm).order(ByteOrder.LITTLE_ENDIAN)
+            for (i in 0 until samples) {
+                val progress = i.toDouble() / samples
+                val envelope = exp(-CLICK_DECAY * progress)
+                val tone = sin(2.0 * PI * CLICK_FREQ_HZ * i / sampleRate)
+                val value = (tone * envelope * CLICK_GAIN * Short.MAX_VALUE)
+                    .toInt()
+                    .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+                buffer.putShort(value.toShort())
+            }
+            return pcm
+        }
     }
 }
 
@@ -70,6 +237,8 @@ class AndroidTextToSpeechEdge(
 ) {
     private var ready = false
     private var lastUtteranceId: String? = null
+    private val utteranceLock = Any()
+    private val queuedUtteranceIds = linkedSetOf<String>()
     private val tts = TextToSpeech(context.applicationContext) { status ->
         ready = status == TextToSpeech.SUCCESS
     }
@@ -82,12 +251,16 @@ class AndroidTextToSpeechEdge(
                 }
 
                 override fun onDone(utteranceId: String?) {
-                    onSpeakingChanged(false)
+                    markUtteranceFinished(utteranceId)
                 }
 
                 @Deprecated("Deprecated in Java")
                 override fun onError(utteranceId: String?) {
-                    onSpeakingChanged(false)
+                    markUtteranceFinished(utteranceId)
+                }
+
+                override fun onError(utteranceId: String?, errorCode: Int) {
+                    markUtteranceFinished(utteranceId)
                 }
             },
         )
@@ -98,25 +271,63 @@ class AndroidTextToSpeechEdge(
         utteranceKey: String?,
         priority: String?,
         interruptPolicy: String?,
+        tone: String? = null,
+        speed: String? = null,
+        flushQueue: Boolean = false,
     ) {
         if (!ready || text.isBlank()) return
         val utteranceId = utteranceKey ?: UUID.randomUUID().toString()
         if (utteranceId == lastUtteranceId) return
         lastUtteranceId = utteranceId
         tts.language = Locale.SIMPLIFIED_CHINESE
+        tts.setPitch(NEUTRAL_TTS_PITCH)
+        tts.setSpeechRate(resolveSpeechRate(tone, speed))
 
-        val queueMode = if (priority == "critical" || interruptPolicy == "interrupt_lower_priority") {
-            TextToSpeech.QUEUE_FLUSH
-        } else {
-            TextToSpeech.QUEUE_ADD
+        val queueMode = if (flushQueue) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
+        synchronized(utteranceLock) {
+            if (queueMode == TextToSpeech.QUEUE_FLUSH) queuedUtteranceIds.clear()
+            queuedUtteranceIds += utteranceId
         }
-        tts.speak(text, queueMode, null, utteranceId)
+        onSpeakingChanged(true)
+        if (tts.speak(text, queueMode, null, utteranceId) == TextToSpeech.ERROR) {
+            markUtteranceFinished(utteranceId)
+        }
+    }
+
+    fun stop() {
+        tts.stop()
+        synchronized(utteranceLock) {
+            queuedUtteranceIds.clear()
+        }
+        onSpeakingChanged(false)
     }
 
     fun shutdown() {
-        tts.stop()
+        stop()
         tts.shutdown()
-        onSpeakingChanged(false)
+    }
+
+    private fun markUtteranceFinished(utteranceId: String?) {
+        val stillSpeaking = synchronized(utteranceLock) {
+            if (utteranceId != null) queuedUtteranceIds.remove(utteranceId)
+            queuedUtteranceIds.isNotEmpty()
+        }
+        onSpeakingChanged(stillSpeaking)
+    }
+
+    private fun resolveSpeechRate(tone: String?, speed: String?): Float =
+        when {
+            speed == "slow" -> SLOW_TTS_RATE
+            tone == "urgent" || speed == "fast" -> URGENT_TTS_RATE
+            tone == "calm_firm" || tone == "calm_soft" -> CALM_TTS_RATE
+            else -> CALM_TTS_RATE
+        }
+
+    companion object {
+        private const val CALM_TTS_RATE = 0.94f
+        private const val SLOW_TTS_RATE = 0.92f
+        private const val URGENT_TTS_RATE = 1.0f
+        private const val NEUTRAL_TTS_PITCH = 1.0f
     }
 }
 
@@ -124,17 +335,19 @@ class LiveAudioCapture {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val running = AtomicBoolean(false)
     private val paused = AtomicBoolean(false)
+    private val ttsSpeaking = AtomicBoolean(false)
     private var recorder: AudioRecord? = null
 
     fun start(
         onLevel: (Float) -> Unit,
-        onSegment: (String) -> Unit,
+        onPcmChunk: (ByteArray) -> Unit,
+        onBargeIn: () -> Unit,
         onError: (String) -> Unit,
     ) {
         if (!running.compareAndSet(false, true)) return
         scope.launch {
             runCatching {
-                captureLoop(onLevel, onSegment)
+                captureLoop(onLevel, onPcmChunk, onBargeIn)
             }.onFailure {
                 running.set(false)
                 onError(it.message ?: "Audio capture failed")
@@ -148,6 +361,10 @@ class LiveAudioCapture {
 
     fun resume() {
         paused.set(false)
+    }
+
+    fun setTtsSpeaking(speaking: Boolean) {
+        ttsSpeaking.set(speaking)
     }
 
     fun stop() {
@@ -164,10 +381,11 @@ class LiveAudioCapture {
     @Suppress("MissingPermission")
     private fun captureLoop(
         onLevel: (Float) -> Unit,
-        onSegment: (String) -> Unit,
+        onPcmChunk: (ByteArray) -> Unit,
+        onBargeIn: () -> Unit,
     ) {
         val minBuffer = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, PCM_FORMAT)
-            .coerceAtLeast(SAMPLE_RATE / 2)
+            .coerceAtLeast(FRAME_SAMPLES * BYTES_PER_SAMPLE * 4)
         val audioRecord = AudioRecord(
             MediaRecorder.AudioSource.VOICE_RECOGNITION,
             SAMPLE_RATE,
@@ -176,50 +394,97 @@ class LiveAudioCapture {
             minBuffer,
         )
         recorder = audioRecord
-        audioRecord.startRecording()
+        val acousticEchoCanceler = createAcousticEchoCanceler(audioRecord.audioSessionId)
+        val noiseSuppressor = createNoiseSuppressor(audioRecord.audioSessionId)
 
-        val readBuffer = ShortArray(minBuffer / BYTES_PER_SAMPLE)
-        val utterance = ArrayList<Short>(SAMPLE_RATE * 4)
-        var speechFrames = 0
-        var silenceFrames = 0
+        val readBuffer = ShortArray(FRAME_SAMPLES)
+        var silenceMs = 0
+        var voicedMs = 0
+        var bargeInVoicedMs = 0
+        var voiceActive = false
+        var bargeInSentForUtterance = false
 
-        while (running.get()) {
-            if (paused.get()) {
-                Thread.sleep(50)
-                continue
-            }
+        try {
+            audioRecord.startRecording()
+            while (running.get()) {
+                if (paused.get()) {
+                    Thread.sleep(50)
+                    continue
+                }
 
-            val count = audioRecord.read(readBuffer, 0, readBuffer.size)
-            if (count <= 0) continue
+                val count = audioRecord.read(readBuffer, 0, readBuffer.size)
+                if (count <= 0) continue
 
-            val rms = readBuffer.rms(count)
-            onLevel(rms)
-            val speech = rms >= VAD_RMS_THRESHOLD
+                val rms = readBuffer.rms(count)
+                val frameMs = (count * 1000 / SAMPLE_RATE).coerceAtLeast(1)
+                onLevel(rms)
+                onPcmChunk(readBuffer.toPcmBytes(count))
 
-            if (speech) {
-                speechFrames += 1
-                silenceFrames = 0
-            } else if (speechFrames > 0) {
-                silenceFrames += 1
-            }
+                if (ttsSpeaking.get()) {
+                    val bargeInSpeech = rms >= BARGE_IN_RMS_THRESHOLD
+                    bargeInVoicedMs = if (bargeInSpeech) bargeInVoicedMs + frameMs else 0
+                    if (!bargeInSentForUtterance && bargeInVoicedMs >= BARGE_IN_SPEECH_MS) {
+                        voiceActive = true
+                        bargeInSentForUtterance = true
+                        onBargeIn()
+                    }
+                    continue
+                }
 
-            if (speechFrames > 0) {
-                for (index in 0 until count) {
-                    utterance += readBuffer[index]
+                bargeInVoicedMs = 0
+                val speech = rms >= LISTENING_RMS_THRESHOLD
+                if (speech) {
+                    silenceMs = 0
+                    voicedMs += frameMs
+                    if (voicedMs >= MIN_UTTERANCE_MS) {
+                        voiceActive = true
+                        if (!bargeInSentForUtterance) {
+                            bargeInSentForUtterance = true
+                            onBargeIn()
+                        }
+                    }
+                } else if (voiceActive) {
+                    silenceMs += frameMs
+                } else {
+                    voicedMs = 0
+                }
+
+                if (voiceActive && silenceMs >= COMMIT_SILENCE_MS) {
+                    voiceActive = false
+                    silenceMs = 0
+                    voicedMs = 0
+                    bargeInSentForUtterance = false
                 }
             }
-
-            val longEnough = utterance.size >= SAMPLE_RATE / 2
-            val ended = longEnough && silenceFrames >= END_SILENCE_FRAMES
-            if (ended || utterance.size >= MAX_SAMPLES) {
-                onSegment(encodeWavBase64(utterance.toShortArray()))
-                utterance.clear()
-                speechFrames = 0
-                silenceFrames = 0
-            }
+        } finally {
+            runCatching { acousticEchoCanceler?.release() }
+            runCatching { noiseSuppressor?.release() }
+            audioRecord.runCatchingStop()
+            recorder = null
         }
-        audioRecord.runCatchingStop()
     }
+
+    private fun createAcousticEchoCanceler(audioSessionId: Int): AcousticEchoCanceler? =
+        if (!AcousticEchoCanceler.isAvailable()) {
+            null
+        } else {
+            runCatching {
+                AcousticEchoCanceler.create(audioSessionId)?.also { effect ->
+                    runCatching { effect.setEnabled(true) }
+                }
+            }.getOrNull()
+        }
+
+    private fun createNoiseSuppressor(audioSessionId: Int): NoiseSuppressor? =
+        if (!NoiseSuppressor.isAvailable()) {
+            null
+        } else {
+            runCatching {
+                NoiseSuppressor.create(audioSessionId)?.also { effect ->
+                    runCatching { effect.setEnabled(true) }
+                }
+            }.getOrNull()
+        }
 
     private fun AudioRecord.runCatchingStop() {
         runCatching { stop() }
@@ -235,40 +500,22 @@ class LiveAudioCapture {
         return sqrt(sum / count).toFloat()
     }
 
-    private fun encodeWavBase64(samples: ShortArray): String {
-        val pcm = ByteArray(samples.size * BYTES_PER_SAMPLE)
-        ByteBuffer.wrap(pcm).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(samples)
-        val wav = ByteArrayOutputStream()
-        wav.write("RIFF".toByteArray(Charsets.US_ASCII))
-        wav.writeIntLe(36 + pcm.size)
-        wav.write("WAVEfmt ".toByteArray(Charsets.US_ASCII))
-        wav.writeIntLe(16)
-        wav.writeShortLe(1)
-        wav.writeShortLe(1)
-        wav.writeIntLe(SAMPLE_RATE)
-        wav.writeIntLe(SAMPLE_RATE * BYTES_PER_SAMPLE)
-        wav.writeShortLe(BYTES_PER_SAMPLE)
-        wav.writeShortLe(16)
-        wav.write("data".toByteArray(Charsets.US_ASCII))
-        wav.writeIntLe(pcm.size)
-        wav.write(pcm)
-        return Base64.encodeToString(wav.toByteArray(), Base64.NO_WRAP)
-    }
-
-    private fun ByteArrayOutputStream.writeIntLe(value: Int) {
-        write(byteArrayOf((value and 0xff).toByte(), ((value shr 8) and 0xff).toByte(), ((value shr 16) and 0xff).toByte(), ((value shr 24) and 0xff).toByte()))
-    }
-
-    private fun ByteArrayOutputStream.writeShortLe(value: Int) {
-        write(byteArrayOf((value and 0xff).toByte(), ((value shr 8) and 0xff).toByte()))
+    private fun ShortArray.toPcmBytes(count: Int): ByteArray {
+        val pcm = ByteArray(count * BYTES_PER_SAMPLE)
+        ByteBuffer.wrap(pcm).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(this, 0, count)
+        return pcm
     }
 
     companion object {
         private const val SAMPLE_RATE = 16_000
         private const val BYTES_PER_SAMPLE = 2
-        private const val VAD_RMS_THRESHOLD = 0.035f
-        private const val END_SILENCE_FRAMES = 12
-        private const val MAX_SAMPLES = SAMPLE_RATE * 8
+        private const val FRAME_MS = 40
+        private const val FRAME_SAMPLES = SAMPLE_RATE * FRAME_MS / 1000
+        private const val LISTENING_RMS_THRESHOLD = 0.035f
+        private const val BARGE_IN_RMS_THRESHOLD = 0.08f
+        private const val BARGE_IN_SPEECH_MS = 320
+        private const val MIN_UTTERANCE_MS = 250
+        private const val COMMIT_SILENCE_MS = 1_200
         private const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
         private const val PCM_FORMAT = AudioFormat.ENCODING_PCM_16BIT
     }

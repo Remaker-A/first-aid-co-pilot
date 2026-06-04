@@ -24,6 +24,8 @@ data class LiveUiState(
     val ttsText: String = "",
     val ttsPriority: String? = null,
     val ttsInterruptPolicy: String? = null,
+    val ttsTone: String? = null,
+    val ttsSpeed: String? = null,
     val lastActionId: String? = null,
 
     // --- visual_overlay-derived fields (D2 overlays consume these) ---
@@ -39,6 +41,7 @@ data class LiveUiState(
     val currentDemoPresetId: String? = null,
 
     // --- Transcript / subtitle (latest user utterance + latest assistant line) ---
+    val partialTranscript: String? = null,
     val lastUserTranscript: String? = null,
     val lastAssistantText: String? = null,
 

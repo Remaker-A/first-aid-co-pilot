@@ -40,7 +40,7 @@
       "scenario": "判断呼吸",
       "stages": ["S3_CHECK_BREATHING"],
       "intents": ["ask_breathing_check"],
-      "text": "请看胸口 5 到 10 秒，有没有规律、正常的起伏？",
+      "text": "看他的胸口。只是偶尔大口喘，或者完全不动，都算没有呼吸。",
       "tone": "calm_firm",
       "tags": ["breathing_check"]
     },
@@ -49,7 +49,7 @@
       "scenario": "呼吸不确定",
       "stages": ["S3_CHECK_BREATHING"],
       "intents": ["ask_breathing_check", "clarify_breathing"],
-      "text": "请继续看胸口 5 到 10 秒，确认有没有正常起伏。",
+      "text": "看他的胸口。偶尔大口喘、或者完全不动，都算没有呼吸；看不清就按没有呼吸处理。",
       "tone": "calm_firm",
       "tags": ["breathing_uncertain", "recheck"]
     },
@@ -90,6 +90,15 @@
       "tags": ["hand_position", "chest_center"]
     },
     {
+      "id": "phone_side_fixed",
+      "scenario": "CPR 手机摆放",
+      "stages": ["S6_CPR_READY"],
+      "intents": ["guide_cpr_position"],
+      "text": "如果手机能稳住，放在患者胸侧，屏幕朝向你；放不好不要耽误，立刻开始按压。",
+      "tone": "calm_firm",
+      "tags": ["camera", "recording", "do_not_delay_cpr"]
+    },
+    {
       "id": "start_compressions",
       "scenario": "开始按压",
       "stages": ["S6_CPR_READY", "S7_CPR_LOOP"],
@@ -103,7 +112,7 @@
       "scenario": "节奏",
       "stages": ["S7_CPR_LOOP"],
       "intents": ["guide_compression_rhythm", "start_metronome"],
-      "text": "跟着震动按，快速有力。",
+      "text": "跟着节拍按，快速有力。",
       "tone": "calm_firm",
       "tags": ["metronome", "rate"]
     },
@@ -121,7 +130,7 @@
       "scenario": "频率偏慢",
       "stages": ["S7_CPR_LOOP"],
       "intents": ["correct_compression_rate"],
-      "text": "再快一点，跟着震动按。",
+      "text": "再快一点，跟着节拍按。",
       "tone": "calm_firm",
       "tags": ["rate_low"]
     },
@@ -130,7 +139,7 @@
       "scenario": "频率偏快",
       "stages": ["S7_CPR_LOOP"],
       "intents": ["correct_compression_rate"],
-      "text": "稍微慢一点，跟着震动按。",
+      "text": "稍微慢一点，跟着节拍按。",
       "tone": "calm_firm",
       "tags": ["rate_high"]
     },
@@ -184,7 +193,7 @@
       "scenario": "AED 辅助",
       "stages": ["S8_ASSISTANCE", "S7_CPR_LOOP"],
       "intents": ["guide_aed_assist"],
-      "text": "有人取到 AED 时，你继续按压，听设备提示。",
+      "text": "打开 AED，跟着它的语音做，先继续按压。",
       "tone": "calm_firm",
       "tags": ["aed", "continue_cpr"]
     },
@@ -193,7 +202,7 @@
       "scenario": "交接",
       "stages": ["S9_HANDOVER"],
       "intents": ["generate_handover_report", "explain_handover_ready"],
-      "text": "急救员到达后，我会生成交接报告。",
+      "text": "急救员到达后，把位置让给他们，后面听他们的；我会生成交接报告。",
       "tone": "calm_firm",
       "tags": ["handover"]
     }

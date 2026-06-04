@@ -13,6 +13,7 @@ import {
   createGemmaServerRunner,
   evaluateGemmaModelCheck,
   findGemmaModelFile,
+  parseGemmaNluResponse,
   parseGemmaResponse,
   resolveGemmaConfig
 } from "../src/index.js";
@@ -57,6 +58,16 @@ const VALID_PATCH = Object.freeze({
   },
   reason: "rescuer_reported_no_response",
   confidence: 0.88
+});
+
+const VALID_NLU = Object.freeze({
+  intent: "no_normal_breathing",
+  slots: {
+    normal_breathing: { value: false, confidence: 0.91 },
+    agonal_breathing: { value: true, confidence: 0.83 }
+  },
+  overall_confidence: 0.89,
+  needs_clarification: false
 });
 
 test("Gemma config defaults to Gemma 4 E2B LiteRT-LM on CPU", () => {
@@ -257,6 +268,72 @@ test("GemmaRuntime parses a valid mock runner JSON patch", async () => {
     assert.equal(result.patch.intent, "parse_response_answer");
     assert.equal(result.patch.tts.text, "Check if they respond.");
   });
+});
+
+test("GemmaRuntime parses NLU observations with independent timeout", async () => {
+  await withMockModelFile(async (modelFile) => {
+    const runtime = new GemmaRuntime({
+      config: {
+        ...resolveGemmaConfig({
+          env: {
+            GEMMA_NLU_TIMEOUT_MS: "640"
+          },
+          cwd: "D:\\test-workspace"
+        }),
+        modelFile
+      },
+      runner: async ({ messages, timeoutMs }) => {
+        assert.equal(timeoutMs, 640);
+        assert.match(messages[0].content, /Gemma NLU|NLU observation parser/);
+        assert.match(messages[1].content, /NluFrame|NluObservationFrame/);
+
+        return {
+          stdout: JSON.stringify(VALID_NLU),
+          stderr: "",
+          exitCode: 0
+        };
+      }
+    });
+
+    const result = await runtime.parseUserIntent({
+      current_stage: "S3_CHECK_BREATHING",
+      allowed_intents: ["no_normal_breathing", "agonal_breathing"],
+      allowed_slots: {
+        normal_breathing: "boolean",
+        agonal_breathing: "boolean"
+      },
+      user_input: {
+        stt_text: "他好像没气了，偶尔喘一下"
+      }
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.intent, "no_normal_breathing");
+    assert.equal(result.slots.normal_breathing.value, false);
+    assert.equal(result.confidence, 0.89);
+  });
+});
+
+test("Gemma NLU parser rejects decision and tool fields", () => {
+  const result = parseGemmaNluResponse(
+    JSON.stringify({
+      ...VALID_NLU,
+      next_stage: "S4_SUSPECTED_ARREST",
+      tool_actions: [{ type: "emergency_call" }]
+    }),
+    {
+      allowed_intents: ["no_normal_breathing", "agonal_breathing"],
+      allowed_slots: {
+        normal_breathing: "boolean",
+        agonal_breathing: "boolean"
+      }
+    }
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error, "nlu_validation_failed");
+  assert.ok(result.violations.includes("disallowed_field:next_stage"));
+  assert.ok(result.violations.includes("disallowed_field:tool_actions"));
 });
 
 test("GemmaRuntime falls back to one-shot runner when daemon runner fails", async () => {

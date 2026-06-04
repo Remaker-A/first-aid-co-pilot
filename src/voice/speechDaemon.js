@@ -36,7 +36,7 @@ export async function requestTtsDaemon(plan, { text, outputPath }) {
     args: buildTtsServeArgs(plan),
   });
   const response = await daemon.request(
-    { text, out: toChildProcessPath(outputPath) },
+    { text, out: toChildProcessPath(outputPath), gain: plan.gain ?? 1 },
     plan.timeoutMs
   );
   if (!response?.ok) {
@@ -88,6 +88,8 @@ function buildTtsServeArgs(plan) {
     String(plan.sid ?? 0),
     "--speed",
     String(plan.speed ?? 1),
+    "--gain",
+    String(plan.gain ?? 1),
   ];
   if (plan.numThreads) {
     args.push("--num-threads", String(plan.numThreads));

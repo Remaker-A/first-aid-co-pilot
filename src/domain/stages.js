@@ -105,13 +105,15 @@ export const StageMetadata = Object.freeze({
     index: 20,
     label: "monitor_response",
     description: "Observe a responsive patient and call for help.",
-    terminal: true,
+    // Not terminal: a deteriorating patient can re-enter the CPR loop (ROSC reversed).
+    terminal: false,
   }),
   [AgentStage.MONITOR_BREATHING]: Object.freeze({
     index: 21,
     label: "monitor_breathing",
-    description: "Observe normal breathing and call emergency services.",
-    terminal: true,
+    description: "Observe breathing (initial gate or post-ROSC) and restart CPR if needed.",
+    // Not terminal: post-ROSC monitoring can restart compressions if signs of life stop.
+    terminal: false,
   }),
 });
 
@@ -136,11 +138,15 @@ export const StageTransitions = Object.freeze({
     AgentStage.S7_CPR_LOOP,
     AgentStage.S8_ASSISTANCE,
     AgentStage.S9_HANDOVER,
+    // ROSC: signs of life returned -> stop compressions, monitor breathing.
+    AgentStage.MONITOR_BREATHING,
   ]),
   [AgentStage.S8_ASSISTANCE]: Object.freeze([AgentStage.S7_CPR_LOOP]),
   [AgentStage.S9_HANDOVER]: Object.freeze([]),
-  [AgentStage.MONITOR_RESPONSE]: Object.freeze([]),
-  [AgentStage.MONITOR_BREATHING]: Object.freeze([]),
+  // MONITOR stages are reversible: a recovered patient can deteriorate and the
+  // rescuer restarts compressions, so each can re-enter the CPR loop.
+  [AgentStage.MONITOR_RESPONSE]: Object.freeze([AgentStage.S7_CPR_LOOP]),
+  [AgentStage.MONITOR_BREATHING]: Object.freeze([AgentStage.S7_CPR_LOOP]),
 });
 
 export function isAgentStage(stage) {

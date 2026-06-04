@@ -16,20 +16,35 @@
   "global_intents": [],
   "gemma_intents_by_stage": {
     "S0_INIT": ["session_started", "check_permissions", "start_recording", "reassure_rescuer"],
-    "S1_SCENE_SAFE": ["ask_scene_safety", "scene_safe_confirmed", "warn_scene_danger", "reassure_rescuer"],
+    "S1_SCENE_SAFE": [
+      "ask_scene_safety",
+      "scene_safe_confirmed",
+      "scene_safe",
+      "scene_unsafe",
+      "adult_likely",
+      "not_adult",
+      "warn_scene_danger",
+      "reassure_rescuer"
+    ],
     "S2_CHECK_RESPONSE": [
       "ask_response_check",
       "parse_response_answer",
       "patient_responsive",
       "patient_unresponsive",
+      "adult_likely",
+      "not_adult",
       "reassure_rescuer"
     ],
     "S3_CHECK_BREATHING": [
       "ask_breathing_check",
       "parse_breathing_answer",
       "clarify_breathing",
+      "normal_breathing",
       "normal_breathing_present",
-      "normal_breathing_absent"
+      "normal_breathing_absent",
+      "no_normal_breathing",
+      "breathing_absent",
+      "agonal_breathing"
     ],
     "S4_SUSPECTED_ARREST": [
       "state_suspected_arrest_handling",
@@ -49,7 +64,9 @@
       "answer_position_question",
       "start_cpr_guidance",
       "start_cpr_loop",
-      "encourage_rescuer"
+      "encourage_rescuer",
+      "step_done",
+      "compressions_reported"
     ],
     "S7_CPR_LOOP": [
       "answer_current_cpr_question",
@@ -61,7 +78,9 @@
       "correction.arm_bent",
       "correction.interruption",
       "continue_cpr",
-      "update_cpr_quality"
+      "update_cpr_quality",
+      "step_done",
+      "compressions_reported"
     ],
     "S8_ASSISTANCE": ["guide_rescuer_change", "explain_aed_support", "calm_rescuer", "continue_cpr"],
     "S9_HANDOVER": [

@@ -3,7 +3,7 @@ import test from "node:test";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { buildSttInvocation, inferIntent, resolveSttPlan, transcribeInput } from "../src/index.js";
+import { buildSttInvocation, classifyIntent, inferIntent, resolveSttPlan, transcribeInput } from "../src/index.js";
 
 const STT_ENV_KEYS = [
   "SHERPA_ONNX_STT_COMMAND",
@@ -66,6 +66,18 @@ test("inferIntent recognizes design-script abnormal breathing and agonal phrasin
   assert.equal(inferIntent("没有正常呼吸"), "no_normal_breathing");
   assert.equal(inferIntent("好像没有呼吸，偶尔喘一下"), "agonal_breathing");
   assert.equal(inferIntent("他只有偶尔喘息"), "agonal_breathing");
+});
+
+test("classifyIntent returns best intent score and candidates", () => {
+  const clear = classifyIntent("周围安全");
+  assert.equal(clear.intent, "scene_safe");
+  assert.equal(clear.score, 0.9);
+  assert.deepEqual(clear.candidates.map((candidate) => candidate.intent), ["scene_safe"]);
+
+  const ambiguous = classifyIntent("好像没有呼吸，偶尔喘一下");
+  assert.equal(ambiguous.intent, "agonal_breathing");
+  assert.ok(ambiguous.candidates.length >= 2);
+  assert.ok(ambiguous.candidates.some((candidate) => candidate.intent === "no_normal_breathing"));
 });
 
 // Keep these tests hermetic regardless of the developer/CI shell environment.

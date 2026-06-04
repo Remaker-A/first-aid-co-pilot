@@ -75,7 +75,7 @@ export function createLiveDriverProposal(input = {}) {
       return proposal({
         responseType: LiveResponseType.QUESTION_ANSWER,
         intent: "answer_current_cpr_question",
-        ttsText: "不要停，继续按压，直到 AED 提示分析、急救人员接手，或他恢复正常呼吸。",
+        ttsText: "不要停，继续按压；等 AED 或急救人员接手、或他恢复正常呼吸再停。",
         priority: "high",
         reasonCodes: ["user_asked_can_stop", "continue_compressions"],
         uiMainText: "不要停",
@@ -86,23 +86,23 @@ export function createLiveDriverProposal(input = {}) {
       return proposal({
         responseType: LiveResponseType.QUESTION_ANSWER,
         intent: "answer_current_cpr_question",
-        ttsText: "继续按压。打开 AED，贴电极；设备提示分析时暂停。",
+        ttsText: "打开 AED，跟着它的语音做；先继续按压。",
         priority: "high",
         reasonCodes: ["user_asked_aed_help"],
         uiMainText: "AED 协助",
-        uiSecondaryText: "继续按压，听设备提示",
+        uiSecondaryText: "继续按压，跟着 AED 语音",
         statusTags: ["AED", "继续按压"],
       });
     case "ask_next_step":
       return proposal({
         responseType: LiveResponseType.QUESTION_ANSWER,
         intent: "answer_current_cpr_question",
-        ttsText: "现在继续胸外按压，跟着震动保持 100 到 120 次每分钟；我会继续看位置和节奏。",
+        ttsText: "继续按压，跟着节拍保持节奏；我会继续看位置和节奏。",
         priority: "normal",
         reasonCodes: ["user_asked_next_step", "cpr_loop_active"],
         uiMainText: "继续按压",
         uiSecondaryText: "目标 100-120 次/分钟",
-        statusTags: ["持续 CPR", "跟着震动"],
+        statusTags: ["持续 CPR", "跟着节拍"],
       });
     case "ask_emergency_call":
       return answerEmergencyCallStatus(input);
@@ -346,18 +346,18 @@ function createAssistanceQuestionProposal(input, intent) {
       return proposal({
         responseType: LiveResponseType.QUESTION_ANSWER,
         intent: "explain_aed_support",
-        ttsText: "继续按压。打开 AED，贴电极；设备提示分析时暂停。",
+        ttsText: "打开 AED，跟着它的语音做；先继续按压。",
         priority: "high",
         reasonCodes: ["user_asked_aed_help", "assistance_stage"],
         uiMainText: "AED 协助",
-        uiSecondaryText: "继续按压，听设备提示",
+        uiSecondaryText: "继续按压，跟着 AED 语音",
         statusTags: ["AED", "继续按压"],
       });
     case "ask_can_stop":
       return proposal({
         responseType: LiveResponseType.QUESTION_ANSWER,
         intent: "continue_cpr",
-        ttsText: "不要停，继续按压；只有 AED 提示分析、急救人员接手，或他恢复正常呼吸时再暂停。",
+        ttsText: "不要停，继续按压；等 AED 或急救人员接手、或他恢复正常呼吸再停。",
         priority: "high",
         reasonCodes: ["user_asked_can_stop", "assistance_stage"],
         uiMainText: "不要停",
@@ -510,7 +510,7 @@ function currentStageInstruction(stage) {
     case AgentStage.S5_CALL_EMERGENCY:
       return "我将为你拨打 120，请保持手机免提。现在准备胸外按压。";
     case AgentStage.S6_CPR_READY:
-      return "让他平躺在硬地面，双手掌根放在胸口中央。";
+      return "让他平躺在硬地面，双手掌根放在胸口中央。手机靠在他胸侧、拍到你的手；放不稳就直接开始按压。";
     default:
       return "";
   }

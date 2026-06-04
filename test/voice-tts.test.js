@@ -20,6 +20,7 @@ const TTS_ENV_KEYS = [
   "SPEECH_TTS_NUM_THREADS",
   "SPEECH_TTS_SID",
   "SPEECH_TTS_SPEED",
+  "SPEECH_TTS_GAIN",
   "SPEECH_DAEMON",
   "VOICE_TTS_PROVIDER",
   "SPEECH_MODE",
@@ -34,7 +35,8 @@ test("resolveTtsPlan defaults to bundled python sherpa_tts.py and recognizes bun
     assert.match(plan.script, /scripts[\\/]speech[\\/]sherpa_tts\.py$/);
     assert.match(plan.modelDir, /models[\\/]speech[\\/]tts$/);
     assert.equal(plan.sid, 0);
-    assert.equal(plan.speed, 1);
+    assert.equal(plan.speed, 1.1);
+    assert.equal(plan.gain, 1.4);
     assert.equal(plan.numThreads, 2);
     assert.equal(plan.timeoutMs, 15000);
 

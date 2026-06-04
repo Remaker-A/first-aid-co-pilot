@@ -1,7 +1,14 @@
 import { AgentStage } from "../domain/stages.js";
 import { createGuidanceAction } from "../domain/actionFactories.js";
 import { CprStartDecision, decideCprStart, getCprStartReasonCodes } from "./cprStartRule.js";
+import { isActionableCprQualityEvent } from "./cprEventGuards.js";
 import { createRuleFeedbackAction } from "./ruleFeedbackEngine.js";
+import { generateCallBrief } from "../report/callBrief.js";
+
+// Opening line kept verbatim so existing "我将为你拨打 120 / 免提 / 胸外按压" TTS
+// substring assertions stay green; the 120 briefing script is appended after it.
+const S5_CALL_OPENING_TTS = "我将为你拨打 120，请保持手机免提。现在准备胸外按压。";
+const S5_CALL_BRIEFING_PREFIX = "向 120 播报：";
 
 export function advanceStateMachine(state = {}, event = null) {
   const currentStage = state.current_stage ?? AgentStage.S0_INIT;
@@ -65,18 +72,25 @@ export function getNextStage(state = {}, event = null, decision = decideCprStart
     case AgentStage.S5_CALL_EMERGENCY:
       return isEmergencyCallStarted(toolState, event) ? AgentStage.S6_CPR_READY : currentStage;
     case AgentStage.S6_CPR_READY:
-      return state.cpr_state?.started === true || Boolean(event?.cpr_quality)
+      return state.cpr_state?.started === true || isActionableCprQualityEvent(event)
         ? AgentStage.S7_CPR_LOOP
         : currentStage;
     case AgentStage.S7_CPR_LOOP:
+      // Return of signs of life (ROSC): stop compressions and move to monitoring.
+      // The actual decision stays deterministic and event-driven here.
+      if (isSignsOfLifeEvent(event)) return AgentStage.MONITOR_BREATHING;
       return isAssistanceEvent(state, event) ? AgentStage.S8_ASSISTANCE : AgentStage.S7_CPR_LOOP;
     case AgentStage.S8_ASSISTANCE:
-      return event?.cpr_quality || isAssistanceComplete(event)
+      return isActionableCprQualityEvent(event) || isAssistanceComplete(event)
         ? AgentStage.S7_CPR_LOOP
         : AgentStage.S8_ASSISTANCE;
-    case AgentStage.S9_HANDOVER:
     case AgentStage.MONITOR_RESPONSE:
     case AgentStage.MONITOR_BREATHING:
+      // ROSC is reversible: a recovered patient can deteriorate again. Restart
+      // is intentionally low-threshold ("易开难停") — compressions resuming,
+      // "没有呼吸", "又没反应了", or an explicit restart re-enters the CPR loop.
+      return isCprRestartEvent(state, event) ? AgentStage.S7_CPR_LOOP : currentStage;
+    case AgentStage.S9_HANDOVER:
       return currentStage;
     default:
       return AgentStage.S0_INIT;
@@ -180,30 +194,44 @@ function buildStateAction(state, currentStage, nextStage, decision, event) {
         intent: "ask_breathing_check",
         priority: "high",
         reasonCodes: ["unresponsive_or_uncertain"],
-        tts: { text: "请看胸口 5 到 10 秒，有没有正常起伏？", tone: "calm_firm" },
+        tts: { text: "看他的胸口。只是偶尔大口喘，或者完全不动，都算没有呼吸。", tone: "calm_firm" },
         ui: {
           mainText: "检查呼吸",
-          secondaryText: "观察胸口 5-10 秒",
-          statusTags: ["看胸口", "正常起伏"],
+          secondaryText: "偶尔大口喘或不动，都算没有呼吸",
+          statusTags: ["看胸口", "没有呼吸"],
           primaryButton: { label: "无正常呼吸", action: "mark_no_normal_breathing" },
         },
         logEvent: { type: "breathing_check_started", detail: "ask_breathing_check" },
       });
-    case AgentStage.MONITOR_BREATHING:
+    case AgentStage.MONITOR_BREATHING: {
+      // Two ways in: the S3 breathing gate (patient never arrested) vs ROSC
+      // re-entry from the CPR loop (signs of life returned). The ROSC wording
+      // stops compressions, puts the patient in the recovery position, and keeps
+      // the door open to restart if they deteriorate again.
+      const roscReentry = currentStage === AgentStage.S7_CPR_LOOP;
       return action(state, {
         stage: nextStage,
-        intent: "monitor_breathing_patient",
+        intent: roscReentry ? "monitor_after_rosc" : "monitor_breathing_patient",
         priority: "high",
-        reasonCodes: ["normal_breathing"],
-        tts: { text: "他有正常呼吸，先不要做胸外按压。请呼叫 120 并持续观察。", tone: "calm_firm" },
-        ui: {
-          mainText: "持续观察呼吸",
-          secondaryText: "呼叫 120，不做胸外按压",
-          statusTags: ["正常呼吸", "观察", "呼叫120"],
+        reasonCodes: roscReentry ? ["signs_of_life", "rosc_reentry"] : ["normal_breathing"],
+        tts: {
+          text: roscReentry
+            ? "他有动静了，停止按压。把他翻成侧躺的复原姿势，盯着他的呼吸。他再没反应就立刻重新开始按压。"
+            : "他有正常呼吸，先不要做胸外按压。请呼叫 120 并持续观察。",
+          tone: "calm_firm",
         },
-        toolActions: [emergencyCallTool()],
-        logEvent: { type: "monitor_breathing", detail: "normal_breathing" },
+        ui: {
+          mainText: roscReentry ? "停止按压 · 复原卧位" : "持续观察呼吸",
+          secondaryText: roscReentry ? "盯住呼吸，再没反应立刻重新按压" : "呼叫 120，不做胸外按压",
+          statusTags: roscReentry ? ["有生命迹象", "复原卧位", "随时可重启"] : ["正常呼吸", "观察", "呼叫120"],
+        },
+        toolActions: roscReentry ? [] : [emergencyCallTool()],
+        logEvent: {
+          type: roscReentry ? "monitor_after_rosc" : "monitor_breathing",
+          detail: roscReentry ? "signs_of_life_reentry" : "normal_breathing",
+        },
       });
+    }
     case AgentStage.S4_SUSPECTED_ARREST:
       return action(state, {
         stage: nextStage,
@@ -220,14 +248,32 @@ function buildStateAction(state, currentStage, nextStage, decision, event) {
         visualOverlay: { mode: "prepare_cpr_position", highlight_target: "chest_center" },
         logEvent: { type: "suspected_cardiac_arrest", detail: "unresponsive_and_no_normal_breathing" },
       });
-    case AgentStage.S5_CALL_EMERGENCY:
+    case AgentStage.S5_CALL_EMERGENCY: {
+      // Auto-dial briefing: generate the "location + GPS + symptoms + dispatch"
+      // script and surface it three ways — spoken as the second TTS segment,
+      // as the visible `call_brief` field, and inside the emergency_call tool's
+      // briefing.script. state.location is populated by the reducer from
+      // device_state.location / metadata.location (mock GPS in Live context).
+      const callbackNumber =
+        state.callback_number ?? state.callbackNumber ?? state.tool_state?.callback_number ?? null;
+      const callBrief = generateCallBrief(state, { location: state.location, callbackNumber });
+      const briefingScript = callBrief.script;
+      const callTool = emergencyCallTool();
+      callTool.briefing = { ...callTool.briefing, script: briefingScript };
       return action(state, {
         stage: nextStage,
         intent: "start_emergency_call_and_cpr",
         priority: "critical",
         reasonCodes: getCprStartReasonCodes(state),
         throttleKey: "stage.call_emergency",
-        tts: { text: "我将为你拨打 120，请保持手机免提。现在准备胸外按压。", tone: "calm_firm" },
+        callBrief,
+        tts: {
+          // 只朗读面向施救者的开场句。完整“向 120 播报”词（地址/坐标/症状）保留在
+          // call_brief 字段与 emergency_call 工具的 briefing.script 里，不再逐字朗读：
+          // 否则坐标会被逐位念成 20 秒以上，听感像“慢放”，体验极差。
+          text: S5_CALL_OPENING_TTS,
+          tone: "calm_firm",
+        },
         ui: {
           mainText: "正在呼叫 120",
           secondaryText: "保持免提，准备胸外按压",
@@ -236,53 +282,67 @@ function buildStateAction(state, currentStage, nextStage, decision, event) {
         },
         visualOverlay: { mode: "prepare_cpr_position", highlight_target: "chest_center" },
         toolActions: [
-          emergencyCallTool(),
+          callTool,
           { type: "start_local_recording", requires_user_confirmation: false },
           { type: "attach_gps_location", requires_user_confirmation: false },
         ],
         logEvent: { type: "emergency_call_started", detail: "call_120_gps_recording" },
       });
+    }
     case AgentStage.S6_CPR_READY:
+      // The single multimodal confirm gate. Wording = one positioning line +
+      // "confirm to start" (decisive instruction, not "you decide"). The button
+      // keeps action mark_cpr_ready; "说开始" hits the readiness fast path
+      // (service.js) -> continue_cpr -> cpr_state.started -> S6→S7.
       return action(state, {
         stage: nextStage,
         intent: "guide_cpr_position",
         priority: "critical",
         reasonCodes: ["emergency_call_started", "prepare_cpr"],
-        tts: { text: "让他平躺在硬地面，双手掌根放在胸口中央。", tone: "calm_firm" },
+        tts: { text: "双手叠在他胸口中央，胳膊伸直。准备好就说“开始”，或点开始按压。", tone: "calm_firm" },
         ui: {
-          mainText: "准备按压",
-          secondaryText: "平躺硬地面，按胸口中央",
-          statusTags: ["硬地面", "胸口中央"],
-          primaryButton: { label: "准备好了", action: "mark_cpr_ready" },
+          mainText: "双手叠在胸口中央",
+          secondaryText: "胳膊伸直，准备好就说“开始”",
+          statusTags: ["胸口中央", "胳膊伸直", "开始按压"],
+          primaryButton: { label: "开始按压", action: "mark_cpr_ready" },
         },
         visualOverlay: { mode: "prepare_cpr_position", highlight_target: "chest_center" },
-        logEvent: { type: "cpr_ready_guidance", detail: "guide_chest_center" },
+        logEvent: { type: "cpr_ready_guidance", detail: "hands_chest_center_arms_straight_confirm_to_start" },
       });
-    case AgentStage.S7_CPR_LOOP:
+    case AgentStage.S7_CPR_LOOP: {
+      // "Start" wording fires both for the first S6→S7 entry and for a restart
+      // from a MONITOR stage (ROSC reversed). Single-voice: the metronome is a
+      // sound now, so wording says "跟着节拍" (never "震动"). The internal
+      // haptic/start_haptic_metronome contract is intentionally preserved.
+      const isCprStart =
+        currentStage === AgentStage.S6_CPR_READY ||
+        currentStage === AgentStage.MONITOR_BREATHING ||
+        currentStage === AgentStage.MONITOR_RESPONSE;
       return action(state, {
         stage: nextStage,
-        intent: currentStage === AgentStage.S6_CPR_READY ? "start_cpr_loop" : "continue_cpr_loop",
-        priority: currentStage === AgentStage.S6_CPR_READY ? "critical" : "normal",
+        intent: isCprStart ? "start_cpr_loop" : "continue_cpr_loop",
+        priority: isCprStart ? "critical" : "normal",
         reasonCodes: ["cpr_loop"],
-        throttleKey: currentStage === AgentStage.S6_CPR_READY ? "stage.cpr_loop" : "stage.continue_cpr",
-        minIntervalMs: currentStage === AgentStage.S6_CPR_READY ? 0 : 8000,
+        throttleKey: isCprStart ? "stage.cpr_loop" : "stage.continue_cpr",
+        minIntervalMs: isCprStart ? 0 : 8000,
         tts: {
-          text: currentStage === AgentStage.S6_CPR_READY
-            ? "现在开始胸外按压，跟着震动快速有力地按。"
+          text: isCprStart
+            ? "现在开始按压，跟着节拍，用力快压。"
             : "继续保持这个节奏。",
           tone: "calm_firm",
         },
         ui: {
-          mainText: currentStage === AgentStage.S6_CPR_READY ? "开始按压" : "持续 CPR",
+          mainText: isCprStart ? "开始按压" : "持续 CPR",
           secondaryText: "目标 100-120 次/分钟",
-          statusTags: ["快速有力", "跟着震动"],
+          statusTags: ["快速有力", "跟着节拍"],
           qualityScore: state.cpr_state?.quality_score ?? null,
         },
         haptic: { enabled: true, pattern: "metronome", bpm: 110 },
         visualOverlay: { mode: "cpr_loop", highlight_target: "chest_center" },
         toolActions: [{ type: "start_haptic_metronome", bpm: 110, requires_user_confirmation: false }],
-        logEvent: { type: currentStage === AgentStage.S6_CPR_READY ? "cpr_started" : "cpr_continued", detail: "cpr_loop" },
+        logEvent: { type: isCprStart ? "cpr_started" : "cpr_continued", detail: "cpr_loop" },
       });
+    }
     case AgentStage.S8_ASSISTANCE:
       return action(state, {
         stage: nextStage,
@@ -293,13 +353,13 @@ function buildStateAction(state, currentStage, nextStage, decision, event) {
         minIntervalMs: 15000,
         tts: {
           text: isAedEvent(event)
-            ? "有人取到 AED 时，你继续按压，听设备提示。"
+            ? "AED 到了，打开它，跟着它的语音做；先继续按压。"
             : "如果旁边有人，请准备换手。",
           tone: "calm_firm",
         },
         ui: {
           mainText: isAedEvent(event) ? "AED 到达" : "准备换手",
-          secondaryText: "继续胸外按压",
+          secondaryText: isAedEvent(event) ? "打开 AED 跟它的语音，先继续按压" : "继续胸外按压",
           statusTags: isAedEvent(event) ? ["AED", "继续按压"] : ["换手", "不要中断"],
         },
         haptic: { enabled: true, pattern: "metronome", bpm: 110 },
@@ -332,11 +392,11 @@ function buildStateAction(state, currentStage, nextStage, decision, event) {
         priority: "critical",
         reasonCodes: ["handover_requested"],
         throttleKey: "stage.handover",
-        tts: { text: "急救员到达，我正在生成交接报告。", tone: "calm_firm" },
+        tts: { text: "急救员到达，把位置让给他们，后面听他们的。我在生成交接报告。", tone: "calm_firm" },
         ui: {
-          mainText: "交接报告",
-          secondaryText: "生成现场处置摘要",
-          statusTags: ["交接报告", "急救员"],
+          mainText: "交给急救员",
+          secondaryText: "让位并听从急救员，生成交接报告",
+          statusTags: ["交接报告", "听急救员"],
         },
         toolActions: [{ type: "generate_handover_report", requires_user_confirmation: false }],
         logEvent: { type: "handover_requested", detail: "generate_handover_report" },
@@ -392,6 +452,47 @@ function isAssistanceComplete(event) {
     event?.user_input?.intent === "assistance_completed" ||
     event?.user_input?.intent === "continue_cpr"
   );
+}
+
+// Return of spontaneous circulation / signs of life while compressing: the
+// patient moved, woke, started breathing again, etc. Recognized both via the
+// dedicated signs_of_life / patient_recovered intents (stt.js) and via the
+// existing responsive / normal-breathing intents, so any "他动了/他醒了/又有呼吸了"
+// utterance during S7 stops compressions and moves to monitoring.
+function isSignsOfLifeEvent(event) {
+  const intent = event?.user_input?.intent;
+  return (
+    intent === "signs_of_life" ||
+    intent === "patient_recovered" ||
+    intent === "patient_responsive" ||
+    intent === "responsive" ||
+    intent === "normal_breathing" ||
+    intent === "normal_breathing_present" ||
+    event?.metadata?.signs_of_life === true ||
+    event?.patient_state?.signs_of_life === true
+  );
+}
+
+// Re-enter the CPR loop from a MONITOR stage. Kept low-threshold on purpose: any
+// resumed compressions, a re-confirmed "no normal breathing", a fresh
+// "unresponsive", or an explicit continue/restart signal restarts CPR.
+function isCprRestartEvent(state, event) {
+  const intent = event?.user_input?.intent;
+  if (
+    intent === "continue_cpr" ||
+    intent === "no_normal_breathing" ||
+    intent === "breathing_absent" ||
+    intent === "agonal_breathing" ||
+    intent === "patient_unresponsive" ||
+    intent === "unresponsive" ||
+    intent === "compressions_reported"
+  ) {
+    return true;
+  }
+  if (event?.metadata?.cpr_restart === true) {
+    return true;
+  }
+  return isActionableCprQualityEvent(event);
 }
 
 function isAedEvent(event) {

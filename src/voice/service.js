@@ -1,11 +1,14 @@
 import { runAgentPipeline } from "../agent/runPipeline.js";
 import { createDecisionFrame } from "../gemma/decisionFrame.js";
 import { GemmaRuntime } from "../gemma/runtime.js";
+import { createNluGovernor } from "../gemma/nluCache.js";
 import { createId } from "../domain/types.js";
 import { validateAction } from "../engine/actionValidator.js";
 import { AgentStage } from "../domain/stages.js";
+import { getNluSlotsConfig } from "../knowledge/knowledgeBase.js";
 import { transcribeInput } from "./stt.js";
 import { synthesizeSpeech } from "./tts.js";
+import { resolveUserIntent } from "./intentResolver.js";
 import {
   LiveResponseType,
   createLiveAgentInput,
@@ -16,11 +19,37 @@ import {
 const DEFAULT_VOICE_EVENT_TTL_MS = 30 * 60 * 1000;
 const DEFAULT_GEMMA_LIVE_TIMEOUT_MS = 1200;
 const DEFAULT_GEMMA_TURN_TIMEOUT_MS = 1000;
+const CPR_READINESS_FAST_PATH = "s6_readiness_continue_cpr";
+
+// At the S6 confirm gate, readiness/start phrases ("开始"/"可以了"/"没有呼吸"/
+// "准备好了"…) all mean "start compressions now". They sometimes classify as a
+// non-continue_cpr intent (e.g. "可以了"->step_done, "没有呼吸"->no_normal_breathing);
+// those are advance-compatible and get folded into the continue_cpr start signal.
+// Divergent intents (responsive / normal breathing / paramedics / scene unsafe /
+// signs of life) are NOT in this set, so they are kept and the flow branches.
+const READINESS_FAST_PATH_OVERRIDABLE_INTENTS = new Set([
+  "continue_cpr",
+  "no_normal_breathing",
+  "breathing_absent",
+  "agonal_breathing",
+  "compressions_reported",
+  "step_done",
+]);
 
 export function createVoiceDemoService(options = {}) {
   const sessions = new Map();
   const runtime = options.runtime || new GemmaRuntime(options.gemma || {});
   const now = options.now || (() => new Date().toISOString());
+  // Per-service NLU governance: an LRU result cache + per-session call budget so
+  // repeated/fuzzy utterances skip the slow local model and one session cannot
+  // hammer the CPU. Instance-scoped on purpose — no cross-session or cross-test
+  // state bleed. Config layering: options > env > nlu_slots.json baseline.
+  const { cache: nluCache, budget: nluBudget } = createNluGovernor({
+    ...options,
+    baseline: resolveNluRuntimeBaseline(),
+    env: options.env || process.env,
+  });
+  const coreOptions = { ...options, nluCache, nluBudget };
 
   return {
     sessions,
@@ -30,65 +59,18 @@ export function createVoiceDemoService(options = {}) {
       const sessionId = input.sessionId || input.session_id || createId("voice_sess");
       const session = getOrCreateSession(sessions, sessionId, now);
       const stt = await timed(timings, "stt_ms", () => transcribeInput(input, options.stt || {}));
-      const event = createVoiceEvent({ sessionId, stt, input, now });
-
-      session.events.push(event);
-
-      // The voice service runs its own Gemma supplement below (runtime +
-      // ActionValidator), so it needs the pipeline's deterministic,
-      // synchronous state-machine actions. Now that runAgentPipeline defaults
-      // Gemma ON, opt out explicitly to keep the synchronous contract.
-      const pipeline = await timed(timings, "agent_pipeline_ms", () => runAgentPipeline({
-        events: session.events,
-        mode: "demo_assisted",
+      const guidance = await runVoiceGuidanceCore({
         sessionId,
+        session,
+        stt,
+        input,
+        runtime,
+        options: coreOptions,
         now,
-        useGemma: false,
-      }));
-      const stateAction = pipeline.actions[pipeline.actions.length - 1] || null;
-      const frame = createDecisionFrame({
-        state: pipeline.state,
-        event,
-        userInput: {
-          stt_text: stt.transcript,
-          intent_hint: stt.intent,
-          confidence: stt.confidence,
-        },
-        perceptionSummary: input.perceptionSummary || input.perception_summary,
+        timings,
       });
-      const liveInput = createLiveAgentInput({
-        sessionState: pipeline.state,
-        latestEvent: event,
-        latestUserUtterance: frame.user_input,
-        pendingFlowAction: stateAction,
-        pendingRuleFeedback: stateAction?.source === "rule_feedback" ? stateAction : null,
-        recentTts: frame.recent_tts,
-        allowedIntents: frame.allowed_intents,
-      });
-      const liveProposal = createLiveDriverProposal(liveInput);
-      const gemmaPlan = planGemmaSupplement(stateAction, stt, {
-        state: pipeline.state,
-        event,
-        liveProposal,
-        options,
-      });
-      const gemma = gemmaPlan.run
-        ? await timed(timings, "gemma_ms", () => generateGemmaPatch(runtime, frame, gemmaPlan))
-        : createSkippedGemma(gemmaPlan.reason);
-      const patch = gemma.patch || null;
-      const gemmaValidation = patch
-        ? validateAction(toGuidanceCandidate(patch, pipeline.state, sessionId), pipeline.state)
-        : null;
-      const guidanceDecision = arbitrateGuidanceAction({
-        stateAction,
-        gemmaValidation,
-        liveProposal,
-        state: pipeline.state,
-        sessionId,
-        allowIntentChange: false,
-      });
-      const guidanceAction = guidanceDecision.action;
-      const spokenText = guidanceAction?.tts?.text || stateAction?.tts?.text || "";
+      const guidanceAction = guidance.guidanceAction;
+      const spokenText = guidanceAction?.tts?.text || guidance.stateAction?.tts?.text || "";
       const tts = await timed(timings, "tts_ms", () => synthesizeSpeech(spokenText, options.tts || {}));
       timings.total_ms = Date.now() - totalStart;
       const response = {
@@ -96,28 +78,46 @@ export function createVoiceDemoService(options = {}) {
         session_id: sessionId,
         transcript: stt.transcript,
         stt,
-        event,
-        state: pipeline.state,
-        state_action: stateAction,
-        decision_frame: frame,
-        action_patch: patch,
-        gemma_validation: gemmaValidation,
-        live_agent_input: liveInput,
-        live_driver_proposal: liveProposal,
+        intent_resolution: guidance.intentResolution,
+        event: guidance.event,
+        state: guidance.pipeline.state,
+        state_action: guidance.stateAction,
+        decision_frame: guidance.frame,
+        action_patch: guidance.patch,
+        gemma_validation: guidance.gemmaValidation,
+        live_agent_input: guidance.liveInput,
+        live_driver_proposal: guidance.liveProposal,
         guidance_action: guidanceAction,
-        guidance_source: guidanceDecision.source,
-        response_type: guidanceDecision.responseType,
-        live_driver_source: guidanceDecision.liveDriverSource,
-        tts_arbitration_reason: guidanceDecision.reason,
-        gemma,
-        gemma_live: createGemmaLiveDebug(gemma, gemmaPlan),
+        guidance_source: guidance.guidanceDecision.source,
+        response_type: guidance.guidanceDecision.responseType,
+        live_driver_source: guidance.guidanceDecision.liveDriverSource,
+        tts_arbitration_reason: guidance.guidanceDecision.reason,
+        gemma: guidance.gemma,
+        gemma_live: createGemmaLiveDebug(guidance.gemma, guidance.gemmaPlan),
         tts,
         timings,
-        report: pipeline.report,
+        report: guidance.pipeline.report,
       };
 
       session.lastResponse = response;
       return response;
+    },
+    async createGuidance(input = {}, stt, timings = {}) {
+      const sessionId = input.sessionId || input.session_id || createId("voice_sess");
+      const session = getOrCreateSession(sessions, sessionId, now);
+      const resolvedStt = stt || await timed(timings, "stt_ms", () => transcribeInput(input, options.stt || {}));
+      const guidance = await runVoiceGuidanceCore({
+        sessionId,
+        session,
+        stt: resolvedStt,
+        input,
+        runtime,
+        options: coreOptions,
+        now,
+        timings,
+      });
+      session.lastResponse = createGuidanceResponseSnapshot(guidance);
+      return guidance;
     },
     reset(sessionId) {
       if (sessionId) {
@@ -130,6 +130,121 @@ export function createVoiceDemoService(options = {}) {
     getSession(sessionId) {
       return sessions.get(sessionId) || null;
     },
+    // Best-effort: pay the resident-daemon model-load cost up front so the first
+    // real NLU turn is fast. No-op in one-shot (non-daemon) mode. Never throws.
+    async prewarm(prewarmOptions = {}) {
+      if (runtime && typeof runtime.prewarm === "function") {
+        return runtime.prewarm(prewarmOptions);
+      }
+      return { ok: true, warmed: false, reason: "runtime_prewarm_unsupported" };
+    },
+  };
+}
+
+export async function runVoiceGuidanceCore({
+  sessionId,
+  session,
+  stt,
+  input = {},
+  runtime,
+  options = {},
+  now = () => new Date().toISOString(),
+  timings = {},
+} = {}) {
+  const priorState = getPriorSessionState(session, input);
+  const resolverStage = resolveIntentStage(priorState, input, session);
+  const rawIntentResolution = await timed(timings, "intent_resolution_ms", () => resolveUserIntent({
+    transcript: stt.transcript,
+    stage: resolverStage,
+    runtime,
+    options: {
+      ...options,
+      sessionId,
+      facts: priorState?.confirmed_facts || {},
+      perceptionSummary: input.perceptionSummary || input.perception_summary,
+      recentTts: priorState?.dialogue_state?.recent_tts,
+    },
+  }));
+  const intentResolution = applyCprReadinessFastPath(rawIntentResolution, {
+    stt,
+    stage: resolverStage,
+  });
+  const event = createVoiceEvent({ sessionId, stt, input, now, intentResolution });
+
+  session.events.push(event);
+
+  // The voice service runs its own Gemma supplement below (runtime +
+  // ActionValidator), so it needs the pipeline's deterministic,
+  // synchronous state-machine actions. Now that runAgentPipeline defaults
+  // Gemma ON, opt out explicitly to keep the synchronous contract.
+  const pipeline = await timed(timings, "agent_pipeline_ms", () => runAgentPipeline({
+    events: session.events,
+    mode: "demo_assisted",
+    sessionId,
+    now,
+    useGemma: false,
+  }));
+  const stateAction = pipeline.actions[pipeline.actions.length - 1] || null;
+  const frame = createDecisionFrame({
+    state: pipeline.state,
+    event,
+    userInput: {
+      stt_text: stt.transcript,
+      intent_hint: event.user_input?.intent,
+      confidence: event.user_input?.confidence,
+    },
+    perceptionSummary: input.perceptionSummary || input.perception_summary,
+  });
+  const liveInput = createLiveAgentInput({
+    sessionState: pipeline.state,
+    latestEvent: event,
+    latestUserUtterance: frame.user_input,
+    pendingFlowAction: stateAction,
+    pendingRuleFeedback: stateAction?.source === "rule_feedback" ? stateAction : null,
+    recentTts: frame.recent_tts,
+    allowedIntents: frame.allowed_intents,
+  });
+  const liveProposal = createLiveDriverProposal(liveInput);
+  const gemmaPlan = planGemmaSupplement(stateAction, stt, {
+    state: pipeline.state,
+    event,
+    liveProposal,
+    options,
+  });
+  const gemma = gemmaPlan.run
+    ? await timed(timings, "gemma_ms", () => generateGemmaPatch(runtime, frame, gemmaPlan))
+    : createSkippedGemma(gemmaPlan.reason);
+  const patch = gemma.patch || null;
+  const gemmaValidation = patch
+    ? validateAction(toGuidanceCandidate(patch, pipeline.state, sessionId), pipeline.state)
+    : null;
+  const guidanceDecision = arbitrateGuidanceAction({
+    stateAction,
+    gemmaValidation,
+    liveProposal,
+    state: pipeline.state,
+    sessionId,
+    allowIntentChange: false,
+    userIntent: event.user_input?.intent ?? null,
+    event,
+  });
+
+  return {
+    sessionId,
+    stt,
+    intentResolution,
+    event,
+    pipeline,
+    stateAction,
+    frame,
+    liveInput,
+    liveProposal,
+    gemmaPlan,
+    gemma,
+    patch,
+    gemmaValidation,
+    guidanceDecision,
+    guidanceAction: guidanceDecision.action,
   };
 }
 
@@ -172,6 +287,8 @@ export function arbitrateGuidanceAction({
   state = {},
   sessionId = null,
   allowIntentChange = false,
+  userIntent = null,
+  event = null,
 } = {}) {
   if (isCriticalRuleCorrection(stateAction)) {
     return {
@@ -183,6 +300,21 @@ export function arbitrateGuidanceAction({
     };
   }
 
+  if (isCprReadinessFlowFastPath(stateAction, state, userIntent, event)) {
+    return {
+      action: stateAction,
+      source: "rule_flow_fast_path",
+      responseType: LiveResponseType.FLOW_INSTRUCTION,
+      liveDriverSource: "rule_flow_fast_path",
+      reason: "s6_readiness_continue_cpr",
+    };
+  }
+
+  // "你说我做" CPR coach has been retired: the autonomous loop now drives the
+  // CPR phase (silence-by-default + rule corrections), so step_done /
+  // compressions_reported no longer voice scripted per-step commands. The
+  // continue_cpr readiness fast path above still starts/keeps the loop, and
+  // compressions_reported keeps its cpr_state.started link (see inferCprQuality).
   const liveValidation = validateLiveProposal(liveProposal, state, sessionId);
   if (
     liveValidation?.ok &&
@@ -204,6 +336,16 @@ export function arbitrateGuidanceAction({
     liveDriverSource: gemmaDecision.source === "gemma_agent" ? "gemma_live_driver" : null,
     reason: gemmaDecision.source,
   };
+}
+
+function isCprReadinessFlowFastPath(stateAction, state = {}, userIntent = null, event = null) {
+  return (
+    userIntent === "continue_cpr" &&
+    event?.metadata?.rule_flow_fast_path === CPR_READINESS_FAST_PATH &&
+    state?.current_stage === AgentStage.S7_CPR_LOOP &&
+    stateAction?.stage === AgentStage.S7_CPR_LOOP &&
+    stateAction?.intent === "start_cpr_loop"
+  );
 }
 
 export function isCriticalFlowAction(action) {
@@ -252,13 +394,19 @@ function planGemmaSupplement(stateAction, stt, context = {}) {
     return { run: false, reason: "no_user_input" };
   }
 
+  // 方案①（诊断轮即时）：非 CPR-live 的流程引导轮（S1/S2 等标准话术）不为
+  // Gemma 润色阻塞，直接用确定性状态机话术即时响应，降低判断阶段延迟。
+  // 这些话术是固定的标准流程句，Gemma 润色收益低；Gemma 仍服务于 CPR-live
+  // 轮（S7/S8）的自然语言润色与安抚，那里语言价值更高。
+  if (!cprLive) {
+    return { run: false, reason: "diagnostic_fast_path" };
+  }
+
   return {
     run: true,
     reason: null,
-    live: cprLive,
-    timeoutMs: cprLive
-      ? resolveGemmaLiveTimeoutMs(context.options)
-      : resolveGemmaTurnTimeoutMs(context.options),
+    live: true,
+    timeoutMs: resolveGemmaLiveTimeoutMs(context.options),
   };
 }
 
@@ -279,6 +427,23 @@ function createGemmaLiveDebug(gemma, plan = {}) {
     stale: gemma?.stale === true,
     live: plan.live === true,
     patch: Boolean(gemma?.patch),
+  };
+}
+
+function createGuidanceResponseSnapshot(guidance = {}) {
+  return {
+    ok: true,
+    session_id: guidance.sessionId,
+    transcript: guidance.stt?.transcript,
+    stt: guidance.stt,
+    intent_resolution: guidance.intentResolution,
+    event: guidance.event,
+    state: guidance.pipeline?.state,
+    state_action: guidance.stateAction,
+    guidance_action: guidance.guidanceAction,
+    guidance_source: guidance.guidanceDecision?.source,
+    response_type: guidance.guidanceDecision?.responseType,
+    report: guidance.pipeline?.report,
   };
 }
 
@@ -438,14 +603,23 @@ function createSessionStartedEvent(sessionId, now) {
   };
 }
 
-function createVoiceEvent({ sessionId, stt, input, now }) {
-  const inferredDeviceState = inferDeviceState(stt.intent);
-  const inferredCprQuality = inferCprQuality(stt.intent);
-  const source = input.eventSource || input.event_source || inferEventSource(input);
+function createVoiceEvent({ sessionId, stt, input, now, intentResolution = null }) {
+  const resolvedIntent = intentResolution?.intent ?? stt.intent;
+  const resolvedConfidence = numberOrNull(intentResolution?.confidence) ?? stt.confidence;
+  const resolvedSource = intentResolution?.source || "stt";
+  const inferredDeviceState = inferDeviceState(resolvedIntent);
+  const inferredCprQuality = inferCprQuality(resolvedIntent);
+  const rawSource = input.eventSource || input.event_source || inferEventSource(input);
   const eventType =
     input.eventType ||
     input.event_type ||
-    inferEventType(input, stt.intent);
+    inferEventType(input, resolvedIntent);
+  const source = canonicalizeVoiceEventSource(rawSource, eventType, input);
+  const sourceMetadata = createCanonicalSourceMetadata(rawSource, source, input.metadata);
+  const patientState = mergeResolvedPatientState(
+    input.patientState || input.patient_state || null,
+    intentResolution,
+  );
 
   return {
     schema_version: "perception_event.v0.1",
@@ -458,19 +632,185 @@ function createVoiceEvent({ sessionId, stt, input, now }) {
     ttl_ms: input.ttlMs || input.ttl_ms || getVoiceEventTtlMs(),
     user_input: {
       stt_text: stt.transcript,
-      intent: stt.intent,
-      confidence: stt.confidence,
+      intent: resolvedIntent,
+      confidence: resolvedConfidence,
+      source: resolvedSource,
     },
-    patient_state: input.patientState || input.patient_state || null,
+    patient_state: patientState,
     cpr_quality: input.cprQuality || input.cpr_quality || inferredCprQuality,
     rescuer_state: input.rescuerState || input.rescuer_state || null,
     device_state: input.deviceState || input.device_state || inferredDeviceState,
     tool_result: input.toolResult || input.tool_result || null,
     metadata: {
       ...(input.metadata || {}),
+      ...sourceMetadata,
+      ...(intentResolution?.fastPath ? { rule_flow_fast_path: intentResolution.fastPath } : {}),
       audio: stt.audio,
+      intent_resolution: createIntentResolutionDebug(intentResolution),
     },
   };
+}
+
+function applyCprReadinessFastPath(intentResolution, { stt = {}, stage = null } = {}) {
+  if (stage !== AgentStage.S6_CPR_READY || !isCprReadinessUtterance(stt.transcript)) {
+    return intentResolution;
+  }
+
+  const existingIntent = intentResolution?.intent ?? stt.intent ?? null;
+  if (existingIntent && !READINESS_FAST_PATH_OVERRIDABLE_INTENTS.has(existingIntent)) {
+    return intentResolution;
+  }
+
+  return {
+    ...(intentResolution || {}),
+    ok: true,
+    intent: "continue_cpr",
+    slots: intentResolution?.slots || {},
+    confidence: Math.max(
+      numberOrNull(intentResolution?.confidence) ?? 0,
+      numberOrNull(stt.confidence) ?? 0,
+      0.92,
+    ),
+    source: "rule_flow_fast_path",
+    needsClarification: false,
+    needs_clarification: false,
+    escalated: intentResolution?.escalated === true,
+    fastPath: CPR_READINESS_FAST_PATH,
+  };
+}
+
+function isCprReadinessUtterance(transcript = "") {
+  const text = normalizeReadinessText(transcript);
+  return (
+    /^(?:我)?(?:已|已经)?准备好了?$/.test(text) ||
+    /^(?:我)?准备就绪$/.test(text) ||
+    // "开始" / "现在开始" / "这就开始" / "开始吧" / "开始按压" / "开始CPR" …
+    /^(?:我|我们)?(?:这就|现在|马上)?开始(?:吧|啊|了|按|按压|心肺复苏|cpr)?$/i.test(text) ||
+    // "可以" / "可以了" / "可以开始" / "可以按了"
+    /^可以(?:了|的|开始了?|按了?|按压了?)?$/.test(text) ||
+    // Re-confirming arrest at the gate also means "start now".
+    /^(?:他)?(?:没有|没|无)(?:正常)?呼吸了?$/.test(text) ||
+    /^(?:他)?(?:不|没在|没有在)呼吸了?$/.test(text)
+  );
+}
+
+function normalizeReadinessText(value) {
+  return typeof value === "string"
+    ? value.trim().replace(/[。！？!,.，、\s]+$/g, "")
+    : "";
+}
+
+function canonicalizeVoiceEventSource(rawSource, eventType, input = {}) {
+  if (
+    rawSource === "real_perception" &&
+    eventType === "cpr_quality_update" &&
+    (input.cprQuality || input.cpr_quality)
+  ) {
+    return "vision_cpr";
+  }
+  return rawSource;
+}
+
+function createCanonicalSourceMetadata(rawSource, source, inputMetadata = {}) {
+  if (!rawSource || rawSource === source) {
+    return {};
+  }
+  return {
+    raw_event_source: inputMetadata.raw_event_source || rawSource,
+    perception_mode: inputMetadata.perception_mode || rawSource,
+  };
+}
+
+function mergeResolvedPatientState(inputPatientState, intentResolution) {
+  const slots = intentResolution?.slots;
+  if (!slots || typeof slots !== "object") {
+    return inputPatientState || null;
+  }
+
+  const patient = inputPatientState && typeof inputPatientState === "object"
+    ? { ...inputPatientState }
+    : {};
+  let changed = false;
+
+  for (const [slot, rawSlot] of Object.entries(slots)) {
+    const normalized = normalizeResolvedSlot(rawSlot, intentResolution.nlu?.slots?.[slot]);
+    if (!normalized || Object.prototype.hasOwnProperty.call(patient, slot)) {
+      continue;
+    }
+
+    patient[slot] = normalized.value;
+    patient[`${slot}_confidence`] = normalized.confidence;
+    patient[`${slot}_source`] = intentResolution.source || "stt";
+    changed = true;
+  }
+
+  return changed || inputPatientState ? patient : null;
+}
+
+function normalizeResolvedSlot(slot, originalSlot) {
+  if (slot === null) {
+    return { value: null, confidence: numberOrNull(originalSlot?.confidence) };
+  }
+  if (!slot || typeof slot !== "object" || Array.isArray(slot)) {
+    return null;
+  }
+  if (!Object.prototype.hasOwnProperty.call(slot, "value")) {
+    return null;
+  }
+  return {
+    value: slot.value,
+    confidence: numberOrNull(slot.confidence),
+  };
+}
+
+function createIntentResolutionDebug(intentResolution) {
+  if (!intentResolution) {
+    return null;
+  }
+
+  return {
+    intent: intentResolution.intent || null,
+    confidence: numberOrNull(intentResolution.confidence),
+    source: intentResolution.source || null,
+    needs_clarification: intentResolution.needs_clarification === true,
+    escalated: intentResolution.escalated === true,
+    escalation_reason: intentResolution.escalationReason || null,
+    fallback_reason: intentResolution.fallbackReason || null,
+    cache_hit: intentResolution.cacheHit === true,
+  };
+}
+
+function getPriorSessionState(session, input = {}) {
+  return input.sessionState || input.session_state || session?.lastResponse?.state || null;
+}
+
+function resolveIntentStage(priorState, input = {}, session = null) {
+  const explicitStage = input.stage || input.stage_hint || input.currentStage || input.current_stage;
+  if (explicitStage) {
+    return explicitStage;
+  }
+  if (priorState?.current_stage) {
+    return priorState.current_stage;
+  }
+  if (Array.isArray(session?.events) && session.events.length > 0) {
+    return AgentStage.S1_SCENE_SAFE;
+  }
+  return AgentStage.S0_INIT;
+}
+
+function numberOrNull(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function resolveNluRuntimeBaseline() {
+  try {
+    const config = getNluSlotsConfig();
+    return config && typeof config.nlu_runtime === "object" && config.nlu_runtime
+      ? config.nlu_runtime
+      : {};
+  } catch {
+    return {};
+  }
 }
 
 function getVoiceEventTtlMs() {
@@ -494,7 +834,9 @@ function inferDeviceState(intent) {
 }
 
 function inferCprQuality(intent) {
-  if (intent !== "continue_cpr") {
+  // compressions_reported ("按了30次"/"在按了") reuses the same continue_cpr ->
+  // cpr_state.started link so the "你说我做" press_30 step can drive S6 -> S7.
+  if (intent !== "continue_cpr" && intent !== "compressions_reported") {
     return null;
   }
 
@@ -551,7 +893,7 @@ function inferEventType(input = {}, intent) {
   if (intent === "normal_breathing" || intent === "no_normal_breathing") {
     return "breathing_update";
   }
-  if (intent === "continue_cpr") {
+  if (intent === "continue_cpr" || intent === "compressions_reported") {
     return "cpr_quality_update";
   }
   if (intent === "emergency_called") {

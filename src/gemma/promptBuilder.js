@@ -152,16 +152,28 @@ export function serializeDecisionFrame(frame, pretty = true) {
 }
 
 export function normalizeDecisionFrameForPrompt(frame = {}) {
-  return {
+  return pruneUndefined({
     session_id: frame.session_id || "sess_unknown",
     current_stage: frame.current_stage || "S0_INIT",
+    transcript: frame.transcript,
     allowed_intents: Array.isArray(frame.allowed_intents) ? frame.allowed_intents : [],
+    allowed_slots: Array.isArray(frame.allowed_slots) ? frame.allowed_slots : undefined,
+    slots_schema: frame.slots_schema,
+    confidence_floors: frame.confidence_floors,
     facts: frame.facts || {},
     user_input: frame.user_input || { stt_text: "", confidence: 0 },
     perception_summary: frame.perception_summary || {},
     recent_tts: Array.isArray(frame.recent_tts) ? frame.recent_tts : [],
     safety_phrases: Array.isArray(frame.safety_phrases) ? frame.safety_phrases : [],
+    escalation_markers: frame.escalation_markers,
+    forbidden_intents: frame.forbidden_intents,
     output_schema: frame.output_schema || GUIDANCE_ACTION_PATCH_SCHEMA,
     language: frame.language || "zh-CN"
-  };
+  });
+}
+
+function pruneUndefined(value) {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, item]) => item !== undefined)
+  );
 }

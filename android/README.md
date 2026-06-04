@@ -65,8 +65,8 @@ Live demo expectations:
 - Start the Node voice server from the repository root with `npm run voice:serve`, then run the Android debug app. The emulator default target is `http://10.0.2.2:8787`; on a real device use `adb reverse tcp:8787 tcp:8787` or point the transport at a LAN host in code.
 - The Camera toggle only controls the background camera preview. It does not imply real CPR recognition. Scripted/demo injection is labeled `演示数据`; real microphone/camera capture without a real perception model is labeled `仅录制/采集`; only a future `real_perception` event source should be labeled `实时识别`.
 - CameraX is preview-only in this phase. It requests runtime `CAMERA` permission and falls back to a mock background if permission or hardware is unavailable.
-- CPR haptics use a single Android vibrator metronome instance at the requested BPM, defaulting to 110 bpm for CPR fallback. The app must never auto-dial real 120.
-- When `/api/turn` is unreachable or times out during S7/S8, Android keeps the last quality score, shows `继续按压`, enables the 110 bpm haptic metronome, and surfaces an honest offline fallback message. HTTP, parse, and application errors remain errors.
+- The CPR metronome is a single Android **audio click** instance (`AudioTrack`, `USAGE_ASSISTANCE_SONIFICATION`) at the requested BPM, defaulting to 110 bpm for CPR fallback. The client is single-voice and **never vibrates**; while TTS speaks the click ducks in volume (it does not pause). The cross-platform contract still calls this intent `haptic` / `start_haptic_metronome`, but that name is never user-visible. The app must never auto-dial real 120.
+- When `/api/turn` is unreachable or times out during S7/S8, Android keeps the last quality score, shows `继续按压`, keeps the local 110 bpm audio metronome ticking (the beat is self-sustaining and does not depend on per-turn server messages), and surfaces an honest offline fallback message. HTTP, parse, and application errors remain errors.
 
 ## Fixtures
 
@@ -82,7 +82,7 @@ Use `manifest.json` to enumerate them in a deterministic order. Each JSON file i
 | --- | --- | --- |
 | `01_ui_tts_response_check.json` | Normal UI + TTS | Render main/secondary text, status tags, primary button, and speak `tts.text`. |
 | `02_cpr_haptic_start.json` | CPR haptic start | Start one 110 bpm metronome instance, render CPR guidance, and speak the critical prompt. |
-| `03_cpr_haptic_update.json` | CPR haptic update | Keep the same metronome instance and update/refresh 110 bpm feedback without stacking vibrations. |
+| `03_cpr_haptic_update.json` | CPR haptic update | Keep the same metronome instance and update/refresh 110 bpm feedback without stacking clicks. |
 | `04_cpr_haptic_stop.json` | CPR haptic stop | Stop/cancel the metronome and render handover text. |
 | `05_critical_emergency_call_mock.json` | Critical emergency call mock | Treat as critical and always surface UI/TTS/tool delivery, but keep Demo behavior mock-only. |
 | `06_share_video_unconfirmed.json` | Share video without confirmation | Show the confirmation UI and block the share tool. No external send should happen. |

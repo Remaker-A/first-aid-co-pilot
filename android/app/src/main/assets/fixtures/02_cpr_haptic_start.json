@@ -16,7 +16,7 @@
   "throttle_key": "cpr.metronome",
   "min_interval_ms": 0,
   "tts": {
-    "text": "现在开始胸外按压，跟着震动快速有力地按。",
+    "text": "现在开始胸外按压，跟着节拍快速有力地按。",
     "tone": "calm_firm",
     "speed": "normal",
     "interrupt_policy": "interrupt_lower_priority"
@@ -26,7 +26,7 @@
     "secondary_text": "目标 100-120 次/分钟",
     "status_tags": [
       "快速有力",
-      "跟着震动"
+      "跟着节拍"
     ],
     "quality_score": 32,
     "primary_button": null

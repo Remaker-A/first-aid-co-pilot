@@ -1,0 +1,138 @@
+{
+  "schema_version": "nlu_slots.v0.1",
+  "confidence": {
+    "default_floor": 0.6,
+    "cpr_trigger_floor": 0.78,
+    "overall_floor": 0.55
+  },
+  "nlu_runtime": {
+    "cache": {
+      "enabled": true,
+      "max_entries": 64,
+      "ttl_ms": 60000
+    },
+    "budget": {
+      "enabled": true,
+      "max_calls": 12,
+      "window_ms": 60000
+    }
+  },
+  "eligible_stages": [
+    "S1_SCENE_SAFE",
+    "S2_CHECK_RESPONSE",
+    "S3_CHECK_BREATHING",
+    "S4_SUSPECTED_ARREST",
+    "S5_CALL_EMERGENCY",
+    "S6_CPR_READY"
+  ],
+  "escalation_markers": {
+    "uncertain": [
+      "好像",
+      "可能",
+      "似乎",
+      "不确定",
+      "不太确定",
+      "感觉",
+      "maybe",
+      "probably",
+      "not sure"
+    ],
+    "negation_or_contrast": [
+      "但是",
+      "不过",
+      "没有但是",
+      "不是很",
+      "不太",
+      "偶尔",
+      "只是",
+      "只有",
+      "but",
+      "however"
+    ]
+  },
+  "stages": {
+    "S1_SCENE_SAFE": {
+      "allowed_intents": [
+        "scene_safe",
+        "scene_unsafe",
+        "adult_likely",
+        "not_adult"
+      ],
+      "slots": {
+        "scene_safe": {
+          "type": "boolean"
+        },
+        "adult_likely": {
+          "type": "boolean"
+        }
+      }
+    },
+    "S2_CHECK_RESPONSE": {
+      "allowed_intents": [
+        "patient_unresponsive",
+        "patient_responsive",
+        "unresponsive",
+        "responsive"
+      ],
+      "slots": {
+        "responsive": {
+          "type": "boolean",
+          "cpr_trigger_value": false
+        }
+      }
+    },
+    "S3_CHECK_BREATHING": {
+      "allowed_intents": [
+        "no_normal_breathing",
+        "normal_breathing",
+        "normal_breathing_absent",
+        "normal_breathing_present",
+        "agonal_breathing",
+        "clarify_breathing"
+      ],
+      "slots": {
+        "normal_breathing": {
+          "type": "boolean",
+          "cpr_trigger_value": false
+        },
+        "agonal_breathing": {
+          "type": "boolean",
+          "cpr_trigger_value": true
+        }
+      }
+    },
+    "S4_SUSPECTED_ARREST": {
+      "allowed_intents": [
+        "emergency_called",
+        "continue_cpr",
+        "clarify_breathing"
+      ],
+      "slots": {
+        "normal_breathing": {
+          "type": "boolean",
+          "cpr_trigger_value": false
+        },
+        "agonal_breathing": {
+          "type": "boolean",
+          "cpr_trigger_value": true
+        }
+      }
+    },
+    "S5_CALL_EMERGENCY": {
+      "allowed_intents": [
+        "emergency_called",
+        "ask_emergency_call"
+      ],
+      "slots": {}
+    },
+    "S6_CPR_READY": {
+      "allowed_intents": [
+        "continue_cpr",
+        "ask_next_step",
+        "step_done",
+        "compressions_reported"
+      ],
+      "slots": {}
+    }
+  }
+}

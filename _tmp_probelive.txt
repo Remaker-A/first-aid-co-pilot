@@ -1,0 +1,19 @@
+﻿
+> firstaid-copilot-agent-core@0.1.0 probe:live
+> node scripts/liveSpeechScenarioProbe.mjs
+
+Live speech flow probe: PASS
+session=live_probe_main steps=10/10
+segments_asserted=10 stages=S1_SCENE_SAFE,S2_CHECK_RESPONSE,S3_CHECK_BREATHING,S4_SUSPECTED_ARREST,S5_CALL_EMERGENCY,S6_CPR_READY,S7_CPR_LOOP
+core_regression(S6->S7 rule_flow_fast_path)=PASS (s6_ready_fast_path)
+report=D:\鏂囨。\Codex\first aid\artifacts\live-speech-flow-2026-06-04T19-57-37-680Z.json
+[PASS]       01 p1_start stages=- source=- final_intent=none events=1
+[PASS]       02 p2_context_gps stages=- source=- final_intent=none events=0
+[PASS]       03 s1_session_started stages=S1_SCENE_SAFE source=state_machine final_intent=none events=6
+[PASS]       04 s2_scene_safe stages=S2_CHECK_RESPONSE source=state_machine final_intent=scene_safe events=6
+[PASS]       05 s3_unresponsive stages=S3_CHECK_BREATHING source=state_machine_critical final_intent=patient_unresponsive events=6
+[PASS]       06 s4_to_s6_autoadvance stages=S4_SUSPECTED_ARREST>S5_CALL_EMERGENCY>S6_CPR_READY source=state_machine_critical final_intent=agonal_breathing events=18
+[PASS] CORE  07 s6_ready_fast_path stages=S7_CPR_LOOP source=rule_flow_fast_path final_intent=continue_cpr events=6
+[PASS] bonus 08 s7_ask_quality stages=S7_CPR_LOOP source=rule_fast_path final_intent=ask_cpr_quality events=6
+[PASS] bonus 09 s7_ask_can_stop stages=S7_CPR_LOOP source=rule_fast_path final_intent=ask_can_stop events=6
+[PASS] bonus 10 s7_ask_aed stages=S7_CPR_LOOP source=rule_fast_path final_intent=ask_aed_help events=6

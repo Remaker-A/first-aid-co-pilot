@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { canUseSpeechDaemon, requestTtsDaemon } from "./speechDaemon.js";
+import { normalizeForTts } from "./ttsText.js";
 
 const VOICE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(VOICE_DIR, "..", "..");
@@ -58,7 +59,8 @@ export function resolveTtsPlan(options = {}) {
   const modelDir = firstNonEmpty(options.modelDir, process.env.SPEECH_TTS_MODEL_DIR) || DEFAULT_MODEL_DIR;
   const timeoutMs = positiveNumber(options.timeoutMs, process.env.VOICE_TTS_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
   const sid = numberValue(options.sid, process.env.SPEECH_TTS_SID, 0);
-  const speed = positiveNumber(options.speed, process.env.SPEECH_TTS_SPEED, 1);
+  const speed = positiveNumber(options.speed, process.env.SPEECH_TTS_SPEED, 1.1);
+  const gain = positiveNumber(options.gain, process.env.SPEECH_TTS_GAIN, 1.4);
   const numThreads = positiveNumber(options.numThreads, process.env.SPEECH_TTS_NUM_THREADS, 2);
   const explicitCommand = firstNonEmpty(
     options.sherpaCommand,
@@ -77,6 +79,7 @@ export function resolveTtsPlan(options = {}) {
         modelDir,
         sid,
         speed,
+        gain,
         numThreads,
         timeoutMs,
         explicit: true,
@@ -104,6 +107,7 @@ export function resolveTtsPlan(options = {}) {
     modelDir,
     sid,
     speed,
+    gain,
     numThreads,
     timeoutMs,
     explicit: false,
@@ -130,6 +134,8 @@ export function buildTtsInvocation(plan, { text, outputPath }) {
     String(plan.sid ?? 0),
     "--speed",
     String(plan.speed ?? 1),
+    "--gain",
+    String(plan.gain ?? 1),
   ];
   if (plan.numThreads) {
     args.push("--num-threads", String(plan.numThreads));
@@ -141,10 +147,13 @@ async function synthesizeWithSherpa(text, plan) {
   await fs.mkdir(RUNTIME_DIR, { recursive: true });
   const fileName = `tts-${Date.now()}-${Math.random().toString(16).slice(2)}.wav`;
   const outputPath = path.join(RUNTIME_DIR, fileName);
+  // Speak Chinese digit readings so VITS does not drop pitch on Arabic numbers;
+  // keep the original text on the returned result for UI/logging/assertions.
+  const speakText = normalizeForTts(text);
 
   if (canUseSpeechDaemon(plan)) {
     try {
-      await requestTtsDaemon(plan, { text, outputPath });
+      await requestTtsDaemon(plan, { text: speakText, outputPath });
       await assertAudioFile(outputPath);
       return createSherpaResult({ text, fileName, outputPath, daemon: true });
     } catch {
@@ -153,7 +162,7 @@ async function synthesizeWithSherpa(text, plan) {
     }
   }
 
-  const { command, args } = buildTtsInvocation(plan, { text, outputPath });
+  const { command, args } = buildTtsInvocation(plan, { text: speakText, outputPath });
   const result = await runCommand(command, args, plan.timeoutMs);
 
   if (result.exitCode !== 0) {

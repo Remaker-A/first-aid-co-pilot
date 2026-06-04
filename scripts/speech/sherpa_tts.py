@@ -111,8 +111,11 @@ def build_tts(model_dir, num_threads):
     return sherpa_onnx.OfflineTts(config)
 
 
-def write_wave(path, samples, sample_rate):
-    clipped = np.clip(samples, -1.0, 1.0)
+def write_wave(path, samples, sample_rate, gain=1.0):
+    arr = np.asarray(samples, dtype=np.float32)
+    if gain and gain != 1.0:
+        arr = arr * float(gain)
+    clipped = np.clip(arr, -1.0, 1.0)
     pcm = (clipped * 32767.0).astype("<i2")
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     with wave.open(path, "wb") as wav:
@@ -122,11 +125,11 @@ def write_wave(path, samples, sample_rate):
         wav.writeframes(pcm.tobytes())
 
 
-def synthesize_to_file(tts, text, output, sid, speed):
+def synthesize_to_file(tts, text, output, sid, speed, gain=1.0):
     audio = tts.generate(text, sid=sid, speed=speed)
     if audio is None or len(audio.samples) == 0:
         raise RuntimeError("TTS produced no samples.")
-    write_wave(output, np.asarray(audio.samples, dtype=np.float32), audio.sample_rate)
+    write_wave(output, np.asarray(audio.samples, dtype=np.float32), audio.sample_rate, gain)
     return audio
 
 
@@ -152,7 +155,8 @@ def serve_tts(args):
             if not output:
                 raise ValueError("missing out")
 
-            audio = synthesize_to_file(tts, text, output, args.sid, args.speed)
+            gain = request.get("gain", args.gain)
+            audio = synthesize_to_file(tts, text, output, args.sid, args.speed, gain)
             response = {
                 "ok": True,
                 "path": output,
@@ -175,7 +179,8 @@ def main():
     parser.add_argument("--output")
     parser.add_argument("--text")
     parser.add_argument("--sid", type=int, default=0)
-    parser.add_argument("--speed", type=float, default=1.0)
+    parser.add_argument("--speed", type=float, default=1.1)
+    parser.add_argument("--gain", type=float, default=1.4)
     parser.add_argument("--num-threads", type=int, default=2)
     parser.add_argument("--serve", action="store_true")
     args = parser.parse_args()
@@ -193,7 +198,7 @@ def main():
 
     try:
         tts = build_tts(args.model_dir, args.num_threads)
-        audio = synthesize_to_file(tts, text, args.output, args.sid, args.speed)
+        audio = synthesize_to_file(tts, text, args.output, args.sid, args.speed, args.gain)
     except Exception as error:  # noqa: BLE001 - surface a clean error to the adapter
         log(f"synthesis failed: {error}")
         return 1

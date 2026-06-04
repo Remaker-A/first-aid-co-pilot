@@ -8,6 +8,7 @@ import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview as CameraPreview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -52,6 +53,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,6 +74,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.firstaid.copilot.live.AttentionMode
 import com.firstaid.copilot.live.ConnectionState
+import com.firstaid.copilot.live.DEMO_WAKE_PHRASE
 import com.firstaid.copilot.live.DemoTurn
 import com.firstaid.copilot.live.LiveSessionViewModel
 import com.firstaid.copilot.live.LiveUiState
@@ -85,7 +88,11 @@ import com.firstaid.copilot.live.demoPresetById
 import com.firstaid.copilot.live.demoPresets
 import com.firstaid.copilot.live.normalizeOverlayMode
 import com.firstaid.copilot.live.toAttentionMode
+import com.firstaid.copilot.live.vision.cpr.CprVisionAnalyzer
+import com.firstaid.copilot.live.vision.cpr.VisionCameraFacing
+import com.firstaid.copilot.live.vision.cpr.VisionCameraMount
 import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 
 @Composable
 fun LiveCprCoachScreen(
@@ -106,6 +113,7 @@ fun LiveCprCoachScreen(
     }
     var startAudioAfterPermission by remember { mutableStateOf(false) }
     var rmsLevel by remember { mutableFloatStateOf(0f) }
+    var liveAudioEnabled by remember { mutableStateOf(false) }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
@@ -116,24 +124,40 @@ fun LiveCprCoachScreen(
     val audioCapture = remember { LiveAudioCapture() }
     val ttsEdge = remember {
         AndroidTextToSpeechEdge(context) { speaking ->
-            viewModel.setMicState(if (speaking) MicState.Speaking else MicState.Idle)
+            audioCapture.setTtsSpeaking(speaking)
+            // Single voice: duck the metronome under TTS, restore to full when done.
+            // The beat itself never pauses for TTS — only its volume changes.
+            metronome.setDucked(speaking)
+            viewModel.setMicState(
+                when {
+                    speaking -> MicState.Speaking
+                    liveAudioEnabled -> MicState.Listening
+                    else -> MicState.Idle
+                },
+            )
         }
     }
     fun startAudioCapture() {
-        viewModel.setMicState(MicState.Listening)
+        liveAudioEnabled = true
+        viewModel.startLiveAudio()
         audioCapture.start(
             onLevel = { level ->
                 mainHandler.post {
                     rmsLevel = level.coerceIn(0f, 0.25f) / 0.25f
                 }
             },
-            onSegment = { wavBase64 ->
+            onPcmChunk = { pcm16 ->
+                viewModel.sendLivePcm(pcm16)
+            },
+            onBargeIn = {
                 mainHandler.post {
-                    viewModel.submitTurn(audioBase64 = wavBase64, mimeType = "audio/wav")
+                    ttsEdge.stop()
+                    viewModel.sendLiveBargeIn()
                 }
             },
             onError = { message ->
                 mainHandler.post {
+                    liveAudioEnabled = false
                     viewModel.setMicState(MicState.Off)
                     viewModel.submitTurn(text = "录音失败：$message")
                 }
@@ -164,20 +188,14 @@ fun LiveCprCoachScreen(
             utteranceKey = state.lastActionId,
             priority = state.ttsPriority,
             interruptPolicy = state.ttsInterruptPolicy,
+            tone = state.ttsTone,
+            speed = state.ttsSpeed,
         )
-    }
-
-    LaunchedEffect(state.micState) {
-        if (state.micState == MicState.Speaking) {
-            audioCapture.pause()
-        } else {
-            audioCapture.resume()
-        }
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            metronome.stop()
+            metronome.release()
             audioCapture.release()
             ttsEdge.shutdown()
         }
@@ -198,6 +216,9 @@ fun LiveCprCoachScreen(
         CameraPreviewSurface(
             useCameraSource = useCameraSource,
             hasCameraPermission = hasCameraPermission,
+            enableVisionAnalysis = useCameraSource && state.currentStage.isCprVisionAnalysisStage(),
+            onVisionMetrics = viewModel::submitVisionMetrics,
+            onVisionUnavailable = viewModel::reportVisionUnavailable,
             onRequestCameraPermission = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) },
             modifier = Modifier.fillMaxSize(),
         )
@@ -240,13 +261,21 @@ fun LiveCprCoachScreen(
                 audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             },
             onStartFirstAid = { viewModel.startFirstAid() },
-            onSubmitText = { viewModel.submitTurn(text = it) },
+            onWakeEntry = { viewModel.triggerWakePhrase(DEMO_WAKE_PHRASE) },
+            onSubmitText = {
+                ttsEdge.stop()
+                viewModel.submitTurn(text = it)
+            },
             onStartAudio = { startAudioCapture() },
             onStopAudio = {
+                liveAudioEnabled = false
                 audioCapture.stop()
-                viewModel.setMicState(MicState.Off)
+                viewModel.stopLiveAudio()
             },
-            onReset = { viewModel.reset() },
+            onReset = {
+                ttsEdge.stop()
+                viewModel.reset()
+            },
             onOpenFixtureDebug = onOpenFixtureDebug,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -515,16 +544,24 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCorrectionArrow
 private fun CameraPreviewSurface(
     useCameraSource: Boolean,
     hasCameraPermission: Boolean,
+    enableVisionAnalysis: Boolean,
+    onVisionMetrics: (Map<String, Any?>) -> Unit,
+    onVisionUnavailable: (String) -> Unit,
     onRequestCameraPermission: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val latestOnVisionMetrics by rememberUpdatedState(onVisionMetrics)
+    val latestOnVisionUnavailable by rememberUpdatedState(onVisionUnavailable)
     val mainExecutor = remember {
         Executor { command -> Handler(Looper.getMainLooper()).post(command) }
     }
+    val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
+    val mainHandler = remember { Handler(Looper.getMainLooper()) }
     var previewView by remember { mutableStateOf<PreviewView?>(null) }
     var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+    var visionAnalyzer by remember { mutableStateOf<CprVisionAnalyzer?>(null) }
     var cameraError by remember { mutableStateOf<String?>(null) }
 
     Box(
@@ -553,9 +590,14 @@ private fun CameraPreviewSurface(
         }
     }
 
-    LaunchedEffect(useCameraSource, hasCameraPermission, previewView, lifecycleOwner) {
+    LaunchedEffect(useCameraSource, hasCameraPermission, enableVisionAnalysis, previewView, lifecycleOwner) {
         val view = previewView ?: return@LaunchedEffect
-        if (!useCameraSource || !hasCameraPermission) return@LaunchedEffect
+        if (!useCameraSource || !hasCameraPermission) {
+            visionAnalyzer?.close()
+            visionAnalyzer = null
+            cameraProvider?.unbindAll()
+            return@LaunchedEffect
+        }
         val future = ProcessCameraProvider.getInstance(context)
         future.addListener(
             {
@@ -564,9 +606,43 @@ private fun CameraPreviewSurface(
                     val preview = CameraPreview.Builder().build().also {
                         it.setSurfaceProvider(view.surfaceProvider)
                     }
+                    visionAnalyzer?.close()
+                    visionAnalyzer = null
+                    val analyzer = if (enableVisionAnalysis) {
+                        CprVisionAnalyzer(
+                            context = context,
+                            cameraFacing = VisionCameraFacing.Front,
+                            cameraMount = VisionCameraMount.SideFixed,
+                            mirrored = true,
+                            onMetrics = { metrics ->
+                                mainHandler.post { latestOnVisionMetrics(metrics) }
+                            },
+                            onUnavailable = { message ->
+                                mainHandler.post {
+                                    cameraError = message
+                                    latestOnVisionUnavailable(message)
+                                }
+                            },
+                        )
+                    } else {
+                        null
+                    }
+                    val analysis = analyzer?.let {
+                        ImageAnalysis.Builder()
+                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                            .build()
+                            .also { imageAnalysis ->
+                                imageAnalysis.setAnalyzer(analysisExecutor, it)
+                            }
+                    }
                     provider.unbindAll()
-                    provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview)
+                    if (analysis != null) {
+                        provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_FRONT_CAMERA, preview, analysis)
+                    } else {
+                        provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_FRONT_CAMERA, preview)
+                    }
                     cameraProvider = provider
+                    visionAnalyzer = analyzer
                     cameraError = null
                 }.onFailure {
                     cameraError = "相机预览不可用：${it.message}"
@@ -576,9 +652,11 @@ private fun CameraPreviewSurface(
         )
     }
 
-    DisposableEffect(cameraProvider) {
+    DisposableEffect(Unit) {
         onDispose {
+            visionAnalyzer?.close()
             cameraProvider?.unbindAll()
+            analysisExecutor.shutdown()
         }
     }
 }
@@ -638,6 +716,9 @@ private fun FlowProgressRail(currentStage: String?) {
 @Composable
 private fun LiveSubtitleLayer(state: LiveUiState) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+        state.partialTranscript?.let {
+            SubtitleLine(prefix = "你（实时）", text = it)
+        }
         state.lastUserTranscript?.let {
             SubtitleLine(prefix = "你", text = it)
         }
@@ -666,6 +747,7 @@ private fun LiveVoiceControls(
     hasAudioPermission: Boolean,
     onRequestAudioPermission: () -> Unit,
     onStartFirstAid: () -> Unit,
+    onWakeEntry: () -> Boolean,
     onSubmitText: (String) -> Unit,
     onStartAudio: () -> Unit,
     onStopAudio: () -> Unit,
@@ -706,6 +788,22 @@ private fun LiveVoiceControls(
                     Text("发送")
                 }
             }
+            if (!flowStarted) {
+                // Wake-word entry (Demo): routes through the same EntryAdapter as the
+                // always-available "一键急救" fallback below. A real offline wake engine
+                // would call viewModel.triggerWakePhrase(recognizedText) on this seam.
+                OutlinedButton(
+                    onClick = {
+                        if (onWakeEntry()) {
+                            if (!hasAudioPermission) onRequestAudioPermission() else onStartAudio()
+                        }
+                    },
+                    enabled = !state.isInFlight,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("语音唤起（Demo：有人没有呼吸了）")
+                }
+            }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(
                     enabled = !state.isInFlight || listening,
@@ -740,7 +838,7 @@ private fun LiveVoiceControls(
                 OutlinedButton(onClick = onOpenFixtureDebug) { Text("旧 Fixture") }
             }
             Text(
-                text = "麦克风：${state.micState.label}。TTS 播放时会暂停采集，避免半双工串音。",
+                text = "麦克风：${state.micState.label}。TTS 播放时保持采集，仅持续高阈值说话会打断播报。",
                 color = Color(0xFFCBD5E1),
                 fontSize = 12.sp,
             )
@@ -866,6 +964,9 @@ private fun SourceBadgeView(sourceBadge: SourceBadge) {
 
 private fun Context.hasPermission(permission: String): Boolean =
     checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+
+private fun String?.isCprVisionAnalysisStage(): Boolean =
+    this?.startsWith("S6") == true || this?.startsWith("S7") == true
 
 private val ConnectionState.label: String
     get() = when (this) {

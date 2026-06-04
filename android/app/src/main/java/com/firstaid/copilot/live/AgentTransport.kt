@@ -1,5 +1,8 @@
 package com.firstaid.copilot.live
 
+import com.firstaid.copilot.execution.GuidanceAction
+import kotlinx.coroutines.flow.Flow
+
 /**
  * The D3 transport abstraction seam between the Live ViewModel and the agent.
  *
@@ -21,4 +24,43 @@ interface AgentTransport {
     suspend fun reset(sessionId: String)
 
     suspend fun health(): Boolean
+}
+
+/**
+ * Full-duplex low-latency voice channel backed by `/ws/live`.
+ *
+ * It is intentionally separate from [AgentTransport]: HTTP turn/reset/health
+ * remain the stable fallback path while the live channel streams raw PCM and
+ * emits incremental events for subtitles, guidance, and future server audio.
+ */
+interface LiveAgentChannel {
+    val events: Flow<LiveAgentEvent>
+
+    fun connect(sessionId: String, mode: String = "demo_assisted")
+
+    fun updateContext(request: TurnRequest)
+
+    fun sendPcm(pcm16: ByteArray)
+
+    fun sendBargeIn()
+
+    fun reset()
+
+    fun close()
+}
+
+sealed interface LiveAgentEvent {
+    data class ConnectionChanged(val connected: Boolean, val message: String? = null) : LiveAgentEvent
+
+    data class PartialTranscript(val text: String) : LiveAgentEvent
+
+    data class FinalTranscript(val text: String, val intent: String?) : LiveAgentEvent
+
+    data class Guidance(val action: GuidanceAction, val response: TurnResponse?) : LiveAgentEvent
+
+    data class State(val currentStage: String?) : LiveAgentEvent
+
+    data class AudioChunk(val bytes: ByteArray) : LiveAgentEvent
+
+    data class Error(val message: String) : LiveAgentEvent
 }

@@ -1,5 +1,6 @@
 import { AgentStage } from "../domain/stages.js";
 import { createGuidanceAction } from "../domain/actionFactories.js";
+import { isActionableCprQualityEvent } from "./cprEventGuards.js";
 
 const TARGET_BPM = 110;
 const RATE_LOW = 100;
@@ -28,7 +29,19 @@ export function createRuleFeedbackAction(state = {}, event = null) {
 export function selectRuleFeedback(state = {}, event = null) {
   const metrics = readMetrics(state, event);
 
-  if (metrics.interruptionSeconds >= INTERRUPTION_SECONDS) {
+  // Interruption is the highest-priority, safety-first correction and is judged
+  // first. It fires whenever compressions have been interrupted past the
+  // threshold, UNLESS the rescuer is demonstrably still compressing at an
+  // actionable (out-of-range) rate — only then are the interruption seconds
+  // treated as stale and deferred to the rate correction. A zero rate or
+  // compressions_started === false counts as "stopped", never a fresh rate, so
+  // a stopped rescuer with an interruption always gets "不要停，继续按压。".
+  const hasActionableFreshRate =
+    metrics.hasFreshCompressionRate &&
+    metrics.compressionRate !== null &&
+    (metrics.compressionRate < RATE_LOW || metrics.compressionRate > RATE_HIGH);
+
+  if (metrics.interruptionSeconds >= INTERRUPTION_SECONDS && !hasActionableFreshRate) {
     return {
       type: RuleFeedbackType.INTERRUPTION,
       intent: "correct_compression_interruption",
@@ -68,11 +81,11 @@ export function selectRuleFeedback(state = {}, event = null) {
       reasonCodes: ["compression_rate_low", `rate_${Math.round(metrics.compressionRate)}_per_min`],
       throttleKey: "correction.rate_low",
       minIntervalMs: 8000,
-      tts: { text: "再快一点，跟着震动按。", tone: "calm_firm" },
+      tts: { text: "再快一点，跟着节拍按。", tone: "calm_firm" },
       ui: {
         mainText: "按压偏慢",
         secondaryText: "目标 100-120 次/分钟",
-        statusTags: ["偏慢", "跟着震动"],
+        statusTags: ["偏慢", "跟着节拍"],
       },
       visualOverlay: { mode: "rate_feedback" },
       logDetail: "compression_rate_low",
@@ -87,11 +100,11 @@ export function selectRuleFeedback(state = {}, event = null) {
       reasonCodes: ["compression_rate_high", `rate_${Math.round(metrics.compressionRate)}_per_min`],
       throttleKey: "correction.rate_high",
       minIntervalMs: 8000,
-      tts: { text: "稍微慢一点，跟着震动按。", tone: "calm_firm" },
+      tts: { text: "稍微慢一点，跟着节拍按。", tone: "calm_firm" },
       ui: {
         mainText: "按压偏快",
         secondaryText: "目标 100-120 次/分钟",
-        statusTags: ["偏快", "跟着震动"],
+        statusTags: ["偏快", "跟着节拍"],
       },
       visualOverlay: { mode: "rate_feedback" },
       logDetail: "compression_rate_high",
@@ -144,7 +157,7 @@ export function selectRuleFeedback(state = {}, event = null) {
       reasonCodes: ["aed_available"],
       throttleKey: "assistance.aed",
       minIntervalMs: 15000,
-      tts: { text: "有人取到 AED 时，你继续按压，听设备提示。", tone: "calm_firm" },
+      tts: { text: "打开 AED，跟着它的语音做，先继续按压。", tone: "calm_firm" },
       ui: {
         mainText: "AED 到达",
         secondaryText: "继续胸外按压",
@@ -192,19 +205,26 @@ function buildFeedbackAction(state, feedback, event) {
 }
 
 function readMetrics(state, event) {
-  const eventQuality = event?.cpr_quality ?? {};
+  const eventQuality = isActionableCprQualityEvent(event) ? event?.cpr_quality ?? {} : {};
   const cprState = state.cpr_state ?? {};
   const rescuerState = { ...(state.rescuer_state ?? {}), ...(event?.rescuer_state ?? {}) };
+  const eventCompressionRate = firstNumber(
+    eventQuality.compression_rate,
+    eventQuality.compression_rate_bpm,
+    eventQuality.current_rate,
+    eventQuality.rate
+  );
 
   return {
     handPosition: firstDefined(eventQuality.hand_position, cprState.hand_position),
     compressionRate: firstNumber(
-      eventQuality.compression_rate,
-      eventQuality.compression_rate_bpm,
-      eventQuality.current_rate,
-      eventQuality.rate,
+      eventCompressionRate,
       cprState.current_rate
     ),
+    hasFreshCompressionRate:
+      eventCompressionRate !== null &&
+      eventCompressionRate !== 0 &&
+      eventQuality.compressions_started !== false,
     interruptionSeconds: firstNumber(
       eventQuality.interruption_seconds,
       eventQuality.last_interruption_seconds,

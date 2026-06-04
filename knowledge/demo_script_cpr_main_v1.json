@@ -213,12 +213,12 @@
       },
       "expected_agent": {
         "intent": "guide_cpr_position",
-        "tts": "让他平躺在硬的平面上。双手掌根放在胸口中央。",
-        "ui_main_text": "胸口中央"
+        "tts": "让他平躺在硬地面，双手掌根放在胸口中央。如果手机能稳住，放在患者胸侧，屏幕朝向你；放不好不要耽误，立刻开始按压。",
+        "ui_main_text": "硬地面 · 胸口中央 · 不延误按压"
       },
       "handover_log": {
         "type": "cpr_ready",
-        "detail": "hard_surface_and_chest_center_guidance"
+        "detail": "hard_ground_chest_center_phone_chest_side_if_stable_no_cpr_delay"
       }
     },
     {
@@ -243,7 +243,7 @@
       },
       "expected_agent": {
         "intent": "start_metronome",
-        "tts": "跟着震动按，快速有力。",
+        "tts": "跟着节拍按，快速有力。",
         "ui_main_text": "开始按压"
       },
       "handover_log": {
@@ -443,7 +443,7 @@
       },
       "expected_agent": {
         "intent": "guide_aed_assist",
-        "tts": "有人取到 AED 时，你继续按压，听设备提示。",
+        "tts": "打开 AED，跟着它的语音做，先继续按压。",
         "ui_main_text": "AED 到达"
       },
       "handover_log": {
@@ -496,7 +496,7 @@
       },
       "expected_agent": {
         "intent": "generate_handover_report",
-        "tts": "急救员到达，我正在生成交接报告。",
+        "tts": "急救员到达，把位置让给他们，后面听他们的；我正在生成交接报告。",
         "ui_main_text": "交接报告"
       },
       "handover_log": {
@@ -544,4 +544,3 @@
     "video_record": "已本地保存，等待用户同意分享"
   }
 }
-

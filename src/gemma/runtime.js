@@ -2,6 +2,8 @@ import { spawn } from "node:child_process";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { buildGemmaMessages, buildGemmaPrompt } from "./promptBuilder.js";
+import { buildGemmaNluMessages } from "./nluPrompt.js";
+import { parseGemmaNluResponse } from "./nluResponseParser.js";
 import { parseGemmaResponse } from "./responseParser.js";
 import { createGemmaFallbackPatch } from "./fallbackPolicy.js";
 import { requestGemma } from "./gemmaServer.js";
@@ -13,6 +15,14 @@ import {
   resolveGemmaConfig
 } from "./modelConfig.js";
 
+export const DEFAULT_GEMMA_NLU_TIMEOUT_MS = 600;
+export const DEFAULT_GEMMA_WARMUP_TIMEOUT_MS = 30000;
+
+const GEMMA_WARMUP_MESSAGES = Object.freeze([
+  { role: "system", content: "warmup" },
+  { role: "user", content: "warmup" }
+]);
+
 export class GemmaRuntime {
   constructor(options = {}) {
     this.options = options.config ? { ...options.config, ...options } : options;
@@ -22,6 +32,137 @@ export class GemmaRuntime {
 
   async generatePatch(frame) {
     return this.run(frame);
+  }
+
+  async parseUserIntent(frame) {
+    const config = resolveGemmaConfig(this.options);
+    const nluTimeoutMs = resolveGemmaNluTimeoutMs(this.options);
+    const requestConfig = {
+      ...config,
+      timeoutMs: nluTimeoutMs,
+      serveRequestTimeoutMs: nluTimeoutMs
+    };
+    const modelFile = await resolveModelFile(config);
+
+    if (!modelFile) {
+      return createNluFallbackResult(frame, "model_missing", {
+        message: `No Gemma model file found in ${config.modelDir}.`
+      });
+    }
+
+    const promptOptions = this.options.nluPromptOptions || this.options.promptOptions || {};
+    const messages = buildGemmaNluMessages(frame, promptOptions);
+    const prompt = config.supportsMessages
+      ? null
+      : buildCombinedPrompt(frame, messages, promptOptions);
+    const args = buildLiteRtLmArgs({
+      ...requestConfig,
+      modelFile,
+      messages,
+      prompt
+    });
+
+    let result = null;
+    if (config.daemon) {
+      try {
+        result = await this.serverRunner({
+          config: requestConfig,
+          messages,
+          prompt,
+          modelFile,
+          timeoutMs: nluTimeoutMs
+        });
+      } catch {
+        result = null;
+      }
+    }
+
+    if (!result) {
+      try {
+        result = await this.runner({
+          command: config.command,
+          args,
+          timeoutMs: nluTimeoutMs,
+          cwd: config.cwd,
+          env: config.env,
+          messages,
+          prompt,
+          modelFile,
+          backend: config.backend
+        });
+      } catch (error) {
+        return createNluFallbackResult(frame, classifyRunnerError(error), error);
+      }
+    }
+
+    if (result?.timedOut) {
+      return createNluFallbackResult(frame, "timeout", {
+        message: `Gemma NLU exceeded ${nluTimeoutMs}ms.`
+      });
+    }
+
+    if (result?.exitCode !== 0) {
+      return createNluFallbackResult(frame, "cli_exit_nonzero", {
+        message: result?.stderr || `Gemma CLI exited with code ${result?.exitCode}.`,
+        exitCode: result?.exitCode,
+        stderr: result?.stderr
+      });
+    }
+
+    const parsed = parseGemmaNluResponse(result?.stdout || "", frame);
+    if (!parsed.ok) {
+      return createNluFallbackResult(frame, parsed.error || "invalid_json", {
+        message: parsed.error || "Gemma NLU output was not a valid observation frame.",
+        violations: parsed.violations
+      });
+    }
+
+    return parsed;
+  }
+
+  // Process reuse: in daemon mode (`GEMMA_DAEMON`), `parseUserIntent`/`run`
+  // already reuse a single resident `serve` process — the daemon is cached in
+  // gemmaServer.js keyed by config + model file, so calls hit a warm process
+  // instead of cold-starting a 2.4GB model each turn. `prewarm` lets a caller
+  // pay the model-load cost up front (e.g. at session start) so the first real
+  // NLU turn is fast. It is best-effort and never throws: a failed warmup just
+  // means the first turn loads lazily, and one-shot (non-daemon) mode is left
+  // untouched so we never spawn a heavyweight child just to warm nothing.
+  async prewarm(options = {}) {
+    const config = resolveGemmaConfig(this.options);
+    if (!config.daemon) {
+      return { ok: true, warmed: false, reason: "daemon_disabled" };
+    }
+
+    let modelFile = null;
+    try {
+      modelFile = await resolveModelFile(config);
+    } catch {
+      modelFile = null;
+    }
+    if (!modelFile) {
+      return { ok: true, warmed: false, reason: "model_missing" };
+    }
+
+    const warmupTimeoutMs = positiveWarmupTimeout(
+      options.timeoutMs ?? options.warmupTimeoutMs,
+      config.serveReadyTimeoutMs,
+      config.serveRequestTimeoutMs
+    );
+    const messages = Array.isArray(options.messages) ? options.messages : GEMMA_WARMUP_MESSAGES;
+
+    try {
+      await this.serverRunner({
+        config: { ...config, serveRequestTimeoutMs: warmupTimeoutMs },
+        messages,
+        prompt: null,
+        modelFile,
+        timeoutMs: warmupTimeoutMs
+      });
+      return { ok: true, warmed: true, daemon: true };
+    } catch (error) {
+      return { ok: true, warmed: false, reason: "warmup_failed", error: normalizeError(error) };
+    }
   }
 
   async run(frame) {
@@ -102,6 +243,30 @@ export class GemmaRuntime {
 
     return parsed;
   }
+}
+
+function positiveWarmupTimeout(...values) {
+  for (const value of values) {
+    const number = Number(value);
+    if (Number.isFinite(number) && number > 0) {
+      return Math.floor(number);
+    }
+  }
+  return DEFAULT_GEMMA_WARMUP_TIMEOUT_MS;
+}
+
+export function resolveGemmaNluTimeoutMs(options = {}) {
+  const env = options.env || process.env;
+  const value = Number(
+    options.nluTimeoutMs ??
+    options.gemmaNluTimeoutMs ??
+    options.gemma_nlu_timeout_ms ??
+    env.GEMMA_NLU_TIMEOUT_MS
+  );
+
+  return Number.isFinite(value) && value > 0
+    ? Math.floor(value)
+    : DEFAULT_GEMMA_NLU_TIMEOUT_MS;
 }
 
 export async function findGemmaModelFile(
@@ -294,6 +459,25 @@ function createFallbackResult(frame, fallbackReason, error) {
     fallback: true,
     fallbackReason,
     reason: fallbackReason,
+    error: normalizeError(error),
+    violations: Array.isArray(error?.violations) ? error.violations : []
+  };
+}
+
+function createNluFallbackResult(frame, fallbackReason, error) {
+  return {
+    ok: false,
+    source: "gemma_nlu",
+    fallback: true,
+    fallbackReason,
+    reason: fallbackReason,
+    intent: null,
+    slots: {},
+    confidence: 0,
+    overall_confidence: 0,
+    needsClarification: true,
+    needs_clarification: true,
+    frame_stage: frame?.current_stage || null,
     error: normalizeError(error),
     violations: Array.isArray(error?.violations) ? error.violations : []
   };

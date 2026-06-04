@@ -60,6 +60,12 @@ export function createGuidanceAction(input = {}) {
     visual_overlay: input.visualOverlay ?? input.visual_overlay
       ? cloneJson(input.visualOverlay ?? input.visual_overlay)
       : null,
+    // Optional emergency-call briefing (location + symptoms script for 120).
+    // Only attached when the state machine supplies it (S5), so every other
+    // guidance action keeps its existing shape.
+    ...(input.callBrief ?? input.call_brief
+      ? { call_brief: cloneJson(input.callBrief ?? input.call_brief) }
+      : {}),
     tool_actions: Array.isArray(toolActions)
       ? toolActions.map((toolAction) => cloneJson(toolAction))
       : [],

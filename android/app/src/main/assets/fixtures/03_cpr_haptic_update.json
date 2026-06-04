@@ -14,14 +14,14 @@
   "throttle_key": "cpr.rate_feedback",
   "min_interval_ms": 3000,
   "tts": {
-    "text": "跟着震动按，稍微加快一点。",
+    "text": "跟着节拍按，稍微加快一点。",
     "tone": "calm_firm",
     "speed": "normal",
     "interrupt_policy": "do_not_interrupt_critical"
   },
   "ui": {
     "main_text": "稍微加快",
-    "secondary_text": "跟着震动节奏按压",
+    "secondary_text": "跟着节拍按压",
     "status_tags": [
       "CPR进行中",
       "频率偏慢"

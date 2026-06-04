@@ -1,11 +1,16 @@
 import {
   getGemmaAllowedIntents,
   getGemmaAllowedIntentsByStage,
+  getForbiddenIntents,
+  getNluConfidenceFloors,
+  getNluEscalationMarkers,
+  getNluStageConfig,
   getSafetyPhrases,
   getSpecialIntents
 } from "../knowledge/knowledgeBase.js";
 
 export const GUIDANCE_ACTION_PATCH_SCHEMA = "GuidanceActionPatch";
+export const NLU_OBSERVATION_SCHEMA = "NluObservationFrame";
 
 // Single source of truth: both decisionFrame (what Gemma is told it may do) and
 // actionValidator (what Gemma is enforced against) derive their allowed intents
@@ -72,6 +77,51 @@ export function createDecisionFrame({
   };
 }
 
+export function createNluFrame({
+  state = {},
+  event = {},
+  transcript,
+  stage,
+  allowedIntents,
+  slotsSchema,
+  perceptionSummary,
+  language = "zh-CN"
+} = {}) {
+  const currentStage =
+    stage || state.current_stage || event.stage_hint || event.stage || event.current_stage || "S0_INIT";
+  const stageConfig = getNluStageConfig(currentStage);
+  const resolvedSlots = normalizeNluSlotSchema(slotsSchema || stageConfig.slots);
+  const resolvedTranscript = normalizeTranscript(
+    firstDefined(
+      transcript,
+      event.transcript,
+      event.stt_text,
+      event.user_input?.stt_text,
+      event.user_input?.text
+    )
+  );
+
+  return {
+    session_id: state.session_id || event.session_id || "sess_unknown",
+    current_stage: currentStage,
+    transcript: resolvedTranscript,
+    allowed_intents: normalizeNluAllowedIntents(allowedIntents || stageConfig.allowed_intents),
+    allowed_slots: Object.keys(resolvedSlots),
+    slots_schema: resolvedSlots,
+    confidence_floors: getNluConfidenceFloors(),
+    facts: buildFacts(state, event),
+    user_input: normalizeUserInput({
+      ...(event.user_input || {}),
+      stt_text: resolvedTranscript
+    }),
+    perception_summary: perceptionSummary || buildPerceptionSummary(event, state),
+    escalation_markers: getNluEscalationMarkers(),
+    forbidden_intents: getForbiddenIntents(),
+    output_schema: NLU_OBSERVATION_SCHEMA,
+    language
+  };
+}
+
 export function normalizeAllowedIntents(stage, allowedIntents) {
   const fromKnowledge = getGemmaAllowedIntents(stage);
   const source =
@@ -82,6 +132,32 @@ export function normalizeAllowedIntents(stage, allowedIntents) {
         : ["fallback_template"];
 
   return uniqueStrings([...source, ...SPECIAL_GEMMA_INTENTS]);
+}
+
+export function normalizeNluAllowedIntents(allowedIntents) {
+  return uniqueStrings(allowedIntents || []);
+}
+
+export function normalizeNluSlotSchema(slotsSchema) {
+  if (!slotsSchema || typeof slotsSchema !== "object" || Array.isArray(slotsSchema)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(slotsSchema)
+      .filter(([, definition]) => definition && typeof definition === "object" && !Array.isArray(definition))
+      .map(([name, definition]) => [
+        name,
+        pruneNullish({
+          type: definition.type === "enum" ? "enum" : "boolean",
+          values: Array.isArray(definition.values) ? [...definition.values] : undefined,
+          floor: typeof definition.floor === "string" ? definition.floor : undefined,
+          cpr_trigger_value: definition.cpr_trigger_value,
+          description: typeof definition.description === "string" ? definition.description : "",
+          maps_to: typeof definition.maps_to === "string" ? definition.maps_to : name
+        })
+      ])
+  );
 }
 
 export function normalizeSafetyPhrases(stage, safetyPhrases) {
@@ -209,6 +285,10 @@ function normalizeRecentTtsItem(item) {
     text: item.text || "",
     seconds_ago: item.seconds_ago
   });
+}
+
+function normalizeTranscript(value) {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 function pruneNullish(value) {

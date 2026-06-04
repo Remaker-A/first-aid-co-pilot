@@ -120,7 +120,10 @@ export function normalizeAction(candidate = {}, state = {}, options = {}) {
     haptic: candidate.haptic || null,
     tool_action: toolActions.length === 0 ? null : toolActions,
     tool_actions: toolActions,
-    log_event: normalizeLogEvent(candidate.log_event, intent)
+    log_event: normalizeLogEvent(candidate.log_event, intent),
+    // Preserve the optional emergency-call briefing (set on the S5 action) so it
+    // survives validation/normalization and reaches the Live/HTTP response.
+    ...(candidate.call_brief ? { call_brief: candidate.call_brief } : {})
   };
 }
 

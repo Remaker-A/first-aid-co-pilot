@@ -40,6 +40,29 @@ class OfflineFallbackReducerTest {
         assertEquals(ConnectionState.Offline, next.connectionState)
         assertEquals("继续按压", next.mainText)
         assertEquals(80, next.qualityScore)
+        assertEquals(true, next.haptic.enabled)
+        assertEquals(110, next.haptic.bpm)
+    }
+
+    @Test
+    fun repeatedOfflineFailuresKeepTheBeatTickingWithoutServerMessages() {
+        // Once the beat is local-self-sustaining, no further server turn is needed
+        // to keep it alive: each subsequent offline failure must keep haptic enabled.
+        var state = LiveUiState(
+            currentStage = "S7_CPR_LOOP",
+            haptic = HapticState(enabled = true, bpm = 110),
+            isInFlight = true,
+        )
+
+        repeat(3) {
+            state = reduceTurnResult(
+                state,
+                TurnResult.Failure(TransportError(TransportErrorKind.NETWORK, "still offline")),
+            )
+            assertEquals(ConnectionState.Offline, state.connectionState)
+            assertEquals(true, state.haptic.enabled)
+            assertEquals(110, state.haptic.bpm)
+        }
     }
 
     @Test
