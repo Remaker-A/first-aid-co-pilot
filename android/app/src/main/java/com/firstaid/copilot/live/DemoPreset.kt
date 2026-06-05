@@ -195,7 +195,7 @@ val demoPresets: List<DemoPreset> = listOf(
     DemoPreset(
         id = "aed_arrived",
         label = "AED arrived",
-        summary = "CPR 中的视觉 AED 到达事件：会进入 S8_ASSISTANCE，TTS 应继续按压并听设备提示",
+        summary = "CPR 中的视觉 AED 到达事件：会进入 S8_ASSISTANCE，TTS 应继续按压并跟着 AED 语音",
         eventSource = "vision_patient",
         eventType = "patient_state_update",
         metadata = mapOf(

@@ -11,6 +11,7 @@ import android.media.audiofx.NoiseSuppressor
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import com.firstaid.copilot.live.HapticState
+import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.Locale
@@ -341,13 +342,14 @@ class LiveAudioCapture {
     fun start(
         onLevel: (Float) -> Unit,
         onPcmChunk: (ByteArray) -> Unit,
+        onUtterancePcm: ((ByteArray) -> Unit)? = null,
         onBargeIn: () -> Unit,
         onError: (String) -> Unit,
     ) {
         if (!running.compareAndSet(false, true)) return
         scope.launch {
             runCatching {
-                captureLoop(onLevel, onPcmChunk, onBargeIn)
+                captureLoop(onLevel, onPcmChunk, onUtterancePcm, onBargeIn)
             }.onFailure {
                 running.set(false)
                 onError(it.message ?: "Audio capture failed")
@@ -382,6 +384,7 @@ class LiveAudioCapture {
     private fun captureLoop(
         onLevel: (Float) -> Unit,
         onPcmChunk: (ByteArray) -> Unit,
+        onUtterancePcm: ((ByteArray) -> Unit)?,
         onBargeIn: () -> Unit,
     ) {
         val minBuffer = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, PCM_FORMAT)
@@ -403,6 +406,7 @@ class LiveAudioCapture {
         var bargeInVoicedMs = 0
         var voiceActive = false
         var bargeInSentForUtterance = false
+        val utterancePcm = ByteArrayOutputStream(FRAME_SAMPLES * BYTES_PER_SAMPLE * 32)
 
         try {
             audioRecord.startRecording()
@@ -417,8 +421,9 @@ class LiveAudioCapture {
 
                 val rms = readBuffer.rms(count)
                 val frameMs = (count * 1000 / SAMPLE_RATE).coerceAtLeast(1)
+                val framePcm = readBuffer.toPcmBytes(count)
                 onLevel(rms)
-                onPcmChunk(readBuffer.toPcmBytes(count))
+                onPcmChunk(framePcm)
 
                 if (ttsSpeaking.get()) {
                     val bargeInSpeech = rms >= BARGE_IN_RMS_THRESHOLD
@@ -434,6 +439,7 @@ class LiveAudioCapture {
                 bargeInVoicedMs = 0
                 val speech = rms >= LISTENING_RMS_THRESHOLD
                 if (speech) {
+                    utterancePcm.write(framePcm)
                     silenceMs = 0
                     voicedMs += frameMs
                     if (voicedMs >= MIN_UTTERANCE_MS) {
@@ -444,12 +450,19 @@ class LiveAudioCapture {
                         }
                     }
                 } else if (voiceActive) {
+                    utterancePcm.write(framePcm)
                     silenceMs += frameMs
                 } else {
                     voicedMs = 0
+                    if (utterancePcm.size() > 0) utterancePcm.reset()
                 }
 
                 if (voiceActive && silenceMs >= COMMIT_SILENCE_MS) {
+                    val committed = utterancePcm.toByteArray()
+                    if (committed.isNotEmpty()) {
+                        onUtterancePcm?.invoke(committed)
+                    }
+                    utterancePcm.reset()
                     voiceActive = false
                     silenceMs = 0
                     voicedMs = 0

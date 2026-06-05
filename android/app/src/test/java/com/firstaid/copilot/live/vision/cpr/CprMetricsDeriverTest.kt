@@ -138,8 +138,8 @@ class CprMetricsDeriverTest {
             this[CprMetricsDeriver.LEFT_HIP] = CprLandmark(0.42 + shiftX, 0.75, confidence)
             this[CprMetricsDeriver.RIGHT_HIP] = CprLandmark(0.58 + shiftX, 0.75, confidence)
             if (bentArms) {
-                this[CprMetricsDeriver.LEFT_ELBOW] = CprLandmark(0.48 + shiftX, 0.42, confidence)
-                this[CprMetricsDeriver.RIGHT_ELBOW] = CprLandmark(0.52 + shiftX, 0.42, confidence)
+                this[CprMetricsDeriver.LEFT_ELBOW] = CprLandmark(0.58 + shiftX, 0.44, confidence)
+                this[CprMetricsDeriver.RIGHT_ELBOW] = CprLandmark(0.42 + shiftX, 0.44, confidence)
             } else {
                 this[CprMetricsDeriver.LEFT_ELBOW] = CprLandmark(0.45 + shiftX, 0.40, confidence)
                 this[CprMetricsDeriver.RIGHT_ELBOW] = CprLandmark(0.55 + shiftX, 0.40, confidence)

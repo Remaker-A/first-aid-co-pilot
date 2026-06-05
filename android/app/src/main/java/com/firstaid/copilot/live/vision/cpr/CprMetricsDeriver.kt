@@ -394,7 +394,7 @@ class CprMetricsDeriver(
             angleDeg(shoulder, elbow, wrist)?.let { angles.add(it) }
         }
         if (angles.isEmpty()) return null
-        return angles.average() >= options.armStraightDeg
+        return angles.none { it < options.armStraightDeg }
     }
 
     private fun computeQualityScore(

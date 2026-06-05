@@ -64,19 +64,19 @@ const samples = [
     }),
   },
   {
-    title: "2. 震动节拍器 start（开始按压，跟随震动）",
+    title: "2. 节拍器 start（开始按压，跟随节拍）",
     action: action({
       intent: "start_cpr_loop",
       priority: "critical",
       stage: "S7_CPR_LOOP",
-      tts: { text: "现在开始胸外按压，跟着震动快速有力地按。", tone: "calm_firm", speed: "normal", interrupt_policy: "interrupt_lower_priority" },
-      ui: { main_text: "开始按压", secondary_text: "目标 100-120 次/分钟", status_tags: ["快速有力", "跟着震动"], quality_score: 32, primary_button: null },
+      tts: { text: "现在开始按压，跟着节拍，用力快压。", tone: "calm_firm", speed: "normal", interrupt_policy: "interrupt_lower_priority" },
+      ui: { main_text: "开始按压", secondary_text: "目标 100-120 次/分钟", status_tags: ["快速有力", "跟着节拍"], quality_score: 32, primary_button: null },
       haptic: { enabled: true, pattern: "metronome", bpm: 110 },
       tool_actions: [{ type: "start_haptic_metronome", bpm: 110, requires_user_confirmation: false }],
     }),
   },
   {
-    title: "3. 震动节拍器 stop（急救员接手，停止节拍）",
+    title: "3. 节拍器 stop（急救员接手，停止节拍）",
     action: action({
       intent: "stop_cpr_loop",
       priority: "normal",

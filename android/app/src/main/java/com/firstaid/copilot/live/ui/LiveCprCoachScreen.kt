@@ -53,6 +53,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -66,6 +67,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -80,19 +82,26 @@ import com.firstaid.copilot.live.LiveSessionViewModel
 import com.firstaid.copilot.live.LiveUiState
 import com.firstaid.copilot.live.MicState
 import com.firstaid.copilot.live.SourceBadge
-import com.firstaid.copilot.live.audio.AndroidTextToSpeechEdge
 import com.firstaid.copilot.live.audio.LiveAudioCapture
 import com.firstaid.copilot.live.audio.MetronomeController
 import com.firstaid.copilot.live.demoCprSetupSequence
 import com.firstaid.copilot.live.demoPresetById
 import com.firstaid.copilot.live.demoPresets
+import com.firstaid.copilot.live.edge.EdgeModelKind
+import com.firstaid.copilot.live.edge.EdgeModelReport
+import com.firstaid.copilot.live.edge.EdgeTextToSpeechEdge
+import com.firstaid.copilot.live.edge.OnDeviceGemmaDriver
+import com.firstaid.copilot.live.edge.buildSherpaSpeechEngine
+import com.firstaid.copilot.live.edge.inspectEdgeModels
 import com.firstaid.copilot.live.normalizeOverlayMode
 import com.firstaid.copilot.live.toAttentionMode
 import com.firstaid.copilot.live.vision.cpr.CprVisionAnalyzer
 import com.firstaid.copilot.live.vision.cpr.VisionCameraFacing
 import com.firstaid.copilot.live.vision.cpr.VisionCameraMount
+import java.io.File
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
+import kotlinx.coroutines.launch
 
 @Composable
 fun LiveCprCoachScreen(
@@ -100,6 +109,7 @@ fun LiveCprCoachScreen(
     onOpenFixtureDebug: () -> Unit = {},
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val attentionMode = state.attentionModeInputs.toAttentionMode()
 
@@ -114,6 +124,9 @@ fun LiveCprCoachScreen(
     var startAudioAfterPermission by remember { mutableStateOf(false) }
     var rmsLevel by remember { mutableFloatStateOf(0f) }
     var liveAudioEnabled by remember { mutableStateOf(false) }
+    var edgeReport by remember { mutableStateOf<EdgeModelReport?>(null) }
+    var edgeSummary by remember { mutableStateOf("Edge models: checking") }
+    var gemmaDriver by remember { mutableStateOf<OnDeviceGemmaDriver?>(null) }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
@@ -122,8 +135,9 @@ fun LiveCprCoachScreen(
 
     val metronome = remember { MetronomeController(context) }
     val audioCapture = remember { LiveAudioCapture() }
+    val edgeSpeechEngine = remember { buildSherpaSpeechEngine(context) }
     val ttsEdge = remember {
-        AndroidTextToSpeechEdge(context) { speaking ->
+        EdgeTextToSpeechEdge(context, edgeSpeechEngine) { speaking ->
             audioCapture.setTtsSpeaking(speaking)
             // Single voice: duck the metronome under TTS, restore to full when done.
             // The beat itself never pauses for TTS — only its volume changes.
@@ -138,6 +152,7 @@ fun LiveCprCoachScreen(
         }
     }
     fun startAudioCapture() {
+        val useLocalAsr = edgeReport?.asrReady == true
         liveAudioEnabled = true
         viewModel.startLiveAudio()
         audioCapture.start(
@@ -147,7 +162,22 @@ fun LiveCprCoachScreen(
                 }
             },
             onPcmChunk = { pcm16 ->
-                viewModel.sendLivePcm(pcm16)
+                if (!useLocalAsr) {
+                    viewModel.sendLivePcm(pcm16)
+                }
+            },
+            onUtterancePcm = { pcm16 ->
+                if (useLocalAsr) {
+                    coroutineScope.launch {
+                        viewModel.setMicState(MicState.Uploading)
+                        val result = edgeSpeechEngine.transcribePcm16(pcm16)
+                        if (result.ok && result.text.isNotBlank()) {
+                            viewModel.submitTurn(text = result.text)
+                        } else {
+                            viewModel.setMicState(MicState.Listening)
+                        }
+                    }
+                }
             },
             onBargeIn = {
                 mainHandler.post {
@@ -176,6 +206,43 @@ fun LiveCprCoachScreen(
 
     LaunchedEffect(Unit) {
         viewModel.connect()
+        val report = inspectEdgeModels(context, edgeSpeechEngine.runtimeAvailable())
+        edgeReport = report
+        edgeSummary = report.summaryLine()
+        launch {
+            var ttsWarmSummary = ""
+            var gemmaWarmSummary = ""
+            fun publishWarmSummary() {
+                edgeSummary = listOf(report.summaryLine(), ttsWarmSummary, gemmaWarmSummary)
+                    .filter(String::isNotBlank)
+                    .joinToString(" ")
+            }
+
+            if (report.ttsReady) {
+                val ttsWarmup = edgeSpeechEngine.synthesizeToWav(
+                    text = "继续按压",
+                    outputFile = File(context.cacheDir, "edge-tts/prewarm.wav"),
+                )
+                ttsWarmSummary = if (ttsWarmup.ok) {
+                    "TTSWarm=${ttsWarmup.latencyMs}ms"
+                } else {
+                    "TTSWarm=error"
+                }
+                publishWarmSummary()
+            }
+
+            report.status(EdgeModelKind.Gemma).path?.let { gemmaPath ->
+                val driver = OnDeviceGemmaDriver(context.applicationContext, File(gemmaPath))
+                gemmaDriver = driver
+                val warmup = driver.prewarm()
+                gemmaWarmSummary = if (warmup.ok) {
+                    "GemmaWarm=${warmup.latencyMs}ms"
+                } else {
+                    "GemmaWarm=error"
+                }
+                publishWarmSummary()
+            }
+        }
     }
 
     LaunchedEffect(state.haptic) {
@@ -198,6 +265,8 @@ fun LiveCprCoachScreen(
             metronome.release()
             audioCapture.release()
             ttsEdge.shutdown()
+            edgeSpeechEngine.close()
+            gemmaDriver?.close()
         }
     }
 
@@ -240,6 +309,14 @@ fun LiveCprCoachScreen(
             state = state,
             sourceBadge = displayBadge,
             useCameraSource = useCameraSource,
+            cameraNotice = state.lastErrorMessage?.takeIf {
+                useCameraSource && (
+                    it.contains("相机") ||
+                        it.contains("姿态") ||
+                        it.contains("实时识别") ||
+                        it.contains("pose_landmarker")
+                    )
+            },
             onCameraToggle = {
                 if (!hasCameraPermission && !useCameraSource) {
                     cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
@@ -277,6 +354,7 @@ fun LiveCprCoachScreen(
                 viewModel.reset()
             },
             onOpenFixtureDebug = onOpenFixtureDebug,
+            edgeSummary = edgeSummary,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(16.dp),
@@ -308,6 +386,7 @@ private fun TopStatusStrip(
     state: LiveUiState,
     sourceBadge: SourceBadge,
     useCameraSource: Boolean,
+    cameraNotice: String?,
     onCameraToggle: (Boolean) -> Unit,
     onOpenDemo: () -> Unit,
     modifier: Modifier = Modifier,
@@ -317,23 +396,51 @@ private fun TopStatusStrip(
         shape = RoundedCornerShape(24.dp),
         modifier = modifier.fillMaxWidth(),
     ) {
-        Row(
+        Column(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            StatusChip(state.connectionState.label, state.connectionState.color)
-            SourceBadgeView(sourceBadge)
-            Text(
-                text = state.currentStage ?: "等待状态",
-                color = Color.White,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f),
-            )
-            Text("Camera", color = Color.White, fontSize = 12.sp)
-            Switch(checked = useCameraSource, onCheckedChange = onCameraToggle)
-            OutlinedButton(onClick = onOpenDemo) {
-                Text("Demo")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                StatusChip(state.connectionState.label, state.connectionState.color)
+                SourceBadgeView(sourceBadge)
+                Text(
+                    text = state.currentStage ?: "等待状态",
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End,
+            ) {
+                Text("Camera", color = Color.White, fontSize = 12.sp)
+                Spacer(Modifier.width(8.dp))
+                Switch(checked = useCameraSource, onCheckedChange = onCameraToggle)
+                Spacer(Modifier.width(8.dp))
+                OutlinedButton(
+                    onClick = onOpenDemo,
+                    modifier = Modifier.height(36.dp),
+                ) {
+                    Text("Demo", fontSize = 12.sp)
+                }
+            }
+            cameraNotice?.let {
+                Text(
+                    text = it,
+                    color = Color(0xFFFCA5A5),
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
@@ -562,7 +669,6 @@ private fun CameraPreviewSurface(
     var previewView by remember { mutableStateOf<PreviewView?>(null) }
     var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     var visionAnalyzer by remember { mutableStateOf<CprVisionAnalyzer?>(null) }
-    var cameraError by remember { mutableStateOf<String?>(null) }
 
     Box(
         modifier = modifier.background(Color(0xFF111827)),
@@ -585,9 +691,6 @@ private fun CameraPreviewSurface(
             )
         }
 
-        cameraError?.let {
-            Text(text = it, color = Color(0xFFFCA5A5), modifier = Modifier.padding(24.dp))
-        }
     }
 
     LaunchedEffect(useCameraSource, hasCameraPermission, enableVisionAnalysis, previewView, lifecycleOwner) {
@@ -619,7 +722,6 @@ private fun CameraPreviewSurface(
                             },
                             onUnavailable = { message ->
                                 mainHandler.post {
-                                    cameraError = message
                                     latestOnVisionUnavailable(message)
                                 }
                             },
@@ -643,9 +745,9 @@ private fun CameraPreviewSurface(
                     }
                     cameraProvider = provider
                     visionAnalyzer = analyzer
-                    cameraError = null
                 }.onFailure {
-                    cameraError = "相机预览不可用：${it.message}"
+                    val message = "相机预览不可用：${it.message}"
+                    latestOnVisionUnavailable(message)
                 }
             },
             mainExecutor,
@@ -753,6 +855,7 @@ private fun LiveVoiceControls(
     onStopAudio: () -> Unit,
     onReset: () -> Unit,
     onOpenFixtureDebug: () -> Unit,
+    edgeSummary: String,
     modifier: Modifier = Modifier,
 ) {
     var text by remember { mutableStateOf("") }
@@ -840,6 +943,11 @@ private fun LiveVoiceControls(
             Text(
                 text = "麦克风：${state.micState.label}。TTS 播放时保持采集，仅持续高阈值说话会打断播报。",
                 color = Color(0xFFCBD5E1),
+                fontSize = 12.sp,
+            )
+            Text(
+                text = edgeSummary,
+                color = Color(0xFF93C5FD),
                 fontSize = 12.sp,
             )
         }

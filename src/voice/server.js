@@ -694,7 +694,7 @@ export function renderDemoPage() {
       {
         id: "aed_arrived",
         label: "AED arrived",
-        summary: "CPR 中的视觉 AED 到达事件：会进入 S8_ASSISTANCE，TTS 应继续按压并听设备提示",
+        summary: "CPR 中的视觉 AED 到达事件：会进入 S8_ASSISTANCE，TTS 应继续按压并跟着 AED 语音",
         bestAfterCprSetup: true,
         payload: {
           eventSource: "vision_patient",

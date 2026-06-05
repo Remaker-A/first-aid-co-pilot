@@ -38,6 +38,15 @@ android {
     }
 }
 
+configurations.configureEach {
+    resolutionStrategy.force(
+        "org.jetbrains.kotlin:kotlin-stdlib:2.0.21",
+        "org.jetbrains.kotlin:kotlin-stdlib-common:2.0.21",
+        "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.0.21",
+        "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.0.21",
+    )
+}
+
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
     implementation(composeBom)
@@ -59,6 +68,7 @@ dependencies {
     val cameraxVersion = "1.4.1"
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.google.code.gson:gson:2.11.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycleVersion")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycleVersion")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:$lifecycleVersion")
@@ -67,6 +77,17 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
     implementation("com.google.mediapipe:tasks-vision:0.10.29")
+    // Runtime-only: this AAR is compiled with newer Kotlin metadata than the app.
+    // The Android edge driver calls its stable Java ABI through reflection.
+    runtimeOnly("com.google.ai.edge.litertlm:litertlm-android:0.12.0") {
+        isTransitive = false
+        exclude(group = "org.jetbrains.kotlin")
+    }
+
+    val sherpaOnnxAar = file("libs/sherpa-onnx-1.13.2.aar")
+    if (sherpaOnnxAar.exists()) {
+        implementation(files(sherpaOnnxAar))
+    }
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")

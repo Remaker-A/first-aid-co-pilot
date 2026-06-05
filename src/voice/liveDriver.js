@@ -504,7 +504,7 @@ function currentStageInstruction(stage) {
     case AgentStage.S2_CHECK_RESPONSE:
       return "请大声叫他，并轻拍双肩。";
     case AgentStage.S3_CHECK_BREATHING:
-      return "请看胸口 5 到 10 秒，有没有正常起伏？";
+      return "看他的胸口。只是偶尔大口喘，或者完全不动，都算没有呼吸。";
     case AgentStage.S4_SUSPECTED_ARREST:
       return "请按疑似心脏骤停处理。现在准备胸外按压。";
     case AgentStage.S5_CALL_EMERGENCY:
