@@ -5,10 +5,41 @@ import os from "node:os";
 import path from "node:path";
 
 import { buildTtsCacheKey } from "../src/voice/ttsText.js";
-import { TtsAudioCache, parseWav } from "../src/voice/ttsCache.js";
+import {
+  TtsAudioCache,
+  parseWav,
+  DEFAULT_TTS_CACHE_DIR,
+  TTS_CACHE_MANIFEST_NAME,
+  TTS_CACHE_SCHEMA_VERSION,
+} from "../src/voice/ttsCache.js";
 import { createStreamingTts } from "../src/voice/streamingTts.js";
 import { synthesizeSpeech } from "../src/voice/tts.js";
 import { encodePcm16Wav } from "../src/voice/liveSession.js";
+
+const REPO_ROOT = path.resolve(DEFAULT_TTS_CACHE_DIR, "..", "..");
+const ANDROID_TTS_CACHE_DIR = path.join(
+  REPO_ROOT,
+  "android",
+  "app",
+  "src",
+  "main",
+  "assets",
+  "tts_cache"
+);
+const SAFETY_PHRASES_PATH = path.join(REPO_ROOT, "knowledge", "safety_phrases.json");
+
+async function readJson(file) {
+  return JSON.parse(await fs.readFile(file, "utf8"));
+}
+
+async function fileExists(file) {
+  try {
+    const stat = await fs.stat(file);
+    return stat.isFile() && stat.size > 0;
+  } catch {
+    return false;
+  }
+}
 
 function fakeWavResult(bytes, sampleRate = 16000) {
   const wav = encodePcm16Wav(Buffer.from(bytes), { sampleRate });
@@ -166,4 +197,99 @@ test("synthesizeSpeech misses fall through to synthesis without caching mock aud
   assert.equal(result.provider, "mock");
   assert.equal(cache.has(buildTtsCacheKey("现场安全了吗")), false);
   assert.equal(cache.snapshotStats().misses >= 1, true);
+});
+
+// ---------------------------------------------------------------------------
+// Shipped WA bundle guard (P0-2): the committed/rendered manifest must stay
+// internally consistent and fresh so the desktop server and the on-device coach
+// never ship a stale or half-rendered cache.
+// ---------------------------------------------------------------------------
+
+async function assertManifestGuard(dir, label) {
+  const manifestPath = path.join(dir, TTS_CACHE_MANIFEST_NAME);
+  assert.equal(await fileExists(manifestPath), true, `${label}: manifest.json must exist`);
+  const manifest = await readJson(manifestPath);
+
+  assert.equal(manifest.schema_version, TTS_CACHE_SCHEMA_VERSION, `${label}: schema_version`);
+  assert.ok(Array.isArray(manifest.entries) && manifest.entries.length > 0, `${label}: entries`);
+
+  // Freshness: a manifest built against an older safety_phrases.json is stale and
+  // must be re-rendered, so the knowledge_version has to match the source of truth.
+  const safety = await readJson(SAFETY_PHRASES_PATH);
+  assert.equal(
+    manifest.knowledge_version,
+    safety.knowledge_version,
+    `${label}: stale cache — knowledge_version must match safety_phrases.json`
+  );
+
+  // Key integrity: every entry's key must be reproducible from its text + prosody.
+  for (const entry of manifest.entries) {
+    assert.ok(typeof entry.file === "string" && entry.file, `${label}: entry.file`);
+    assert.ok(typeof entry.text === "string" && entry.text, `${label}: entry.text`);
+    assert.equal(
+      entry.key,
+      buildTtsCacheKey(entry.text, { tone: entry.tone, speed: entry.speed }),
+      `${label}: entry.key must match buildTtsCacheKey(${entry.text})`
+    );
+  }
+
+  // When audio_rendered is true, every referenced WAV must exist on disk so we
+  // never ship a manifest that claims audio it does not have. A manifest-only
+  // build (audio_rendered:false) is a valid shippable state and skips this.
+  if (manifest.audio_rendered === true) {
+    for (const entry of manifest.entries) {
+      assert.equal(
+        await fileExists(path.resolve(dir, entry.file)),
+        true,
+        `${label}: audio_rendered=true but missing WAV ${entry.file}`
+      );
+    }
+  }
+
+  return manifest;
+}
+
+test("desktop WA bundle manifest is internally consistent and fresh", async () => {
+  await assertManifestGuard(DEFAULT_TTS_CACHE_DIR, "desktop");
+});
+
+test("android WA bundle manifest matches the desktop bundle (no drift)", async () => {
+  const desktop = await readJson(path.join(DEFAULT_TTS_CACHE_DIR, TTS_CACHE_MANIFEST_NAME));
+  const android = await assertManifestGuard(ANDROID_TTS_CACHE_DIR, "android");
+
+  // The on-device assets must cover at least the same closed-set keys the desktop
+  // ships, otherwise the edge coach would miss phrases the server caches.
+  const desktopKeys = new Set(desktop.entries.map((entry) => entry.key));
+  const androidKeys = new Set(android.entries.map((entry) => entry.key));
+  for (const key of desktopKeys) {
+    assert.equal(androidKeys.has(key), true, `android bundle missing desktop key: ${key}`);
+  }
+  assert.equal(
+    android.knowledge_version,
+    desktop.knowledge_version,
+    "android/desktop knowledge_version drift"
+  );
+});
+
+test("a rendered standard phrase replays from the shipped bundle (not synthesized)", async () => {
+  const manifest = await readJson(path.join(DEFAULT_TTS_CACHE_DIR, TTS_CACHE_MANIFEST_NAME));
+  if (manifest.audio_rendered !== true) {
+    // Manifest-only checkout: nothing to replay. The guard test above already
+    // verified consistency; the bundle-hit path is covered by the synthetic test.
+    return;
+  }
+
+  const phrase = manifest.entries.find((entry) => entry.kind === "phrase") || manifest.entries[0];
+  const cache = new TtsAudioCache({ bundleDir: DEFAULT_TTS_CACHE_DIR });
+  await cache.loadBundle();
+
+  // provider:"mock" guarantees a bundle MISS would fall through to mock audio, so a
+  // tts_cache provider proves the pre-rendered WAV was actually replayed (~0ms).
+  const result = await synthesizeSpeech(phrase.text, { cache, provider: "mock" });
+  assert.equal(result.provider, "tts_cache", `expected bundle hit for "${phrase.text}"`);
+  assert.equal(result.cached, true);
+  assert.ok(result.audio.data_url.startsWith("data:audio/wav;base64,"));
+
+  const stats = cache.snapshotStats();
+  assert.ok(stats.bundleHits >= 1, "bundle hit must be counted in the cache stats");
 });

@@ -29,6 +29,8 @@ test("inferIntent recognizes common zh-CN emergency call confirmations", () => {
 });
 
 test("inferIntent recognizes common zh-CN handover arrival phrases", () => {
+  assert.equal(inferIntent("120到了"), "paramedics_arrived");
+  assert.equal(inferIntent("120 到了"), "paramedics_arrived");
   assert.equal(inferIntent("救护车到了"), "paramedics_arrived");
   assert.equal(inferIntent("救货车到了。"), "paramedics_arrived");
   assert.equal(inferIntent("医生来了"), "paramedics_arrived");
@@ -41,11 +43,18 @@ test("inferIntent recognizes CPR live question intents", () => {
   assert.equal(inferIntent("我爱你的对吗？"), "ask_cpr_quality");
   assert.equal(inferIntent("我能不能停"), "ask_can_stop");
   assert.equal(inferIntent("我能不能听？"), "ask_can_stop");
-  assert.equal(inferIntent("AED 来了怎么办"), "ask_aed_help");
-  assert.equal(inferIntent("说颤姨来了怎么办？"), "ask_aed_help");
-  assert.equal(inferIntent("出差一来了怎么办？"), "ask_aed_help");
-  assert.equal(inferIntent("出差疑来了怎么办？"), "ask_aed_help");
-  assert.equal(inferIntent("说差姨来了怎么办？"), "ask_aed_help");
+  assert.equal(inferIntent("还要继续按吗？"), "ask_can_stop");
+  assert.equal(inferIntent("我们就一直按吗？"), "ask_can_stop");
+  assert.equal(inferIntent("一直按到什么时候？"), "ask_can_stop");
+  assert.equal(inferIntent("AED 怎么用"), "ask_aed_help");
+  assert.equal(inferIntent("AED 和按压怎么交替？"), "ask_aed_cpr_alternation");
+  assert.equal(inferIntent("按压和 AED 怎么配合？"), "ask_aed_cpr_alternation");
+  assert.equal(inferIntent("AED 来了怎么办"), "aed_available");
+  assert.equal(inferIntent("除颤仪到了"), "aed_available");
+  assert.equal(inferIntent("说颤姨来了"), "aed_available");
+  assert.equal(inferIntent("出差一来了"), "aed_available");
+  assert.equal(inferIntent("出差疑到了"), "aed_available");
+  assert.equal(inferIntent("说差姨来了"), "aed_available");
   assert.equal(inferIntent("现在怎么办"), "ask_next_step");
   assert.equal(inferIntent("要不要打120"), "ask_emergency_call");
 });

@@ -30,6 +30,10 @@ import {
 const DEFAULT_VOICE_EVENT_TTL_MS = 30 * 60 * 1000;
 const DEFAULT_GEMMA_LIVE_TIMEOUT_MS = 1200;
 const DEFAULT_GEMMA_TURN_TIMEOUT_MS = 1000;
+const DEFAULT_GEMMA_OPEN_QUESTION_LIVE_TIMEOUT_MS = 800;
+const DEFAULT_GEMMA_OPEN_QUESTION_TURN_TIMEOUT_MS = 1200;
+const DEFAULT_OPEN_QUESTION_CACHE_TTL_MS = 10 * 60 * 1000;
+const DEFAULT_OPEN_QUESTION_CACHE_MAX_ENTRIES = 64;
 const CPR_READINESS_FAST_PATH = "s6_readiness_continue_cpr";
 
 // At the S6 confirm gate, readiness/start phrases ("开始"/"可以了"/"没有呼吸"/
@@ -51,6 +55,13 @@ export function createVoiceDemoService(options = {}) {
   const sessions = new Map();
   const runtime = options.runtime || new GemmaRuntime(options.gemma || {});
   const now = options.now || (() => new Date().toISOString());
+  const env = options.env || process.env;
+  let startupPrewarm = null;
+  if (shouldPrewarmGemmaOnStart(options, env) && runtime && typeof runtime.prewarm === "function") {
+    startupPrewarm = runtime.prewarm({
+      timeoutMs: options.gemmaPrewarmTimeoutMs ?? options.gemma_prewarm_timeout_ms,
+    }).catch((error) => ({ ok: true, warmed: false, reason: "startup_prewarm_failed", error }));
+  }
   // Per-service NLU governance: an LRU result cache + per-session call budget so
   // repeated/fuzzy utterances skip the slow local model and one session cannot
   // hammer the CPU. Instance-scoped on purpose — no cross-session or cross-test
@@ -83,11 +94,19 @@ export function createVoiceDemoService(options = {}) {
       const guidanceAction = guidance.guidanceAction;
       const spokenText = guidanceAction?.tts?.text || guidance.stateAction?.tts?.text || "";
       const tts = await timed(timings, "tts_ms", () => synthesizeSpeech(spokenText, options.tts || {}));
-      // The open-question answer is generated asynchronously; HTTP is single-shot so
-      // we resolve it here (bounded by the Gemma timeout) and attach it as data. The
-      // primary spoken audio stays the immediate ack/flow line.
+      // Low-latency path: `/api/turn` returns the immediate ack/flow guidance and
+      // does not wait for the controlled Gemma Q&A answer. Live sessions keep the
+      // promise channel and stream the answer later; probes can opt back into the
+      // bounded wait when they explicitly need the resolved answer.
+      const shouldWaitForOpenQuestionAnswer =
+        input.waitForOpenQuestionAnswer === true ||
+        input.awaitOpenQuestionAnswer === true ||
+        options.waitForOpenQuestionAnswer === true ||
+        options.awaitOpenQuestionAnswer === true;
       const openQuestionAnswer = guidance.openQuestionAnswer
-        ? await guidance.openQuestionAnswer.promise.catch(() => null)
+        ? shouldWaitForOpenQuestionAnswer
+          ? summarizeOpenQuestionAnswer(await guidance.openQuestionAnswer.promise.catch(() => null))
+          : summarizeOpenQuestionChannel(guidance.openQuestionAnswer)
         : null;
       timings.total_ms = Date.now() - totalStart;
       const response = {
@@ -113,7 +132,7 @@ export function createVoiceDemoService(options = {}) {
         gemma: guidance.gemma,
         gemma_live: createGemmaLiveDebug(guidance.gemma, guidance.gemmaPlan),
         open_question: guidance.openQuestion === true,
-        open_question_answer: summarizeOpenQuestionAnswer(openQuestionAnswer),
+        open_question_answer: openQuestionAnswer,
         tts,
         timings,
         report: guidance.pipeline.report,
@@ -153,6 +172,9 @@ export function createVoiceDemoService(options = {}) {
     // Best-effort: pay the resident-daemon model-load cost up front so the first
     // real NLU turn is fast. No-op in one-shot (non-daemon) mode. Never throws.
     async prewarm(prewarmOptions = {}) {
+      if (startupPrewarm && prewarmOptions.reuseStartup !== false) {
+        return startupPrewarm;
+      }
       if (runtime && typeof runtime.prewarm === "function") {
         return runtime.prewarm(prewarmOptions);
       }
@@ -250,6 +272,8 @@ export async function runVoiceGuidanceCore({
       plan: gemmaPlan,
       state: pipeline.state,
       sessionId,
+      cache: session.openQuestionCache,
+      options,
     });
     gemma = createSkippedGemma("open_question_async");
   } else {
@@ -511,8 +535,8 @@ function planGemmaSupplement(stateAction, stt, context = {}) {
       live: cprLive,
       openQuestion: true,
       timeoutMs: cprLive
-        ? resolveGemmaLiveTimeoutMs(context.options)
-        : resolveGemmaTurnTimeoutMs(context.options),
+        ? resolveGemmaOpenQuestionTimeoutMs(context.options, { live: true })
+        : resolveGemmaOpenQuestionTimeoutMs(context.options, { live: false }),
       timeoutReason: "gemma_open_question_timeout",
     };
   }
@@ -569,13 +593,30 @@ function summarizeOpenQuestionAnswer(answer) {
   if (!answer) {
     return null;
   }
+  const metrics = answer.openQuestionMetrics || {};
   return {
     ok: answer.ok === true,
     fallback: answer.fallback === true,
     source: answer.source || null,
     response_type: answer.responseType || null,
     reason: answer.reason || null,
+    cache_hit: metrics.cache_hit === true || answer.cacheHit === true,
+    wait_ms: numberOrNull(metrics.wait_ms),
+    timeout_ms: numberOrNull(metrics.timeout_ms),
     action: answer.action || null,
+  };
+}
+
+function summarizeOpenQuestionChannel(channel) {
+  if (!channel) {
+    return null;
+  }
+  return {
+    pending: typeof channel.promise?.then === "function",
+    cache_hit: channel.cacheHit === true,
+    cache_key: channel.cacheKey || null,
+    timeout_ms: numberOrNull(channel.timeoutMs),
+    started_at_ms: numberOrNull(channel.startedAt),
   };
 }
 
@@ -597,10 +638,10 @@ function createGuidanceResponseSnapshot(guidance = {}) {
 }
 
 async function generateGemmaPatch(runtime, frame, plan = {}) {
-  const invoke = () =>
-    plan.promptOptions
-      ? runtime.generatePatch(frame, { promptOptions: plan.promptOptions })
-      : runtime.generatePatch(frame);
+  const invoke = () => runtime.generatePatch(frame, {
+    ...(plan.promptOptions ? { promptOptions: plan.promptOptions } : {}),
+    ...(plan.timeoutMs ? { timeoutMs: plan.timeoutMs } : {}),
+  });
 
   if (!plan.timeoutMs) {
     return invoke();
@@ -627,12 +668,64 @@ function buildOpenQuestionAck(stage, state, sessionId) {
 // whose `promise` always resolves to a safe { action, source, responseType } —
 // timeouts and illegal/forbidden answers resolve to a deterministic safety
 // fallback, never a rejection, so the streaming layer can speak it after the ack.
-function startOpenQuestionAnswer({ runtime, frame, plan, state, sessionId }) {
+function startOpenQuestionAnswer({ runtime, frame, plan, state, sessionId, cache = null, options = {} }) {
   const stage = state.current_stage;
   const answerIntents = openQuestionAnswerIntents(stage);
+  const answerFrame = buildOpenQuestionFrame(frame, answerIntents);
+  const cacheOptions = resolveOpenQuestionCacheOptions(options);
+  const cacheKey = buildOpenQuestionCacheKey(answerFrame);
+  const cached = readOpenQuestionCache(cache, cacheKey, cacheOptions);
+  if (cached) {
+    const answer = attachOpenQuestionMetrics(
+      {
+        ...cached.answer,
+        source: "gemma_open_question_cache",
+        reason: cached.answer.reason || "open_question_cache_hit",
+        cacheHit: true,
+      },
+      {
+        cacheHit: true,
+        cacheKey,
+        timeoutMs: plan.timeoutMs,
+        waitMs: 0,
+      }
+    );
+    return {
+      promise: Promise.resolve(answer),
+      intents: answerIntents,
+      cacheKey,
+      cacheHit: true,
+      timeoutMs: plan.timeoutMs,
+    };
+  }
+
+  const templateAnswer = buildOpenQuestionTemplateAnswer({
+    stage,
+    frame: answerFrame,
+    state,
+    sessionId,
+  });
+  if (templateAnswer) {
+    const answer = attachOpenQuestionMetrics(templateAnswer, {
+      cacheHit: false,
+      cacheKey,
+      timeoutMs: plan.timeoutMs,
+      waitMs: 0,
+    });
+    return {
+      promise: Promise.resolve(answer),
+      intents: answerIntents,
+      cacheKey,
+      cacheHit: false,
+      timeoutMs: plan.timeoutMs,
+      template: true,
+    };
+  }
+
+  const startedAt = Date.now();
   const promise = resolveOpenQuestionAnswer({
     runtime,
-    frame: buildOpenQuestionFrame(frame, answerIntents),
+    frame: answerFrame,
     plan: {
       timeoutMs: plan.timeoutMs,
       live: plan.live,
@@ -643,9 +736,37 @@ function startOpenQuestionAnswer({ runtime, frame, plan, state, sessionId }) {
     sessionId,
     stage,
     answerIntents,
-  }).catch((error) => openQuestionFallback(stage, state, sessionId, "open_question_error", { error }));
+  })
+    .then((answer) => {
+      const enriched = attachOpenQuestionMetrics(answer, {
+        cacheHit: false,
+        cacheKey,
+        timeoutMs: plan.timeoutMs,
+        waitMs: Date.now() - startedAt,
+      });
+      if (shouldCacheOpenQuestionAnswer(enriched)) {
+        writeOpenQuestionCache(cache, cacheKey, enriched, cacheOptions);
+      }
+      return enriched;
+    })
+    .catch((error) => attachOpenQuestionMetrics(
+      openQuestionFallback(stage, state, sessionId, "open_question_error", { error }),
+      {
+        cacheHit: false,
+        cacheKey,
+        timeoutMs: plan.timeoutMs,
+        waitMs: Date.now() - startedAt,
+      }
+    ));
 
-  return { promise, intents: answerIntents };
+  return {
+    promise,
+    intents: answerIntents,
+    cacheKey,
+    cacheHit: false,
+    timeoutMs: plan.timeoutMs,
+    startedAt,
+  };
 }
 
 async function resolveOpenQuestionAnswer({ runtime, frame, plan, state, sessionId, stage, answerIntents }) {
@@ -682,10 +803,177 @@ async function resolveOpenQuestionAnswer({ runtime, frame, plan, state, sessionI
 // Restrict the answer frame to the stage's controlled-answer intents so both the
 // prompt and the validator agree on what Gemma may say.
 function buildOpenQuestionFrame(frame, answerIntents) {
-  return {
-    ...frame,
+  const facts = frame?.facts || {};
+  const userInput = frame?.user_input || {};
+  const recentTts = Array.isArray(frame?.recent_tts) ? frame.recent_tts.slice(-2) : [];
+  const safetyPhrases = Array.isArray(frame?.safety_phrases) ? frame.safety_phrases.slice(0, 3) : [];
+  return pruneNullish({
+    session_id: frame?.session_id,
+    current_stage: frame?.current_stage,
     allowed_intents: [...answerIntents, ...SPECIAL_GEMMA_INTENTS],
+    facts: pruneNullish({
+      adult_likely: facts.adult_likely,
+      scene_safe: facts.scene_safe,
+      responsive: facts.responsive,
+      normal_breathing: facts.normal_breathing,
+      agonal_breathing: facts.agonal_breathing,
+      suspected_cardiac_arrest: facts.suspected_cardiac_arrest,
+      emergency_call_status: facts.emergency_call_status,
+      cpr_started: facts.cpr_started,
+      total_compressions: facts.total_compressions,
+      current_rate: facts.current_rate,
+      average_rate: facts.average_rate,
+      quality_score: facts.quality_score,
+      last_interruption_seconds: facts.last_interruption_seconds,
+      fatigue_level: facts.fatigue_level,
+    }),
+    user_input: pruneNullish({
+      stt_text: typeof userInput.stt_text === "string" ? userInput.stt_text : "",
+      intent_hint: userInput.intent_hint,
+      confidence: userInput.confidence,
+    }),
+    perception_summary: compactOpenQuestionPerception(frame?.perception_summary),
+    recent_tts: recentTts.map((item) => pruneNullish({
+      intent: item?.intent,
+      text: typeof item?.text === "string" ? item.text : "",
+      seconds_ago: item?.seconds_ago,
+    })),
+    safety_phrases: safetyPhrases,
+    output_schema: frame?.output_schema,
+    language: frame?.language || "zh-CN",
+  });
+}
+
+function compactOpenQuestionPerception(summary) {
+  if (!summary || typeof summary !== "object" || Array.isArray(summary)) {
+    return undefined;
+  }
+  const cpr = summary.cpr_quality || summary.cprQuality || {};
+  return pruneNullish({
+    cpr_quality: cpr && typeof cpr === "object" && !Array.isArray(cpr)
+      ? pruneNullish({
+          compression_rate_bpm: cpr.compression_rate_bpm ?? cpr.current_rate ?? cpr.compressionRate,
+          hand_position: cpr.hand_position ?? cpr.handPosition,
+          arm_posture: cpr.arm_posture ?? cpr.armPosture,
+          interruption_seconds: cpr.interruption_seconds ?? cpr.interruptionSeconds,
+          quality_score: cpr.quality_score ?? cpr.qualityScore,
+        })
+      : undefined,
+  });
+}
+
+function buildOpenQuestionCacheKey(frame = {}) {
+  const facts = frame.facts || {};
+  const factKey = [
+    facts.normal_breathing,
+    facts.agonal_breathing,
+    facts.suspected_cardiac_arrest,
+    facts.emergency_call_status,
+    facts.cpr_started,
+  ].map((item) => item === undefined ? "" : String(item)).join(",");
+  return [
+    frame.current_stage || "",
+    normalizeOpenQuestionBucket(frame.user_input?.stt_text || ""),
+    factKey,
+  ].join("|");
+}
+
+function normalizeOpenQuestionBucket(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[，。！？、,.!?;；:"“”'‘’\s]/g, "")
+    .slice(0, 80);
+}
+
+function readOpenQuestionCache(cache, key, options = {}) {
+  if (!cache || !key) {
+    return null;
+  }
+  const entry = cache.get(key);
+  if (!entry) {
+    return null;
+  }
+  if (Date.now() - entry.createdAt > options.ttlMs) {
+    cache.delete(key);
+    return null;
+  }
+  return cloneJson(entry);
+}
+
+function writeOpenQuestionCache(cache, key, answer, options = {}) {
+  if (!cache || !key || !answer?.action) {
+    return;
+  }
+  cache.set(key, {
+    createdAt: Date.now(),
+    answer: cloneOpenQuestionAnswerForCache(answer),
+  });
+  while (cache.size > options.maxEntries) {
+    const oldestKey = cache.keys().next().value;
+    if (!oldestKey) {
+      break;
+    }
+    cache.delete(oldestKey);
+  }
+}
+
+function shouldCacheOpenQuestionAnswer(answer) {
+  return answer?.ok === true && answer?.fallback !== true && Boolean(answer.action?.tts?.text);
+}
+
+function cloneOpenQuestionAnswerForCache(answer) {
+  return cloneJson({
+    ok: answer.ok === true,
+    action: answer.action,
+    source: answer.source || "gemma_open_question",
+    responseType: answer.responseType || LiveResponseType.OPEN_QUESTION_ANSWER,
+    reason: answer.reason || "open_question_answered",
+  });
+}
+
+function attachOpenQuestionMetrics(answer, { cacheHit, cacheKey, timeoutMs, waitMs } = {}) {
+  if (!answer) {
+    return answer;
+  }
+  return {
+    ...answer,
+    cacheHit: cacheHit === true,
+    openQuestionMetrics: {
+      ...(answer.openQuestionMetrics || {}),
+      cache_hit: cacheHit === true,
+      cache_key: cacheKey || null,
+      timeout_ms: numberOrNull(timeoutMs),
+      wait_ms: numberOrNull(waitMs),
+      fallback: answer.fallback === true,
+      reason: answer.reason || null,
+    },
   };
+}
+
+function resolveOpenQuestionCacheOptions(options = {}) {
+  const env = options.env || process.env;
+  const ttlMs = firstPositiveNumber(
+    options.openQuestionCacheTtlMs,
+    options.open_question_cache_ttl_ms,
+    env.OPEN_QUESTION_CACHE_TTL_MS,
+    DEFAULT_OPEN_QUESTION_CACHE_TTL_MS
+  );
+  const maxEntries = firstPositiveNumber(
+    options.openQuestionCacheMaxEntries,
+    options.open_question_cache_max_entries,
+    env.OPEN_QUESTION_CACHE_MAX_ENTRIES,
+    DEFAULT_OPEN_QUESTION_CACHE_MAX_ENTRIES
+  );
+  return {
+    ttlMs,
+    maxEntries,
+  };
+}
+
+function pruneNullish(value) {
+  return Object.fromEntries(
+    Object.entries(value || {}).filter(([, item]) => item !== undefined)
+  );
 }
 
 // Deterministic safety fallback for a timed-out / illegal open-question answer. In
@@ -704,28 +992,150 @@ function openQuestionFallback(stage, state, sessionId, reason, extra = {}) {
   };
 }
 
+// Stage-safe fallback spoken lines for a timed-out / blocked open-question answer
+// OUTSIDE the CPR loop. Each acknowledges the uncertainty and redirects to that
+// stage's deterministic next step WITHOUT inventing any medical fact, so a Gemma
+// failure no longer leaves a non-CPR open question answered only by the flow line.
+const NON_CPR_OPEN_QUESTION_FALLBACK_TEXT = Object.freeze({
+  [AgentStage.S0_INIT]: "这个我先说不准，别紧张，我一直在，我们一步一步来。",
+  [AgentStage.S1_SCENE_SAFE]: "这个我先说不准，别紧张，先确认周围安全，再靠近他，我一直在。",
+  [AgentStage.S2_CHECK_RESPONSE]: "这个我先说不准，别紧张，先拍他双肩、大声叫他，看他有没有反应，我一直在。",
+  [AgentStage.S5_CALL_EMERGENCY]: "这个我先说不准，别紧张，先保持手机免提，准备开始按压，我一直在。",
+  [AgentStage.S6_CPR_READY]: "这个我先说不准，别紧张，先把双手放回他胸口中央，准备好就开始按压。",
+});
+
 function buildOpenQuestionFallbackAction(stage, state, sessionId, reason) {
-  if (stage !== AgentStage.S7_CPR_LOOP && stage !== AgentStage.S8_ASSISTANCE) {
+  const spec = openQuestionFallbackSpec(stage);
+  if (!spec) {
     return null;
   }
   const candidate = {
-    intent: "encourage_rescuer",
+    intent: spec.intent,
     session_id: sessionId,
     stage,
     source: "open_question_fallback",
     priority: "normal",
     reason_codes: ["open_question_fallback", reason],
     tts: {
-      text: OPEN_QUESTION_CPR_FALLBACK_PHRASE,
+      text: spec.text,
       tone: "calm_firm",
       speed: "normal",
       interrupt_policy: "do_not_interrupt_critical",
     },
-    ui: { main_text: "继续按压", secondary_text: "跟着节拍，不要停" },
+    ui: { main_text: spec.uiMain, secondary_text: spec.uiSecondary },
     log_event: { type: "open_question_fallback", detail: reason },
   };
   const validation = validateAction(candidate, state);
   return validation.ok ? validation.action : null;
+}
+
+// Resolve the deterministic fallback line + a stage-legal intent. CPR-live keeps the
+// "继续按压不要停" reassurance; the non-CPR open-question stages draw their intent from
+// the stage's own controlled-answer set (so the line still passes ActionValidator) and
+// speak a stage-safe redirect instead of staying silent (P2-8).
+function openQuestionFallbackSpec(stage) {
+  if (stage === AgentStage.S7_CPR_LOOP || stage === AgentStage.S8_ASSISTANCE) {
+    return {
+      intent: "encourage_rescuer",
+      text: OPEN_QUESTION_CPR_FALLBACK_PHRASE,
+      uiMain: "继续按压",
+      uiSecondary: "跟着节拍，不要停",
+    };
+  }
+
+  const text = NON_CPR_OPEN_QUESTION_FALLBACK_TEXT[stage];
+  const intent = openQuestionAnswerIntents(stage)[0] || null;
+  if (!text || !intent) {
+    return null;
+  }
+  return {
+    intent,
+    text,
+    uiMain: "别紧张，我在",
+    uiSecondary: "先跟着当前步骤",
+  };
+}
+
+function buildOpenQuestionTemplateAnswer({ stage, frame, state, sessionId }) {
+  const spec = openQuestionTemplateSpec(stage, frame?.user_input?.stt_text || "");
+  if (!spec) {
+    return null;
+  }
+  const candidate = {
+    intent: spec.intent,
+    session_id: sessionId,
+    stage,
+    source: "open_question_template",
+    priority: "normal",
+    reason_codes: ["open_question_template", spec.reason],
+    tts: {
+      text: spec.text,
+      tone: "calm_firm",
+      speed: "normal",
+      interrupt_policy: "do_not_interrupt_critical",
+    },
+    ui: { main_text: spec.uiMain, secondary_text: spec.uiSecondary },
+    log_event: { type: "open_question_template", detail: spec.reason },
+  };
+  const validation = validateAction(candidate, state);
+  if (!validation.ok || !validation.action?.tts?.text) {
+    return null;
+  }
+  return {
+    ok: true,
+    action: validation.action,
+    source: "open_question_template",
+    responseType: LiveResponseType.OPEN_QUESTION_ANSWER,
+    reason: spec.reason,
+  };
+}
+
+function openQuestionTemplateSpec(stage, transcript = "") {
+  if (stage !== AgentStage.S7_CPR_LOOP && stage !== AgentStage.S8_ASSISTANCE) {
+    return null;
+  }
+  const text = normalizeOpenQuestionBucket(transcript);
+  const base = {
+    intent: "answer_current_cpr_question",
+    uiMain: "继续按压",
+    uiSecondary: "别停，等急救员接手",
+  };
+  if (/(有用|有帮助|管用|值得|意义)/.test(text)) {
+    return {
+      ...base,
+      text: "有帮助，持续按压能帮他维持血流，继续别停。",
+      reason: "template_cpr_helps",
+    };
+  }
+  if (/((按压|心肺|cpr|胸口|胸).*(原理|为什么|为何|背后|作用)|(原理|为什么|为何|背后|作用).*(按压|心肺|cpr|胸口|胸))/.test(text)) {
+    return {
+      ...base,
+      text: "按压是在替心脏把血送到大脑和重要器官。现在继续按压，别停。",
+      reason: "template_cpr_principle",
+    };
+  }
+  if (/(救回来|救活|活过来|还有希望|能不能活|会不会死)/.test(text)) {
+    return {
+      ...base,
+      text: "现在不能保证结果，继续按压是在为他争取时间。",
+      reason: "template_no_outcome_promise",
+    };
+  }
+  if (/(害怕|紧张|慌|我怕|很怕|怎么办)/.test(text)) {
+    return {
+      ...base,
+      text: "害怕很正常，盯着节拍继续按，我陪着你。",
+      reason: "template_rescuer_fear",
+    };
+  }
+  if (/(肋骨|骨折|按坏|压坏|弄断|受伤)/.test(text)) {
+    return {
+      ...base,
+      text: "可能会受伤，但现在继续按压更重要。",
+      reason: "template_possible_rib_injury",
+    };
+  }
+  return null;
 }
 
 async function withTimeout(promise, timeoutMs, reason) {
@@ -812,17 +1222,51 @@ function isCprVisionEvent(event = null) {
 }
 
 function resolveGemmaLiveTimeoutMs(options = {}) {
-  const value = Number(options.gemmaLiveTimeoutMs ?? options.gemma_live_timeout_ms ?? process.env.GEMMA_LIVE_TIMEOUT_MS);
-  return Number.isFinite(value) && value > 0
-    ? Math.floor(value)
-    : DEFAULT_GEMMA_LIVE_TIMEOUT_MS;
+  return firstPositiveNumber(
+    options.gemmaLiveTimeoutMs,
+    options.gemma_live_timeout_ms,
+    (options.env || process.env).GEMMA_LIVE_TIMEOUT_MS,
+    DEFAULT_GEMMA_LIVE_TIMEOUT_MS
+  );
+}
+
+function resolveGemmaOpenQuestionTimeoutMs(options = {}, { live = false } = {}) {
+  const env = options.env || process.env;
+  if (live) {
+    return firstPositiveNumber(
+      options.gemmaOpenQuestionLiveTimeoutMs,
+      options.gemma_open_question_live_timeout_ms,
+      env.GEMMA_OPEN_QUESTION_LIVE_TIMEOUT_MS,
+      options.gemmaOpenQuestionTimeoutMs,
+      options.gemma_open_question_timeout_ms,
+      env.GEMMA_OPEN_QUESTION_TIMEOUT_MS,
+      options.gemmaLiveTimeoutMs,
+      options.gemma_live_timeout_ms,
+      env.GEMMA_LIVE_TIMEOUT_MS,
+      DEFAULT_GEMMA_OPEN_QUESTION_LIVE_TIMEOUT_MS
+    );
+  }
+  return firstPositiveNumber(
+    options.gemmaOpenQuestionTurnTimeoutMs,
+    options.gemma_open_question_turn_timeout_ms,
+    env.GEMMA_OPEN_QUESTION_TURN_TIMEOUT_MS,
+    options.gemmaOpenQuestionTimeoutMs,
+    options.gemma_open_question_timeout_ms,
+    env.GEMMA_OPEN_QUESTION_TIMEOUT_MS,
+    options.gemmaTurnTimeoutMs,
+    options.gemma_turn_timeout_ms,
+    env.GEMMA_TURN_TIMEOUT_MS,
+    DEFAULT_GEMMA_OPEN_QUESTION_TURN_TIMEOUT_MS
+  );
 }
 
 export function resolveGemmaTurnTimeoutMs(options = {}) {
-  const value = Number(options.gemmaTurnTimeoutMs ?? options.gemma_turn_timeout_ms ?? process.env.GEMMA_TURN_TIMEOUT_MS);
-  return Number.isFinite(value) && value > 0
-    ? Math.floor(value)
-    : DEFAULT_GEMMA_TURN_TIMEOUT_MS;
+  return firstPositiveNumber(
+    options.gemmaTurnTimeoutMs,
+    options.gemma_turn_timeout_ms,
+    (options.env || process.env).GEMMA_TURN_TIMEOUT_MS,
+    DEFAULT_GEMMA_TURN_TIMEOUT_MS
+  );
 }
 
 function toGuidanceCandidate(patch, state, sessionId) {
@@ -848,6 +1292,7 @@ function getOrCreateSession(sessions, sessionId, now) {
       createdAt: now(),
       events: [createSessionStartedEvent(sessionId, now)],
       lastResponse: null,
+      openQuestionCache: new Map(),
     };
     sessions.set(sessionId, session);
   }
@@ -889,6 +1334,7 @@ function createVoiceEvent({ sessionId, stt, input, now, intentResolution = null 
     input.patientState || input.patient_state || null,
     intentResolution,
   );
+  const intentMetadata = inferIntentMetadata(resolvedIntent, stt.transcript, intentResolution);
 
   return {
     schema_version: "perception_event.v0.1",
@@ -913,6 +1359,7 @@ function createVoiceEvent({ sessionId, stt, input, now, intentResolution = null 
     metadata: {
       ...(input.metadata || {}),
       ...sourceMetadata,
+      ...intentMetadata,
       ...(intentResolution?.fastPath ? { rule_flow_fast_path: intentResolution.fastPath } : {}),
       audio: stt.audio,
       intent_resolution: createIntentResolutionDebug(intentResolution),
@@ -921,11 +1368,23 @@ function createVoiceEvent({ sessionId, stt, input, now, intentResolution = null 
 }
 
 function applyCprReadinessFastPath(intentResolution, { stt = {}, stage = null } = {}) {
-  if (stage !== AgentStage.S6_CPR_READY || !isCprReadinessUtterance(stt.transcript)) {
+  if (stage !== AgentStage.S6_CPR_READY) {
     return intentResolution;
   }
 
   const existingIntent = intentResolution?.intent ?? stt.intent ?? null;
+  // At the S6 confirm gate both the readiness phrases the regex enumerates AND any
+  // utterance already classified as continue_cpr ("开始按压"/"继续按"/"开始 CPR"/"开始
+  // 按压吧"…) mean "start compressions now". The latter previously skipped the fast
+  // path (the readiness regex doesn't list every continue_cpr phrasing), so the S6→S7
+  // start lost its rule_flow_fast_path tag and its guidance source drifted to
+  // state_machine_critical even though the behaviour/wording were correct. Treat an
+  // already-continue_cpr intent as a readiness signal so the fastPath flag — and the
+  // downstream attribution — stay consistent for every "就绪即开始" utterance.
+  if (!isCprReadinessUtterance(stt.transcript) && existingIntent !== "continue_cpr") {
+    return intentResolution;
+  }
+
   if (existingIntent && !READINESS_FAST_PATH_OVERRIDABLE_INTENTS.has(existingIntent)) {
     return intentResolution;
   }
@@ -1071,6 +1530,28 @@ function numberOrNull(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function firstPositiveNumber(...values) {
+  for (const value of values) {
+    const number = Number(value);
+    if (Number.isFinite(number) && number > 0) {
+      return Math.floor(number);
+    }
+  }
+  return null;
+}
+
+function shouldPrewarmGemmaOnStart(options = {}, env = process.env) {
+  const value = options.gemmaPrewarmOnStart ?? options.gemma_prewarm_on_start ?? env.GEMMA_PREWARM_ON_START;
+  return value === true || value === "true" || value === "1";
+}
+
+function cloneJson(value) {
+  if (value === undefined || value === null) {
+    return value;
+  }
+  return JSON.parse(JSON.stringify(value));
+}
+
 function resolveNluRuntimeBaseline() {
   try {
     const config = getNluSlotsConfig();
@@ -1100,6 +1581,33 @@ function inferDeviceState(intent) {
     gps_attached: true,
     recording: true,
   };
+}
+
+function inferIntentMetadata(intent, transcript = "", intentResolution = null) {
+  if (intent === "aed_available") {
+    const softAlias = isSoftAedAlias(transcript);
+    return {
+      aed_available: true,
+      aed_status: "available",
+      ...(softAlias
+        ? {
+            aed_soft_alias: true,
+            aed_alias: "pacemaker",
+          }
+        : {}),
+      ...(intentResolution?.source === "phonetic_fuzzy" ? { aed_source: "phonetic_fuzzy" } : {}),
+    };
+  }
+
+  if (intent === "paramedics_arrived" || intent === "emergency_team_arrived") {
+    return { ems_arrived: true };
+  }
+
+  return {};
+}
+
+function isSoftAedAlias(transcript = "") {
+  return /起搏器|心脏起搏/.test(String(transcript || ""));
 }
 
 function inferCprQuality(intent) {

@@ -109,6 +109,7 @@ class GemmaServerDaemon {
     this.starting = null;
     this.stderr = "";
     this.stdout = "";
+    this.modelId = config.serveModelId || "";
   }
 
   async request({ messages, timeoutMs }) {
@@ -127,7 +128,7 @@ class GemmaServerDaemon {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          model: this.config.serveModelId || modelIdFromFile(this.modelFile) || this.config.modelRepo || "gemma",
+          model: this.modelId || this.modelFile || modelIdFromFile(this.modelFile) || this.config.modelRepo || "gemma",
           messages: messages || [],
           temperature: 0,
         }),
@@ -252,6 +253,9 @@ class GemmaServerDaemon {
           signal: abort.signal,
         });
         if (response?.ok) {
+          if (path === "/v1/models" && !this.modelId) {
+            this.modelId = await readFirstServedModelId(response).catch(() => "");
+          }
           return true;
         }
       } finally {
@@ -301,6 +305,23 @@ async function readResponseText(response) {
   } catch {
     return response.statusText || "request failed";
   }
+}
+
+async function readFirstServedModelId(response) {
+  if (!response || typeof response.json !== "function") {
+    return "";
+  }
+  const json = await response.json();
+  const candidates = Array.isArray(json?.data)
+    ? json.data
+    : Array.isArray(json?.models)
+      ? json.models
+      : [];
+  const first = candidates.find((item) => item && (typeof item === "string" || typeof item.id === "string"));
+  if (typeof first === "string") {
+    return first;
+  }
+  return first?.id || "";
 }
 
 function createUtf8ProcessEnv(env = process.env) {

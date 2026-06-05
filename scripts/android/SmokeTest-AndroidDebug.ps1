@@ -307,7 +307,9 @@ function Install-Apk {
     $adbArgs += @("-s", $DeviceSerial)
   }
 
-  $adbArgs += @("install", "-r", "-d", "-t", $ApkPath)
+  # -g auto-grants runtime permissions so the smoke does not stall on a
+  # permission dialog; -t allows the debug (test-only) APK; -d allows downgrade.
+  $adbArgs += @("install", "-r", "-d", "-g", "-t", $ApkPath)
   Write-Step ("Running: {0} {1}" -f $Adb, ($adbArgs -join " "))
 
   Remove-Item -LiteralPath $InstallStdoutPath, $InstallStderrPath -Force -ErrorAction SilentlyContinue

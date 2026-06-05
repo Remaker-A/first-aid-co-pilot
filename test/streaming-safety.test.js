@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import test from "node:test";
 import { createLiveSession } from "../src/index.js";
+import { breathingPolarity } from "../src/voice/liveSession.js";
 import { createSttReconnectPolicy } from "../src/voice/sttReconnect.js";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
@@ -358,6 +359,92 @@ test("energy gate triggers a barge-in when loud speech overlaps playback", async
   session.close();
 });
 
+test("streaming STT final emitted during assistant playback is ignored", async () => {
+  const fakeStt = makeReadyFakeStt();
+  let serviceCalls = 0;
+  let releaseHold;
+  const hold = new Promise((resolve) => {
+    releaseHold = resolve;
+  });
+  const session = createLiveSession({
+    sessionId: "sess_drop_speaking_final",
+    createStreamingStt: () => fakeStt,
+    service: {
+      async createGuidance(input) {
+        serviceCalls += 1;
+        return {
+          stt: { transcript: input.text, intent: input.intent },
+          guidanceAction: { action_id: "act_speaking", tts: { text: "first prompt" } },
+        };
+      },
+      reset() {},
+    },
+    tts: {
+      cancel() {},
+      async *speak() {
+        yield { chunk: Buffer.from([1, 0]), sampleRate: 16000, channels: 1, bitsPerSample: 16 };
+        await hold;
+      },
+    },
+  });
+  const ignored = [];
+  session.on("json", (event) => {
+    if (event.type === "asr_ignored") ignored.push(event);
+  });
+
+  session.handlePcm(Buffer.from([0, 1, 0, 1]));
+  await tick();
+  const firstTurn = session.processTurn({ text: "first" });
+  await tick();
+  assert.equal(session.speaking, true);
+
+  fakeStt.emit("final", { text: "没有呼吸", intent: "no_normal_breathing" });
+  await tick();
+
+  assert.equal(serviceCalls, 1, "echo final during playback must not start another turn");
+  assert.equal(ignored.at(-1)?.reason, "assistant_speaking");
+
+  releaseHold();
+  await firstTurn;
+  session.close();
+});
+
+test("streaming STT duplicate final inside the short window is ignored", async () => {
+  const fakeStt = makeReadyFakeStt();
+  const captured = [];
+  const session = createLiveSession({
+    sessionId: "sess_drop_duplicate_final",
+    createStreamingStt: () => fakeStt,
+    service: {
+      async createGuidance(input) {
+        captured.push(input.text);
+        return {
+          stt: { transcript: input.text, intent: input.intent },
+          guidanceAction: { action_id: `act_${captured.length}`, tts: { text: "ok" } },
+        };
+      },
+      reset() {},
+    },
+    tts: silentTts(),
+  });
+  const ignored = [];
+  session.on("json", (event) => {
+    if (event.type === "asr_ignored") ignored.push(event);
+  });
+
+  session.handlePcm(Buffer.from([0, 1, 0, 1]));
+  await tick();
+  fakeStt.emit("final", { text: "没有呼吸", intent: "no_normal_breathing" });
+  await tick();
+  fakeStt.emit("final", { text: "没有 呼吸。", intent: "no_normal_breathing" });
+  await tick();
+
+  assert.deepEqual(captured, ["没有呼吸"]);
+  assert.equal(ignored.at(-1)?.reason, "duplicate_final");
+
+  session.close();
+});
+
 test("critical breathing final is re-checked offline and corrected", async () => {
   const reviewCalls = [];
   const fakeStt = makeReadyFakeStt();
@@ -433,6 +520,112 @@ test("non-critical final skips the offline reviewer entirely", async () => {
   await tick();
 
   assert.equal(reviewed, 0, "non-breathing finals must not invoke the offline reviewer");
+
+  session.close();
+});
+
+test("breathingPolarity classifies CPR-critical readings without misreading negation", () => {
+  // "absent" = CPR-indicating; "present" = non-CPR. The negative lookbehind keeps
+  // "没有呼吸" from ever resolving to present.
+  assert.equal(breathingPolarity("没有呼吸"), "absent");
+  assert.equal(breathingPolarity("没有正常呼吸"), "absent");
+  assert.equal(breathingPolarity("没呼吸"), "absent");
+  assert.equal(breathingPolarity("偶尔喘一下，没气了"), "absent");
+  assert.equal(breathingPolarity("濒死喘息"), "absent");
+  assert.equal(breathingPolarity("no breathing"), "absent");
+  assert.equal(breathingPolarity("有呼吸"), "present");
+  assert.equal(breathingPolarity("有正常呼吸"), "present");
+  assert.equal(breathingPolarity("呼吸正常"), "present");
+  assert.equal(breathingPolarity("breathing normally"), "present");
+  assert.equal(breathingPolarity("现场安全了"), null);
+  assert.equal(breathingPolarity(""), null);
+  assert.equal(breathingPolarity(undefined), null);
+});
+
+test("a corrected breathing-polarity flip is surfaced in the per-turn metrics", async () => {
+  const fakeStt = makeReadyFakeStt();
+  const session = createLiveSession({
+    sessionId: "sess_review_metrics",
+    emitMetrics: true,
+    createStreamingStt: () => fakeStt,
+    reviewFinal: async () => ({ transcript: "没有呼吸" }), // offline engine corrects to absent
+    service: {
+      async createGuidance(input) {
+        return {
+          stt: { transcript: input.text, intent: input.intent },
+          guidanceAction: { action_id: "act_flip", tts: { text: "开始胸外按压。" } },
+        };
+      },
+      reset() {},
+    },
+    tts: silentTts(),
+  });
+
+  const metrics = [];
+  session.on("json", (event) => {
+    if (event.type === "metrics") {
+      metrics.push(event);
+    }
+  });
+
+  session.handlePcm(Buffer.from([0, 1, 0, 1]));
+  await tick();
+  // Streaming mishears as "有呼吸" (present); the offline review flips it to absent.
+  fakeStt.emit("final", { text: "有呼吸", intent: "normal_breathing" });
+  await tick();
+  await tick();
+
+  const m = metrics.at(-1);
+  assert.ok(m?.review, "metrics must carry the review audit segment when a re-check ran");
+  assert.equal(m.review.triggered, true);
+  assert.equal(m.review.corrected, true);
+  assert.equal(m.review.breathing_polarity_flip, true);
+  assert.equal(m.review.polarity_before, "present");
+  assert.equal(m.review.polarity_after, "absent");
+
+  session.close();
+});
+
+test("a same-polarity correction is not mislabeled as a polarity flip", async () => {
+  const fakeStt = makeReadyFakeStt();
+  const session = createLiveSession({
+    sessionId: "sess_review_same_polarity",
+    emitMetrics: true,
+    createStreamingStt: () => fakeStt,
+    // Offline engine refines the wording but the reading stays "absent".
+    reviewFinal: async () => ({ transcript: "没有呼吸" }),
+    service: {
+      async createGuidance(input) {
+        return {
+          stt: { transcript: input.text, intent: input.intent },
+          guidanceAction: { action_id: "act_same", tts: { text: "开始胸外按压。" } },
+        };
+      },
+      reset() {},
+    },
+    tts: silentTts(),
+  });
+
+  const metrics = [];
+  session.on("json", (event) => {
+    if (event.type === "metrics") {
+      metrics.push(event);
+    }
+  });
+
+  session.handlePcm(Buffer.from([0, 1, 0, 1]));
+  await tick();
+  // Streaming heard "呼吸很弱" (already absent); the refinement must not count as a flip.
+  fakeStt.emit("final", { text: "呼吸很弱", intent: "no_normal_breathing" });
+  await tick();
+  await tick();
+
+  const m = metrics.at(-1);
+  assert.ok(m?.review);
+  assert.equal(m.review.corrected, true);
+  assert.equal(m.review.breathing_polarity_flip, false, "same-polarity refinement is not a flip");
+  assert.equal(m.review.polarity_before, "absent");
+  assert.equal(m.review.polarity_after, "absent");
 
   session.close();
 });

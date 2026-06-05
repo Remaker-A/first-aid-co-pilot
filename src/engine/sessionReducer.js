@@ -213,6 +213,22 @@ function reduceUserIntent(next, event, timestamp) {
       next.confirmed_facts.signs_of_life_source = source;
       next.confirmed_facts.signs_of_life_at = timestamp;
       break;
+    case "aed_available":
+      next.tool_state.aed_status = "available";
+      next.tool_state.aed_source = source;
+      next.tool_state.aed_available_at = timestamp;
+      if (event.metadata?.aed_alias) {
+        next.tool_state.aed_alias = event.metadata.aed_alias;
+      }
+      if (event.metadata?.aed_soft_alias === true) {
+        next.tool_state.aed_soft_alias = true;
+      }
+      break;
+    case "paramedics_arrived":
+    case "emergency_team_arrived":
+      next.tool_state.ems_status = "arrived";
+      next.tool_state.ems_arrived_at = timestamp;
+      break;
     case "scene_safe":
       updateScopeFact(next, "scene_safe", true, source, confidence, timestamp, event);
       break;

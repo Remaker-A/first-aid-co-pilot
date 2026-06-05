@@ -35,6 +35,11 @@ test("detectOpenQuestion marks closed-set-external questions, not closed-set or 
   // Closed-set questions keep their deterministic fixed answers (not open).
   assert.equal(detectOpenQuestion({ transcript: "我能不能停", intent: "ask_can_stop" }), false);
   assert.equal(detectOpenQuestion({ transcript: "我按得对吗", intent: "ask_cpr_quality" }), false);
+  assert.equal(detectOpenQuestion({ transcript: "还要继续按吗", intent: "ask_can_stop" }), false);
+  assert.equal(
+    detectOpenQuestion({ transcript: "AED 和按压怎么交替", intent: "ask_aed_cpr_alternation" }),
+    false
+  );
 
   // Flow-progress / fact reports drive the state machine, not Q&A (not open).
   assert.equal(detectOpenQuestion({ transcript: "他没有呼吸吗", intent: "no_normal_breathing" }), false);
@@ -105,7 +110,11 @@ test("CPR-live open question: immediate ack now, controlled Gemma answer async, 
   const sessionId = "open_q_cpr_live";
   await advanceVoiceSessionToCpr(service, sessionId);
 
-  const result = await service.handleTurn({ sessionId, text: "做这个真的有用吗" });
+  const result = await service.handleTurn({
+    sessionId,
+    text: "这个步骤背后的原理是什么呢",
+    waitForOpenQuestionAnswer: true,
+  });
 
   assert.equal(result.state.current_stage, AgentStage.S7_CPR_LOOP);
   assert.equal(result.event.user_input.intent, null);
@@ -135,6 +144,27 @@ test("CPR-live open question: immediate ack now, controlled Gemma answer async, 
   assert.equal(result.open_question_answer.action.tts.interrupt_policy, "do_not_interrupt_critical");
 });
 
+test("HTTP open question returns the ack without waiting for Gemma by default", async () => {
+  const service = createVoiceDemoService({
+    runtime: neverResolvingRuntime(),
+    tts: { provider: "mock" },
+    gemmaOpenQuestionLiveTimeoutMs: 400,
+  });
+  const sessionId = "open_q_http_low_latency";
+  await advanceVoiceSessionToCpr(service, sessionId);
+
+  const startedAt = Date.now();
+  const result = await service.handleTurn({ sessionId, text: "这样做真的有用吗" });
+  const elapsed = Date.now() - startedAt;
+
+  assert.equal(result.open_question, true);
+  assert.equal(result.guidance_source, "open_question_ack");
+  assert.equal(result.open_question_answer.pending, true);
+  assert.equal(result.open_question_answer.timeout_ms, 400);
+  assert.equal(result.open_question_answer.ok, undefined);
+  assert.ok(elapsed < 250, `HTTP turn waited ${elapsed}ms for async Gemma`);
+});
+
 test("CPR-live open question answer times out to a safety fallback (never blocks the ack)", async () => {
   const service = createVoiceDemoService({
     runtime: neverResolvingRuntime(),
@@ -144,7 +174,11 @@ test("CPR-live open question answer times out to a safety fallback (never blocks
   const sessionId = "open_q_timeout";
   await advanceVoiceSessionToCpr(service, sessionId);
 
-  const result = await service.handleTurn({ sessionId, text: "这样按会不会把肋骨弄断呀" });
+  const result = await service.handleTurn({
+    sessionId,
+    text: "为什么要保持这个节奏呢",
+    waitForOpenQuestionAnswer: true,
+  });
 
   assert.equal(result.open_question, true);
   // Ack still played immediately.
@@ -157,6 +191,112 @@ test("CPR-live open question answer times out to a safety fallback (never blocks
   assert.match(result.open_question_answer.action.tts.text, /继续按压/);
 });
 
+test("CPR-live common open questions get an immediate safety answer when Gemma is too slow", async () => {
+  let runtimeCalls = 0;
+  const service = createVoiceDemoService({
+    runtime: {
+      async generatePatch() {
+        runtimeCalls += 1;
+        return new Promise(() => {});
+      },
+    },
+    tts: { provider: "mock" },
+    gemmaOpenQuestionLiveTimeoutMs: 800,
+  });
+  const sessionId = "open_q_template";
+  await advanceVoiceSessionToCpr(service, sessionId);
+
+  const result = await service.handleTurn({
+    sessionId,
+    text: "我这样做真的有帮助吗",
+    waitForOpenQuestionAnswer: true,
+  });
+
+  assert.equal(result.open_question, true);
+  assert.equal(result.guidance_source, "open_question_ack");
+  assert.equal(result.open_question_answer.ok, true);
+  assert.equal(result.open_question_answer.source, "open_question_template");
+  assert.equal(result.open_question_answer.wait_ms, 0);
+  assert.match(result.open_question_answer.action.tts.text, /有帮助|继续/);
+  assert.equal(runtimeCalls, 0, "template answer must not wait on a stuck model");
+
+  const principle = await service.handleTurn({
+    sessionId,
+    text: "这个按压背后的原理是什么",
+    waitForOpenQuestionAnswer: true,
+  });
+
+  assert.equal(principle.open_question, true);
+  assert.equal(principle.open_question_answer.ok, true);
+  assert.equal(principle.open_question_answer.source, "open_question_template");
+  assert.equal(principle.open_question_answer.wait_ms, 0);
+  assert.equal(principle.open_question_answer.reason, "template_cpr_principle");
+  assert.match(principle.open_question_answer.action.tts.text, /血|继续按压/);
+  assert.equal(runtimeCalls, 0, "principle template answer must not wait on a stuck model");
+});
+
+test("open questions use a dedicated timeout, compact Gemma frame, and session answer cache", async () => {
+  const captured = [];
+  const runtime = {
+    async generatePatch(frame, options) {
+      captured.push({ frame, options });
+      return {
+        ok: true,
+        patch: {
+          intent: "answer_current_cpr_question",
+          tts: { text: "继续按压别停，等急救员接手。", tone: "calm_firm", speed: "normal" },
+          ui: { main_text: "继续按压", secondary_text: "别停，等急救员接手" },
+          reason: "cached_open_question_answer",
+          confidence: 0.82,
+        },
+      };
+    },
+  };
+  const service = createVoiceDemoService({
+    runtime,
+    tts: { provider: "mock" },
+    gemmaOpenQuestionLiveTimeoutMs: 50,
+    openQuestionCacheTtlMs: 60_000,
+    openQuestionCacheMaxEntries: 8,
+  });
+  const sessionId = "open_q_cache";
+  await advanceVoiceSessionToCpr(service, sessionId);
+
+  const first = await service.handleTurn({
+    sessionId,
+    text: "这个步骤背后的原理是什么呢",
+    waitForOpenQuestionAnswer: true,
+    perceptionSummary: {
+      raw_frames: ["large-context-that-must-not-reach-gemma"],
+      cprQuality: { current_rate: 109, hand_position: "center" },
+    },
+  });
+  const second = await service.handleTurn({
+    sessionId,
+    text: "这个步骤背后的原理是什么呢",
+    waitForOpenQuestionAnswer: true,
+  });
+
+  assert.equal(captured.length, 1, "same session/stage/question should reuse the validated answer");
+  assert.equal(first.gemma_live.timeout_ms, 50);
+  assert.equal(first.open_question_answer.cache_hit, false);
+  assert.equal(first.open_question_answer.wait_ms >= 0, true);
+  assert.equal(second.open_question_answer.cache_hit, true);
+  assert.equal(second.open_question_answer.source, "gemma_open_question_cache");
+
+  const frame = captured[0].frame;
+  assert.ok(frame.allowed_intents.includes("answer_current_cpr_question"));
+  assert.ok(frame.allowed_intents.includes("fallback_template"));
+  assert.equal(frame.allowed_intents.includes("start_cpr_loop"), false);
+  assert.equal(frame.allowed_intents.includes("paramedics_arrived"), false);
+  assert.equal(frame.user_input.stt_text, "这个步骤背后的原理是什么呢");
+  assert.equal(frame.perception_summary.raw_frames, undefined, "raw/high-volume context must be stripped");
+  assert.equal(frame.perception_summary.cpr_quality.compression_rate_bpm, 109);
+  assert.equal(frame.facts.active_priority, undefined, "open question frame keeps only compact safety facts");
+  assert.equal(captured[0].options.timeoutMs, 50);
+  assert.equal(captured[0].options.promptOptions.systemPromptFile.endsWith("gemma_open_question_system_prompt_v1.txt"), true);
+});
+
 test("CPR-live open question with a forbidden answer is blocked to a safety fallback", async () => {
   const service = createVoiceDemoService({
     runtime: forbiddenAnswerRuntime(),
@@ -165,7 +305,11 @@ test("CPR-live open question with a forbidden answer is blocked to a safety fall
   const sessionId = "open_q_forbidden";
   await advanceVoiceSessionToCpr(service, sessionId);
 
-  const result = await service.handleTurn({ sessionId, text: "他还能不能救回来呀" });
+  const result = await service.handleTurn({
+    sessionId,
+    text: "这背后的原理是什么呀",
+    waitForOpenQuestionAnswer: true,
+  });
 
   assert.equal(result.open_question, true);
   assert.equal(result.open_question_answer.source, "open_question_fallback");
@@ -222,6 +366,37 @@ test("closed-set CPR question stays a deterministic fast-path answer (not an ope
   assert.equal(result.guidance_source, "rule_fast_path");
   assert.match(result.guidance_action.tts.text, /不要停/);
   assert.equal(result.open_question_answer, null);
+});
+
+test("non-CPR open question gets a stage-safe spoken fallback when Gemma fails (no longer silent) [P2-8]", async () => {
+  const service = createVoiceDemoService({
+    runtime: noAnswerRuntime(),
+    tts: { provider: "mock" },
+  });
+  const sessionId = "open_q_non_cpr_fallback";
+  await advanceVoiceSessionToCheckResponse(service, sessionId);
+
+  const result = await service.handleTurn({
+    sessionId,
+    text: "他会不会有事啊",
+    waitForOpenQuestionAnswer: true,
+  });
+
+  assert.equal(result.state.current_stage, AgentStage.S2_CHECK_RESPONSE);
+  assert.equal(result.open_question, true, "a non-flow question at a Q&A stage is an open question");
+
+  // Gemma produced no patch -> the async answer falls back, but a non-CPR stage no
+  // longer stays silent: it speaks a stage-safe reassurance drawn from the stage's
+  // own controlled-answer intent (so it still passes ActionValidator).
+  assert.equal(result.open_question_answer.ok, false);
+  assert.equal(result.open_question_answer.fallback, true);
+  assert.equal(result.open_question_answer.source, "open_question_fallback");
+  assert.ok(result.open_question_answer.action, "non-CPR fallback must speak, not return a null action");
+  assert.equal(result.open_question_answer.action.intent, "reassure_rescuer");
+  assert.ok(result.open_question_answer.action.tts.text.length > 0);
+  assert.match(result.open_question_answer.action.tts.text, /别紧张|我一直在/);
+  // Calm, non-interrupting reassurance.
+  assert.equal(result.open_question_answer.action.tts.interrupt_policy, "do_not_interrupt_critical");
 });
 
 // ---------------------------------------------------------------------------
@@ -296,6 +471,38 @@ test("a barge-in while the answer is pending suppresses it (ack already played)"
   session.close();
 });
 
+test("LiveSession emits separate metrics for the open-question ack and async answer", async () => {
+  const answer = {
+    ok: true,
+    action: { action_id: "act_ans", intent: "answer_current_cpr_question", tts: { text: "继续按压别停。" } },
+    source: "gemma_open_question",
+    responseType: "open_question_answer",
+    openQuestionMetrics: { wait_ms: 15, timeout_ms: 800, cache_hit: false, reason: "open_question_answered" },
+  };
+  const session = createLiveSession({
+    sessionId: "live_open_q_metrics",
+    emitMetrics: true,
+    service: openQuestionLiveService({ answerPromise: Promise.resolve(answer) }),
+    tts: oneFrameTts(),
+    disableStreamingStt: true,
+  });
+  const json = [];
+  session.on("json", (event) => json.push(event));
+
+  await session.processTurn({ text: "做这个有用吗" });
+
+  const metrics = json.filter((event) => event.type === "metrics");
+  assert.equal(metrics.length, 2);
+  assert.equal(metrics[0].open_question.segment, "ack");
+  assert.equal(metrics[0].gemma.open_question, true);
+  assert.equal(metrics[1].open_question.segment, "answer");
+  assert.equal(metrics[1].open_question.cache_hit, false);
+  assert.equal(metrics[1].timings.open_question_answer_wait_ms, 15);
+  assert.equal(metrics[1].gemma.timeout_ms, 800);
+
+  session.close();
+});
+
 // ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------
@@ -344,6 +551,15 @@ function neverResolvingRuntime() {
   };
 }
 
+// Resolves with no patch -> exercises the open-question fallback (Gemma "failed").
+function noAnswerRuntime() {
+  return {
+    async generatePatch() {
+      return { ok: true, skipped: true, skipReason: "stub_no_patch", patch: null };
+    },
+  };
+}
+
 function openQuestionLiveService({ answerPromise, ackText = "我在，按住别停，听我说。" } = {}) {
   return {
     async createGuidance(input = {}) {
@@ -358,6 +574,9 @@ function openQuestionLiveService({ answerPromise, ackText = "我在，按住别�
         },
         guidanceDecision: { source: "open_question_ack", responseType: "open_question_ack" },
         pipeline: { state: { current_stage: AgentStage.S7_CPR_LOOP } },
+        gemma: { skipped: true, skipReason: "open_question_async" },
+        gemmaPlan: { live: true, openQuestion: true, timeoutMs: 800 },
+        openQuestion: true,
         openQuestionAnswer: { promise: answerPromise },
       };
     },
@@ -372,6 +591,17 @@ function oneFrameTts() {
       yield { chunk: Buffer.from([1, 0]), sampleRate: 16000, channels: 1, bitsPerSample: 16 };
     },
   };
+}
+
+// Advance to the S2 response-check gate, a non-CPR open-question stage.
+async function advanceVoiceSessionToCheckResponse(service, sessionId) {
+  const result = await service.handleTurn({
+    sessionId,
+    text: "现场安全了",
+    patientState: { scene_safe: true, adult_likely: true },
+  });
+  assert.equal(result.state.current_stage, AgentStage.S2_CHECK_RESPONSE);
+  return result;
 }
 
 async function advanceVoiceSessionToCpr(service, sessionId) {

@@ -17,7 +17,11 @@
 // Usage:
 //   node scripts/speech/prerenderTtsCache.mjs                 # manifest only
 //   node scripts/speech/prerenderTtsCache.mjs --audio         # + synthesize WAVs
+//   node scripts/speech/prerenderTtsCache.mjs --audio --sync-android  # + copy into APK assets
 //   node scripts/speech/prerenderTtsCache.mjs --out build/cache --max-clause-chars 34
+//
+// `npm run render:tts-cache` wraps `--audio --sync-android` (render WAVs and mirror
+// the bundle into android/app/src/main/assets/tts_cache).
 
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
@@ -33,6 +37,15 @@ const REPO_ROOT = path.resolve(SCRIPT_DIR, "..", "..");
 const SAFETY_PHRASES_PATH = path.join(REPO_ROOT, "knowledge", "safety_phrases.json");
 const LIVE_DRIVER_PATH = path.join(REPO_ROOT, "src", "voice", "liveDriver.js");
 const DEFAULT_OUT_DIR = path.join(REPO_ROOT, "assets", "tts_cache");
+const DEFAULT_ANDROID_OUT_DIR = path.join(
+  REPO_ROOT,
+  "android",
+  "app",
+  "src",
+  "main",
+  "assets",
+  "tts_cache"
+);
 const DEFAULT_MAX_CLAUSE_CHARS = 34;
 const DEFAULT_SAMPLE_RATE_HINT = 22050;
 
@@ -57,7 +70,12 @@ async function main() {
     generated_at: new Date().toISOString(),
     sample_rate_hint: DEFAULT_SAMPLE_RATE_HINT,
     max_clause_chars: maxClauseChars,
-    audio_rendered: audio.attempted,
+    // True only when WAVs were actually produced. A manifest-only build (or one
+    // where sherpa was unavailable so every entry was skipped) stays false, which
+    // the manifest guard (test/tts-cache.test.js) treats as a valid, shippable
+    // "manifest-only" state. When true, the guard requires every referenced WAV to
+    // exist, so a partial/failed render is caught instead of silently shipping gaps.
+    audio_rendered: audio.rendered > 0,
     counts: {
       total: entries.length,
       phrases: entries.filter((entry) => entry.kind === "phrase").length,
@@ -69,16 +87,51 @@ async function main() {
   const manifestPath = path.join(outDir, "manifest.json");
   await fs.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 
+  let androidSync = null;
+  if (args.syncAndroid) {
+    androidSync = await syncToAndroid(outDir, args.androidOut);
+  }
+
   process.stdout.write(
     [
       `Wrote ${manifestPath}`,
       `  entries: ${manifest.counts.total} (phrases ${manifest.counts.phrases}, clauses ${manifest.counts.clauses})`,
       args.audio
-        ? `  audio: rendered ${audio.rendered}, skipped ${audio.skipped}, failed ${audio.failed}`
+        ? `  audio: rendered ${audio.rendered}, skipped ${audio.skipped}, failed ${audio.failed} (audio_rendered=${manifest.audio_rendered})`
         : "  audio: skipped (run with --audio + a sherpa TTS env to synthesize WAVs)",
+      androidSync
+        ? `  android: synced ${androidSync.files} files -> ${androidSync.dir}`
+        : "  android: not synced (pass --sync-android to copy manifest + wav into the APK assets)",
       "",
     ].join("\n")
   );
+}
+
+// Mirror the freshly written bundle (manifest + wav/*) into the Android APK assets
+// so the on-device coach (assets/tts_cache, EdgeTextToSpeechEdge.preloadBundledCache)
+// loads the exact same closed-set audio as the desktop server. Cross-platform
+// (Node fs) so it works the same on Windows/macOS/Linux CI.
+async function syncToAndroid(outDir, androidOutArg) {
+  const dir = path.resolve(androidOutArg || DEFAULT_ANDROID_OUT_DIR);
+  await fs.rm(dir, { recursive: true, force: true });
+  const files = await copyDir(outDir, dir);
+  return { dir, files };
+}
+
+async function copyDir(src, dest) {
+  await fs.mkdir(dest, { recursive: true });
+  let count = 0;
+  for (const entry of await fs.readdir(src, { withFileTypes: true })) {
+    const from = path.join(src, entry.name);
+    const to = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      count += await copyDir(from, to);
+    } else if (entry.isFile()) {
+      await fs.copyFile(from, to);
+      count += 1;
+    }
+  }
+  return count;
 }
 
 async function collectPhrases() {
@@ -261,6 +314,10 @@ function parseArgs(argv) {
       args.provider = argv[++i];
     } else if (token === "--limit") {
       args.limit = argv[++i];
+    } else if (token === "--sync-android") {
+      args.syncAndroid = true;
+    } else if (token === "--android-out") {
+      args.androidOut = argv[++i];
     }
   }
   return args;

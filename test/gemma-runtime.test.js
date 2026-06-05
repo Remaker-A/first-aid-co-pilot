@@ -238,8 +238,58 @@ test("Gemma server runner posts OpenAI-compatible chat requests with mock fetch"
     assert.ok(post);
     const body = JSON.parse(post.init.body);
     assert.equal(body.messages[0].content, "hello");
-    assert.equal(body.model, "gemma-4-E2B-it-q4_k_m");
-    assert.equal(body.model.includes(".litertlm"), false);
+    assert.equal(body.model, modelFile);
+    assert.equal(body.model.endsWith(".litertlm"), true);
+  });
+});
+
+test("Gemma server runner uses the served model id from /v1/models when available", async () => {
+  await withMockModelFile(async (modelFile) => {
+    const servedModelId = "litert-served-gemma-model";
+    const requests = [];
+    const runner = createGemmaServerRunner({
+      spawnImpl: createFakeSpawn(),
+      fetchImpl: async (url, init = {}) => {
+        requests.push({ url, init });
+        if (init.method === "GET") {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ data: [{ id: servedModelId }] }),
+            text: async () => "",
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            choices: [{ message: { content: JSON.stringify(VALID_PATCH) } }],
+          }),
+          text: async () => "",
+        };
+      },
+    });
+
+    await runner({
+      config: {
+        ...resolveGemmaConfig({
+          env: {
+            GEMMA_DAEMON: "1",
+            GEMMA_SERVE_PORT: "8798",
+          },
+          cwd: "D:\\test-workspace",
+        }),
+        modelFile,
+        serveReadyTimeoutMs: 50,
+      },
+      modelFile,
+      messages: [{ role: "user", content: "hello" }],
+      timeoutMs: 50,
+    });
+
+    const post = requests.find((request) => request.init.method === "POST");
+    assert.ok(post);
+    assert.equal(JSON.parse(post.init.body).model, servedModelId);
   });
 });
 
@@ -296,6 +346,31 @@ test("GemmaRuntime generatePatch honors a per-call controlled-prompt override", 
     });
     assert.notEqual(seenSystemPrompt, defaultPrompt);
     assert.match(seenSystemPrompt, /受控问答/);
+  });
+});
+
+test("GemmaRuntime generatePatch honors a per-call timeout override", async () => {
+  await withMockModelFile(async (modelFile) => {
+    const runtime = new GemmaRuntime({
+      config: {
+        ...resolveGemmaConfig({
+          env: {
+            GEMMA_TIMEOUT_MS: "5000",
+          },
+          cwd: "D:\\test-workspace"
+        }),
+        modelFile
+      },
+      runner: async ({ timeoutMs }) => {
+        assert.equal(timeoutMs, 321);
+        return { stdout: JSON.stringify(VALID_PATCH), stderr: "", exitCode: 0 };
+      }
+    });
+
+    const result = await runtime.generatePatch(DECISION_FRAME, { timeoutMs: 321 });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.patch.intent, "parse_response_answer");
   });
 });
 
@@ -401,6 +476,45 @@ test("GemmaRuntime falls back to one-shot runner when daemon runner fails", asyn
     assert.equal(result.patch.intent, "parse_response_answer");
     assert.equal(serverCalls, 1);
     assert.equal(spawnCalls, 1);
+  });
+});
+
+test("GemmaRuntime skips one-shot fallback when a realtime timeout budget is explicit", async () => {
+  await withMockModelFile(async (modelFile) => {
+    let serverCalls = 0;
+    let spawnCalls = 0;
+    const runtime = new GemmaRuntime({
+      config: {
+        ...resolveGemmaConfig({
+          env: {
+            GEMMA_DAEMON: "1",
+            GEMMA_BACKEND: "gpu",
+          },
+          cwd: "D:\\test-workspace",
+        }),
+        modelFile
+      },
+      serverRunner: async () => {
+        serverCalls += 1;
+        throw new Error("daemon request timed out");
+      },
+      runner: async () => {
+        spawnCalls += 1;
+        return {
+          stdout: JSON.stringify(VALID_PATCH),
+          stderr: "",
+          exitCode: 0
+        };
+      }
+    });
+
+    const result = await runtime.generatePatch(DECISION_FRAME, { timeoutMs: 321 });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.fallback, true);
+    assert.equal(result.reason, "timeout");
+    assert.equal(serverCalls, 1);
+    assert.equal(spawnCalls, 0);
   });
 });
 

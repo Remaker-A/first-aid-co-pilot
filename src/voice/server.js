@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import { createVoiceDemoService } from "./service.js";
 import { getRuntimeDir } from "./tts.js";
 import { attachVoiceWsGateway } from "./wsGateway.js";
+import { mergeLiveSessionEnvOptions } from "./liveSessionEnv.js";
+import { createMetricsAggregator } from "./metricsAggregator.js";
 
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 8787;
@@ -12,10 +14,14 @@ const MAX_BODY_BYTES = 12 * 1024 * 1024;
 
 export function createVoiceServer(options = {}) {
   const service = options.service || createVoiceDemoService(options.serviceOptions || {});
+  // Shared per-turn metrics aggregator (P2). Folds every live `metrics` event so
+  // GET /api/metrics can report latency p50/p95, TTS cache hit-rate, intent
+  // fallback mix, gemma skip/stale, and safety re-check counts for tuning.
+  const metricsAggregator = options.metricsAggregator || createMetricsAggregator();
 
   const server = http.createServer(async (req, res) => {
     try {
-      await routeRequest(req, res, service);
+      await routeRequest(req, res, service, metricsAggregator);
     } catch (error) {
       sendJson(res, 500, {
         ok: false,
@@ -30,6 +36,11 @@ export function createVoiceServer(options = {}) {
     ...(options.ws || {}),
     service,
     ttsOptions: options.serviceOptions?.tts || options.tts || {},
+    // Opt-in safety/observability switches (STT final re-check, server-side
+    // energy barge-in backstop). Default OFF; enabled via .env on real builds.
+    // Explicit ws.sessionOptions always win over env.
+    sessionOptions: mergeLiveSessionEnvOptions(options.ws?.sessionOptions, process.env),
+    metricsAggregator,
   });
   return server;
 }
@@ -55,7 +66,7 @@ export async function startVoiceServer(options = {}) {
   };
 }
 
-async function routeRequest(req, res, service) {
+async function routeRequest(req, res, service, metricsAggregator = null) {
   const url = new URL(req.url || "/", "http://localhost");
 
   if (req.method === "OPTIONS") {
@@ -75,6 +86,11 @@ async function routeRequest(req, res, service) {
       live_ws_path: "/ws/live",
       tts_provider: process.env.SHERPA_ONNX_TTS_COMMAND ? "sherpa-onnx" : "mock",
     });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/metrics") {
+    sendJson(res, 200, metricsAggregator ? metricsAggregator.snapshot() : { turns: 0 });
     return;
   }
 

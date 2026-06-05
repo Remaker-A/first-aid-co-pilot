@@ -343,29 +343,50 @@ function buildStateAction(state, currentStage, nextStage, decision, event) {
         logEvent: { type: isCprStart ? "cpr_started" : "cpr_continued", detail: "cpr_loop" },
       });
     }
-    case AgentStage.S8_ASSISTANCE:
+    case AgentStage.S8_ASSISTANCE: {
+      const aedEvent = isAedEvent(event);
+      const fatigueEvent = isFatigueEvent(event);
+      const softAedAlias = isSoftAedAliasEvent(event);
+      const intent = aedEvent ? "assist_aed" : fatigueEvent ? "assist_rescuer_fatigue" : "continue_cpr";
+      const ttsText = aedEvent
+        ? softAedAlias
+          ? "如果这是 AED 或自动体外除颤器，打开它，跟着它的语音做；你先继续按压。分析或电击时所有人离开，结束后马上继续按压。"
+          : "AED 到了，让旁人打开它并跟着语音做；你先继续按压。分析或电击时所有人离开，结束后马上继续按压。"
+        : fatigueEvent
+          ? "如果旁边有人，请准备换手。"
+          : "继续按压，跟着节拍；AED 分析或电击时所有人离开。";
       return action(state, {
         stage: nextStage,
-        intent: isAedEvent(event) ? "assist_aed" : "assist_rescuer_fatigue",
+        intent,
         priority: "normal",
-        reasonCodes: isAedEvent(event) ? ["aed_event"] : ["rescuer_fatigue"],
-        throttleKey: isAedEvent(event) ? "assistance.aed" : "assistance.fatigue",
-        minIntervalMs: 15000,
+        reasonCodes: aedEvent
+          ? [softAedAlias ? "aed_soft_alias_event" : "aed_event"]
+          : fatigueEvent
+            ? ["rescuer_fatigue"]
+            : ["assistance_continue_cpr"],
+        throttleKey: aedEvent ? "assistance.aed" : fatigueEvent ? "assistance.fatigue" : "assistance.continue_cpr",
+        minIntervalMs: aedEvent || fatigueEvent ? 15000 : 3000,
         tts: {
-          text: isAedEvent(event)
-            ? "AED 到了，打开它，跟着它的语音做；先继续按压。"
-            : "如果旁边有人，请准备换手。",
+          text: ttsText,
           tone: "calm_firm",
         },
         ui: {
-          mainText: isAedEvent(event) ? "AED 到达" : "准备换手",
-          secondaryText: isAedEvent(event) ? "打开 AED 跟它的语音，先继续按压" : "继续胸外按压",
-          statusTags: isAedEvent(event) ? ["AED", "继续按压"] : ["换手", "不要中断"],
+          mainText: aedEvent ? (softAedAlias ? "疑似 AED 到达" : "AED 到达") : fatigueEvent ? "准备换手" : "继续按压",
+          secondaryText: aedEvent
+            ? "打开 AED，分析/电击时所有人离开"
+            : fatigueEvent
+              ? "继续胸外按压"
+              : "跟着节拍，不要停",
+          statusTags: aedEvent ? ["AED", "继续按压"] : fatigueEvent ? ["换手", "不要中断"] : ["继续按压", "AED"],
         },
         haptic: { enabled: true, pattern: "metronome", bpm: 110 },
-        visualOverlay: { mode: isAedEvent(event) ? "aed_assistance" : "rescuer_assistance" },
-        logEvent: { type: "assistance", detail: isAedEvent(event) ? "aed_event" : "rescuer_fatigue" },
+        visualOverlay: { mode: aedEvent ? "aed_assistance" : fatigueEvent ? "rescuer_assistance" : "cpr_loop" },
+        logEvent: {
+          type: "assistance",
+          detail: aedEvent ? "aed_event" : fatigueEvent ? "rescuer_fatigue" : "continue_cpr",
+        },
       });
+    }
     case AgentStage.S9_HANDOVER:
       if (isHandoverReportGenerated(event)) {
         return action(state, {
@@ -398,7 +419,10 @@ function buildStateAction(state, currentStage, nextStage, decision, event) {
           secondaryText: "让位并听从急救员，生成交接报告",
           statusTags: ["交接报告", "听急救员"],
         },
-        toolActions: [{ type: "generate_handover_report", requires_user_confirmation: false }],
+        toolActions: [
+          { type: "stop_haptic_metronome", requires_user_confirmation: false },
+          { type: "generate_handover_report", requires_user_confirmation: false },
+        ],
         logEvent: { type: "handover_requested", detail: "generate_handover_report" },
       });
     default:
@@ -442,8 +466,12 @@ function isEmergencyCallStarted(toolState, event) {
 }
 
 function isAssistanceEvent(state, event) {
-  const fatigue = event?.rescuer_state?.fatigue_level ?? state.rescuer_state?.fatigue_level;
-  return fatigue === "high" || fatigue === "exhausted" || isAedEvent(event);
+  return isFatigueEvent(event) || isAedEvent(event);
+}
+
+function isFatigueEvent(event) {
+  const fatigue = event?.rescuer_state?.fatigue_level;
+  return fatigue === "high" || fatigue === "exhausted";
 }
 
 function isAssistanceComplete(event) {
@@ -502,6 +530,13 @@ function isAedEvent(event) {
     event?.device_state?.aed_available === true ||
     event?.rescuer_state?.aed_available === true ||
     event?.user_input?.intent === "aed_available"
+  );
+}
+
+function isSoftAedAliasEvent(event) {
+  return (
+    event?.metadata?.aed_soft_alias === true ||
+    event?.user_input?.stt_text?.includes?.("起搏器") === true
   );
 }
 

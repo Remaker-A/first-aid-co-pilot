@@ -61,6 +61,7 @@ const DEFAULT_ALLOWED_TOOL_TYPES_BY_STAGE = Object.freeze({
   MONITOR_RESPONSE: ["emergency_call", "mock_emergency_call", "attach_gps", "attach_gps_location"],
   MONITOR_BREATHING: ["emergency_call", "mock_emergency_call", "attach_gps", "attach_gps_location"],
   S9_HANDOVER: [
+    "stop_haptic_metronome",
     "generate_handover_report",
     "request_share_report",
     "request_share_video",

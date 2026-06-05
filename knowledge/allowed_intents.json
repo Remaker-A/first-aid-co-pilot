@@ -82,7 +82,7 @@
       "step_done",
       "compressions_reported"
     ],
-    "S8_ASSISTANCE": ["guide_rescuer_change", "explain_aed_support", "calm_rescuer", "continue_cpr"],
+    "S8_ASSISTANCE": ["guide_rescuer_change", "assist_aed", "explain_aed_support", "calm_rescuer", "continue_cpr"],
     "S9_HANDOVER": [
       "handover_summary_patch",
       "explain_handover",

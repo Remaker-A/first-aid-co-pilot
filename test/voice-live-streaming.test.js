@@ -176,6 +176,103 @@ test("live session emits final, guidance, state, and streaming audio", async () 
   assert.deepEqual([...audioEvents[0]], [7, 8]);
 });
 
+test("live session emits a per-turn metrics event (timings + tts provider + intent/gemma) when enabled", async () => {
+  const session = createLiveSession({
+    sessionId: "sess_metrics",
+    emitMetrics: true,
+    service: {
+      async createGuidance(input, _stt, timings = {}) {
+        // The TTS-free guidance core populates these stage timers on the shared object.
+        timings.stt_ms = 5;
+        timings.intent_resolution_ms = 3;
+        timings.agent_pipeline_ms = 2;
+        timings.gemma_ms = 0;
+        return {
+          stt: { transcript: input.text, intent: "continue_cpr" },
+          intentResolution: { source: "rule_flow_fast_path", intent: "continue_cpr", fastPath: "s6_readiness_continue_cpr" },
+          pipeline: { state: { current_stage: "S7_CPR_LOOP" } },
+          gemma: { skipped: true, skipReason: "critical_or_tool_state_action" },
+          gemmaPlan: { live: false },
+          guidanceDecision: { source: "rule_flow_fast_path", responseType: "flow_instruction" },
+          guidanceAction: { action_id: "act_metrics", intent: "start_cpr_loop", tts: { text: "现在开始按压。" } },
+          openQuestion: false,
+        };
+      },
+      reset() {},
+    },
+    tts: {
+      cancel() {},
+      async *speak() {
+        yield { chunk: Buffer.from([1, 0]), sampleRate: 16000, channels: 1, bitsPerSample: 16, provider: "tts_cache" };
+      },
+    },
+  });
+  const jsonEvents = [];
+  session.on("json", (event) => jsonEvents.push(event));
+
+  await session.handleControl({ type: "final", text: "开始按压" });
+
+  // The metrics event lands after the spoken audio so the baseline event prefix is unchanged.
+  assert.deepEqual(
+    jsonEvents.map((event) => event.type),
+    ["thinking", "final", "guidance", "state", "audio_begin", "audio_end", "metrics"]
+  );
+
+  const metrics = jsonEvents.find((event) => event.type === "metrics");
+  assert.equal(metrics.turn_seq, 1);
+  assert.equal(metrics.current_stage, "S7_CPR_LOOP");
+  assert.equal(metrics.auto_advance, false);
+  // Latency breakdown threaded from the guidance core + measured TTS + total.
+  assert.equal(metrics.timings.stt_ms, 5);
+  assert.equal(metrics.timings.intent_resolution_ms, 3);
+  assert.equal(metrics.timings.gemma_ms, 0);
+  assert.equal(typeof metrics.timings.tts_ms, "number");
+  assert.equal(typeof metrics.timings.total_ms, "number");
+  // TTS provenance: WA-cache hit + provider name.
+  assert.equal(metrics.tts.provider, "tts_cache");
+  assert.equal(metrics.tts.cache_hit, true);
+  assert.equal(metrics.tts.spoke, true);
+  // Intent source + gemma skip/stale + guidance source for attribution observability.
+  assert.equal(metrics.intent.source, "rule_flow_fast_path");
+  assert.equal(metrics.gemma.skipped, true);
+  assert.equal(metrics.gemma.skip_reason, "critical_or_tool_state_action");
+  assert.equal(metrics.gemma.stale, false);
+  assert.equal(metrics.guidance_source, "rule_flow_fast_path");
+
+  session.close();
+});
+
+test("live session omits the metrics event by default (opt-in only)", async () => {
+  const session = createLiveSession({
+    sessionId: "sess_no_metrics",
+    service: {
+      async createGuidance(input) {
+        return {
+          stt: { transcript: input.text, intent: "scene_safe" },
+          pipeline: { state: { current_stage: "S2_CHECK_RESPONSE" } },
+          guidanceDecision: { source: "state_machine", responseType: "flow_instruction" },
+          guidanceAction: { action_id: "act_no_metrics", tts: { text: "请检查反应。" } },
+        };
+      },
+      reset() {},
+    },
+    tts: {
+      cancel() {},
+      async *speak() {
+        yield { chunk: Buffer.from([1, 0]), sampleRate: 16000, channels: 1, bitsPerSample: 16 };
+      },
+    },
+  });
+  const jsonEvents = [];
+  session.on("json", (event) => jsonEvents.push(event));
+
+  await session.handleControl({ type: "final", text: "现场安全了" });
+
+  assert.equal(jsonEvents.some((event) => event.type === "metrics"), false);
+
+  session.close();
+});
+
 test("live session accepts Android turn control frames", async () => {
   let capturedInput = null;
   const session = createLiveSession({

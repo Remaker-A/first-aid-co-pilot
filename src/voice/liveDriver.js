@@ -14,6 +14,7 @@ export const LiveResponseType = Object.freeze({
 const QUESTION_INTENTS = new Set([
   "ask_cpr_quality",
   "ask_can_stop",
+  "ask_aed_cpr_alternation",
   "ask_aed_help",
   "ask_next_step",
   "ask_emergency_call",
@@ -39,6 +40,7 @@ const OPEN_QUESTION_FLOW_OR_FACT_INTENTS = new Set([
   "scene_safe",
   "scene_unsafe",
   "emergency_called",
+  "aed_available",
   "paramedics_arrived",
 ]);
 
@@ -129,6 +131,11 @@ export function createLiveDriverProposal(input = {}) {
   }
 
   const intent = input.latestUserUtterance?.intent_hint || input.latestUserUtterance?.intent || null;
+  const assistanceFact = createAssistanceFactProposal(input, intent);
+  if (assistanceFact) {
+    return assistanceFact;
+  }
+
   const assistanceQuestion = createAssistanceQuestionProposal(input, intent);
   if (assistanceQuestion) {
     return assistanceQuestion;
@@ -156,16 +163,29 @@ export function createLiveDriverProposal(input = {}) {
         uiSecondaryText: "继续胸外按压",
         statusTags: ["不要停", "继续按压"],
       });
+    case "ask_aed_cpr_alternation":
+      return proposal({
+        responseType: LiveResponseType.QUESTION_ANSWER,
+        intent: "answer_current_cpr_question",
+        ttsText: "继续按压。让旁人贴好 AED 电极并跟着语音做；AED 说正在分析或提示电击时，所有人离开不要碰患者，结束后马上继续按压。",
+        priority: "high",
+        reasonCodes: ["user_asked_aed_cpr_alternation", "continue_compressions"],
+        uiMainText: "AED 配合按压",
+        uiSecondaryText: "分析/电击时离开，结束后继续按压",
+        statusTags: ["AED", "继续按压"],
+        visualOverlay: { mode: "aed_assistance" },
+      });
     case "ask_aed_help":
       return proposal({
         responseType: LiveResponseType.QUESTION_ANSWER,
         intent: "answer_current_cpr_question",
-        ttsText: "打开 AED，跟着它的语音做；先继续按压。",
+        ttsText: "打开 AED，跟着它的语音做；先继续按压。分析或电击时所有人离开，结束后马上继续按压。",
         priority: "high",
         reasonCodes: ["user_asked_aed_help"],
         uiMainText: "AED 协助",
-        uiSecondaryText: "继续按压，跟着 AED 语音",
+        uiSecondaryText: "继续按压，分析/电击时离开",
         statusTags: ["AED", "继续按压"],
+        visualOverlay: { mode: "aed_assistance" },
       });
     case "ask_next_step":
       return proposal({
@@ -189,6 +209,9 @@ export function liveProposalToGuidanceAction(proposalInput, state = {}, sessionI
   if (!proposalInput) {
     return null;
   }
+  const hapticEnabled =
+    state.current_stage === AgentStage.S7_CPR_LOOP ||
+    state.current_stage === AgentStage.S8_ASSISTANCE;
 
   return createGuidanceAction({
     sessionId: sessionId || state.session_id || null,
@@ -212,7 +235,9 @@ export function liveProposalToGuidanceAction(proposalInput, state = {}, sessionI
       statusTags: proposalInput.statusTags || [],
       qualityScore: state.cpr_state?.quality_score ?? null,
     },
-    haptic: { enabled: true, pattern: "metronome", bpm: 110 },
+    haptic: hapticEnabled
+      ? { enabled: true, pattern: "metronome", bpm: 110 }
+      : { enabled: false },
     visualOverlay: proposalInput.visualOverlay || { mode: "cpr_loop", highlight_target: "chest_center" },
     toolActions: [],
     logEvent: {
@@ -473,16 +498,29 @@ function createAssistanceQuestionProposal(input, intent) {
   }
 
   switch (intent) {
+    case "ask_aed_cpr_alternation":
+      return proposal({
+        responseType: LiveResponseType.QUESTION_ANSWER,
+        intent: "explain_aed_support",
+        ttsText: "继续按压。让旁人贴好 AED 电极并跟着语音做；AED 说正在分析或提示电击时，所有人离开不要碰患者，结束后马上继续按压。",
+        priority: "high",
+        reasonCodes: ["user_asked_aed_cpr_alternation", "assistance_stage"],
+        uiMainText: "AED 配合按压",
+        uiSecondaryText: "分析/电击时离开，结束后继续按压",
+        statusTags: ["AED", "继续按压"],
+        visualOverlay: { mode: "aed_assistance" },
+      });
     case "ask_aed_help":
       return proposal({
         responseType: LiveResponseType.QUESTION_ANSWER,
         intent: "explain_aed_support",
-        ttsText: "打开 AED，跟着它的语音做；先继续按压。",
+        ttsText: "打开 AED，跟着它的语音做；先继续按压。分析或电击时所有人离开，结束后马上继续按压。",
         priority: "high",
         reasonCodes: ["user_asked_aed_help", "assistance_stage"],
         uiMainText: "AED 协助",
-        uiSecondaryText: "继续按压，跟着 AED 语音",
+        uiSecondaryText: "继续按压，分析/电击时离开",
         statusTags: ["AED", "继续按压"],
+        visualOverlay: { mode: "aed_assistance" },
       });
     case "ask_can_stop":
       return proposal({
@@ -500,6 +538,29 @@ function createAssistanceQuestionProposal(input, intent) {
   }
 }
 
+function createAssistanceFactProposal(input, intent) {
+  if (input.activeMedicalStage !== AgentStage.S8_ASSISTANCE || intent !== "aed_available") {
+    return null;
+  }
+
+  const softAlias = input.latestEvent?.metadata?.aed_soft_alias === true;
+  const ttsText = softAlias
+    ? "如果这是 AED 或自动体外除颤器，打开它，跟着它的语音做；你先继续按压。分析或电击时所有人离开，结束后马上继续按压。"
+    : "AED 到了，让旁人打开它并跟着语音做；你先继续按压。分析或电击时所有人离开，结束后马上继续按压。";
+
+  return proposal({
+    responseType: LiveResponseType.FLOW_INSTRUCTION,
+    intent: "assist_aed",
+    ttsText,
+    priority: "high",
+    reasonCodes: [softAlias ? "aed_soft_alias_available" : "aed_available", "continue_compressions"],
+    uiMainText: softAlias ? "疑似 AED 到达" : "AED 到达",
+    uiSecondaryText: "打开 AED，分析/电击时所有人离开",
+    statusTags: ["AED", "继续按压"],
+    visualOverlay: { mode: "aed_assistance" },
+  });
+}
+
 function preCprQuestionPrefix(intent) {
   switch (intent) {
     case "ask_cpr_quality":
@@ -507,6 +568,7 @@ function preCprQuestionPrefix(intent) {
     case "ask_can_stop":
       return "还没进入胸外按压步骤；如果你已经开始按压，不要随意停止。";
     case "ask_aed_help":
+    case "ask_aed_cpr_alternation":
       return "AED 可以先放在旁边准备。还没进入胸外按压步骤。";
     case "ask_emergency_call":
       return "是否需要拨打 120，要先看反应和呼吸检查结果。";

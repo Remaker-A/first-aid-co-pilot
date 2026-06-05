@@ -80,6 +80,36 @@ test("intent resolver gates low-confidence CPR trigger slots", async () => {
   assert.equal(result.needsClarification, true);
 });
 
+test("intent resolver exposes only live-safe NLU intents in CPR loop", async () => {
+  let observedFrame = null;
+  const runtime = {
+    parseUserIntent: async (frame) => {
+      observedFrame = frame;
+      return {
+        ok: true,
+        intent: "paramedics_arrived",
+        slots: {},
+        confidence: 0.88,
+        needsClarification: false
+      };
+    }
+  };
+
+  const result = await resolveUserIntent({
+    transcript: "他们已经接手了",
+    stage: AgentStage.S7_CPR_LOOP,
+    runtime,
+    options: { env: { INTENT_NLU: "on" } }
+  });
+
+  assert.equal(result.intent, "paramedics_arrived");
+  assert.equal(result.source, "gemma_nlu");
+  assert.ok(observedFrame.allowed_intents.includes("aed_available"));
+  assert.ok(observedFrame.allowed_intents.includes("paramedics_arrived"));
+  assert.ok(!observedFrame.allowed_intents.includes("no_normal_breathing"));
+  assert.deepEqual(observedFrame.allowed_slots, []);
+});
+
 test("intent resolver honors INTENT_NLU off switch", () => {
   const result = shouldEscalateToNlu({
     transcript: "他好像没气了",

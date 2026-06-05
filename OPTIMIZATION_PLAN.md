@@ -9,14 +9,26 @@
 
 ---
 
+## 进展更新（2026-06-06）
+
+> 单元测试 **355/355 通过**（基线 153 → 329 → 355）。本轮把 P0-B/P2 的"已写好但未接入生产链路"的安全/可观测骨架完成"最后一公里"，全部**默认 OFF、`.env` 显式开启**，默认事件契约与延迟字节不变。
+
+- **P0-B STT final 复核（接入 + 加固 + 度量）**：`liveSessionEnv.js` 把 `STT_FINAL_REVIEW` 等开关从 `.env` 注入 WS 会话（`server.js`）；`liveSession.js` 新增 `breathingPolarity()`，把复核从"整句不同就替换"升级为可审计的 **"有呼吸↔没有呼吸"极性反转**判定（`没/无/不` 负向断言防误判）；每轮 `metrics` 事件新增 `review` 段（triggered/corrected/polarity_flip）。异构纠偏成立：流式 zipformer ↔ 复核用 SenseVoice。
+- **P0-B barge-in 兜底接入**：服务端能量门控 `VOICE_BARGE_IN_ENERGY_GATE`（+ RMS/时长调参项）可经 `.env` 启用为客户端 VAD 的双保险。
+- **P2 可观测性**：新增 `metricsAggregator.js` + **`GET /api/metrics`**，聚合延迟 p50/p95、TTS 缓存命中率、intent 回退分布、gemma skip/stale、复核纠偏计数。
+- **P2 背压**：`MiniWebSocketConnection.sendBinary` 改为"有损背压"——音频帧在 socket 积压超 1MB 时丢弃并计数，控制/状态 JSON 帧永不丢，弱网不再堆爆内存。
+- 启用方式见根目录 `.env.example`（本轮新增的完整模板）。
+
+---
+
 ## 优先级总览
 
 | 编号 | 工作项 | 重要性 | 风险/成本 | 状态 |
 | --- | --- | --- | --- | --- |
 | P0-A | NLU 延迟瓶颈：让 `INTENT_NLU` 升级真正生效 | 高（决定该方向成败） | 中-高（可能涉及模型方案/下载） | 部分落地（异步纠正 + Live stage 修复已上线） |
-| P0-B | Streaming 医疗安全：final 复核 + barge-in 鲁棒 + STT 自愈 | 高（安全相关） | 中 | 部分落地（barge-in / 断句 VAD 已上线） |
+| P0-B | Streaming 医疗安全：final 复核 + barge-in 鲁棒 + STT 自愈 | 高（安全相关） | 中 | 已落地（final 复核接入+极性消歧+度量、能量门控兜底接入、STT 自愈；默认 OFF/`.env` 开启） |
 | P1 | Vision 起步：`cprMetrics.js` 纯算法库 + 单测 | 中（解锁整个视觉方向） | 低（独立、可即时验证） | 待启动 |
-| P2 | 可观测性与增强：度量、缓存、异步润色、背压 | 中-低 | 低-中 | 待启动 |
+| P2 | 可观测性与增强：度量、缓存、异步润色、背压 | 中-低 | 低-中 | 部分落地（per-turn `metrics` + `/api/metrics` 聚合 + WS 写背压；异步润色待续） |
 
 **重要性≠执行顺序**：P1 风险最低、可立即产出可验证成果，适合作为"逐项执行"的破冰第一步；P0-A 在动手前需要先做一次延迟实测以确定方案。建议执行顺序见文末第 6 节。
 

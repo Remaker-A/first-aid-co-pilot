@@ -11,6 +11,7 @@ const DEFAULT_PCM_SAMPLE_RATE = 16000;
 const DEFAULT_PCM_CHANNELS = 1;
 const DEFAULT_PCM_BITS_PER_SAMPLE = 16;
 const MAX_BUFFERED_PCM_BYTES = 8 * 1024 * 1024;
+const DUPLICATE_TEXT_TURN_WINDOW_MS = 4000;
 
 // Live-only proactive follow-up: after a user turn lands on a transition stage
 // (suspected arrest / call-emergency), synthesize system events so "判定骤停 ->
@@ -21,6 +22,8 @@ const AUTO_ADVANCE_STAGES = new Set([
   AgentStage.S4_SUSPECTED_ARREST,
   AgentStage.S5_CALL_EMERGENCY,
 ]);
+const AUTO_ADVANCE_BRIDGE_TTS =
+  "按疑似心脏骤停处理。我将打开 120 拨号并保持免提。现在双手放胸口中央，胳膊伸直；准备好就说开始。";
 
 export function createLiveSession(options = {}) {
   return new LiveSession(options);
@@ -35,6 +38,12 @@ export class LiveSession extends EventEmitter {
     this.sttFactory = options.createStreamingStt || createStreamingStt;
     this.sttOptions = options.sttOptions || {};
     this.disableStreamingStt = options.disableStreamingStt === true;
+
+    // Per-turn latency observability (P2-6). OFF by default so the turn-driven
+    // event contract is byte-for-byte unchanged; the live WS gateway opts in so
+    // every turn emits a `metrics` event (stt/intent/gemma/tts/total + TTS cache
+    // hit + intent source + gemma skip/stale) for device-side latency tuning.
+    this.metricsEnabled = options.emitMetrics === true || options.metrics?.enabled === true;
     this.pcmSampleRate = options.pcmSampleRate || DEFAULT_PCM_SAMPLE_RATE;
     this.pcmChannels = options.pcmChannels || DEFAULT_PCM_CHANNELS;
     this.pcmBitsPerSample = options.pcmBitsPerSample || DEFAULT_PCM_BITS_PER_SAMPLE;
@@ -45,6 +54,8 @@ export class LiveSession extends EventEmitter {
     this.closed = false;
     this.turnSeq = 0;
     this.currentSpeechSeq = 0;
+    this.lastAcceptedFinalText = "";
+    this.lastAcceptedFinalAt = 0;
     this.context = {};
     this.sttSession = null;
     this.sttReady = false;
@@ -376,6 +387,9 @@ export class LiveSession extends EventEmitter {
     if (!text) {
       return;
     }
+    if (this.shouldDropStaleFinal(text)) {
+      return;
+    }
     let intent = event?.intent ?? null;
 
     // Snapshot the captured utterance *before* clearing so an optional offline
@@ -387,18 +401,62 @@ export class LiveSession extends EventEmitter {
         : null;
     this.clearBufferedAudio();
 
+    let review = null;
     if (reviewPcm) {
-      const corrected = await this.reviewCriticalFinal(text, reviewPcm);
+      const originalText = text;
+      const corrected = await this.reviewCriticalFinal(originalText, reviewPcm);
       if (this.closed) {
         return;
       }
-      if (corrected && corrected !== text) {
+      review = { triggered: true, corrected: false, polarity_flip: false };
+      if (corrected && corrected !== originalText) {
+        // The heterogeneous offline engine (SenseVoice) disagrees with the
+        // streaming zipformer on a safety-critical breathing/negation final:
+        // trust the offline transcript and re-derive intent. A breathing
+        // polarity flip (有呼吸 <-> 没有呼吸) is the most dangerous mishear —
+        // surface it explicitly so the metrics/audit trail can count it.
+        const before = breathingPolarity(originalText);
+        const after = breathingPolarity(corrected);
         text = corrected;
         intent = inferIntent(text);
+        review.corrected = true;
+        review.polarity_flip = before !== null && after !== null && before !== after;
+        review.polarity_before = before;
+        review.polarity_after = after;
       }
     }
 
-    this.processTurn({ text, intent });
+    this.processTurn({ text, intent, review });
+  }
+
+  shouldDropStaleFinal(text) {
+    const normalized = normalizeAsrFinalText(text);
+    if (!normalized) {
+      return true;
+    }
+    if (this.speaking) {
+      this.emitJson({
+        type: "asr_ignored",
+        session_id: this.sessionId,
+        reason: "assistant_speaking",
+      });
+      return true;
+    }
+    const now = Date.now();
+    if (
+      normalized === this.lastAcceptedFinalText &&
+      now - this.lastAcceptedFinalAt <= DUPLICATE_TEXT_TURN_WINDOW_MS
+    ) {
+      this.emitJson({
+        type: "asr_ignored",
+        session_id: this.sessionId,
+        reason: "duplicate_final",
+      });
+      return true;
+    }
+    this.lastAcceptedFinalText = normalized;
+    this.lastAcceptedFinalAt = now;
+    return false;
   }
 
   // Best-effort offline re-check for safety-critical finals. Never throws into
@@ -464,19 +522,26 @@ export class LiveSession extends EventEmitter {
 
     const turnSeq = ++this.turnSeq;
     this.cancelSpeech("new_turn");
+    // The offline-review metadata (if any) rides alongside the turn so the
+    // per-turn metrics event can report the safety re-check; it must not leak
+    // into the service payload, so it is stripped by withoutControlFields.
+    const review = input.review || null;
     const payload = {
       ...this.context,
       ...withoutControlFields(input),
       sessionId: this.sessionId,
     };
 
-    const result = await this.runGuidanceTurn(payload, turnSeq);
+    const result = await this.runGuidanceTurn(payload, turnSeq, {
+      deferAutoAdvanceSpeech: true,
+      review,
+    });
     if (result !== null) {
-      await this.runAutoAdvance(result, turnSeq);
+      const finalResult = await this.runAutoAdvance(result, turnSeq, { deferAutoAdvanceSpeech: true });
       // WB open question: after the immediate ack (the user turn above), stream the
       // controlled Q&A answer that was generated asynchronously. Same turnSeq, so a
       // barge-in / new user turn supersedes a still-pending answer.
-      await this.speakOpenQuestionAnswer(result, turnSeq);
+      await this.speakOpenQuestionAnswer(finalResult || result, turnSeq);
     }
     // Re-arm the autonomous tick relative to the latest activity so the
     // observation window measures "quiet since the last turn settled".
@@ -487,12 +552,16 @@ export class LiveSession extends EventEmitter {
   // One guidance segment: emit thinking/final/guidance/state and stream the
   // spoken audio. Shared by the user turn and each proactive auto-advance
   // segment so they all reuse the exact same emission contract.
-  async runGuidanceTurn(payload, turnSeq) {
+  async runGuidanceTurn(payload, turnSeq, segmentMeta = {}) {
+    const startedAt = Date.now();
+    // Threaded into the TTS-free guidance core so stt/intent/gemma stage timings
+    // are captured on the same object we later fold tts_ms/total_ms into.
+    const timings = {};
     this.emitJson({ type: "thinking", session_id: this.sessionId, turn_seq: turnSeq });
 
     let result;
     try {
-      result = await this.runGuidance(payload);
+      result = await this.runGuidance(payload, timings);
     } catch (error) {
       this.emitError(error?.message || "Live turn failed.", error?.code || "turn_failed");
       return null;
@@ -518,14 +587,20 @@ export class LiveSession extends EventEmitter {
       intent: guidance.intent,
     });
 
-    if (guidance.guidanceAction) {
+    const emittedGuidance = shouldBridgeGuidanceSpeech(guidance, segmentMeta)
+      ? withGuidanceTts(guidance, AUTO_ADVANCE_BRIDGE_TTS)
+      : guidance;
+
+    if (emittedGuidance.guidanceAction) {
       this.emitJson({
         type: "guidance",
         session_id: this.sessionId,
         turn_seq: turnSeq,
-        action: guidance.guidanceAction,
-        source: guidance.guidanceSource,
-        response_type: guidance.responseType,
+        action: emittedGuidance.guidanceAction,
+        source: emittedGuidance.guidanceSource,
+        response_type: emittedGuidance.responseType,
+        suppress_local_tts: shouldSuppressGuidanceSpeech(guidance, segmentMeta),
+        auto_advance_bridge: emittedGuidance !== guidance,
       });
     }
 
@@ -540,14 +615,150 @@ export class LiveSession extends EventEmitter {
       });
     }
 
-    await this.speakGuidance(guidance, turnSeq);
+    const ttsStats = { spoke: false };
+    if (emittedGuidance !== guidance) {
+      await this.speakGuidance(emittedGuidance, turnSeq, ttsStats);
+    } else if (!shouldSuppressGuidanceSpeech(guidance, segmentMeta)) {
+      await this.speakGuidance(guidance, turnSeq, ttsStats);
+    }
+    this.emitTurnMetrics({ result, guidance, timings, ttsStats, turnSeq, startedAt, segmentMeta });
     return result;
+  }
+
+  // Emit one `metrics` event per guidance segment (the user turn and each proactive
+  // auto-advance segment), carrying the per-stage latency breakdown plus the TTS
+  // cache provider, the resolved intent source and the Gemma skip/stale state. No-op
+  // unless metrics are enabled, so the default event contract is unchanged.
+  emitTurnMetrics({ result, guidance, timings, ttsStats, turnSeq, startedAt, segmentMeta = {} }) {
+    if (!this.metricsEnabled || this.closed) {
+      return;
+    }
+    // handleTurn-style services compute their own timings; createGuidance mutates the
+    // object we passed in. Merge so either service shape reports the same fields.
+    const stageTimings = { ...(result?.timings || {}), ...timings };
+    const gemma = result?.gemma || {};
+    const gemmaPlan = result?.gemmaPlan || {};
+    const openQuestionAnswer = result?.openQuestionAnswer || result?.open_question_answer || null;
+    const intentResolution = result?.intentResolution || result?.intent_resolution || {};
+    const decision = result?.guidanceDecision || {};
+
+    this.emitJson({
+      type: "metrics",
+      session_id: this.sessionId,
+      turn_seq: turnSeq,
+      current_stage: guidance.state?.current_stage ?? null,
+      auto_advance: segmentMeta.autoAdvance === true,
+      timings: {
+        stt_ms: numberOrNull(stageTimings.stt_ms),
+        intent_resolution_ms: numberOrNull(stageTimings.intent_resolution_ms),
+        agent_pipeline_ms: numberOrNull(stageTimings.agent_pipeline_ms),
+        gemma_ms: numberOrNull(stageTimings.gemma_ms),
+        tts_ms: numberOrNull(ttsStats.ms),
+        tts_first_chunk_ms: numberOrNull(ttsStats.firstChunkMs),
+        total_ms: Date.now() - startedAt,
+      },
+      tts: {
+        provider: ttsStats.provider ?? null,
+        cache_hit: typeof ttsStats.cacheHit === "boolean" ? ttsStats.cacheHit : null,
+        spoke: ttsStats.spoke === true,
+      },
+      intent: {
+        source: intentResolution.source ?? null,
+        intent: guidance.intent ?? intentResolution.intent ?? null,
+        fast_path: intentResolution.fastPath ?? null,
+      },
+      gemma: {
+        skipped: gemma.skipped === true,
+        skip_reason: gemma.skipReason ?? null,
+        stale: gemma.stale === true,
+        live: gemmaPlan.live === true || gemma.live === true,
+        open_question: result?.openQuestion === true,
+        open_question_cache_hit: openQuestionAnswer?.cacheHit === true,
+        timeout_ms: numberOrNull(gemmaPlan.timeoutMs ?? gemma.timeout_ms),
+      },
+      open_question: result?.openQuestion === true
+        ? {
+            segment: segmentMeta.openQuestionSegment || "ack",
+            pending: typeof openQuestionAnswer?.promise?.then === "function",
+            cache_hit: openQuestionAnswer?.cacheHit === true ? true : null,
+            cache_key: openQuestionAnswer?.cacheKey ?? null,
+            timeout_ms: numberOrNull(openQuestionAnswer?.timeoutMs ?? gemmaPlan.timeoutMs),
+          }
+        : null,
+      guidance_source: guidance.guidanceSource ?? decision.source ?? null,
+      // Safety re-check provenance (P0). Present only when an offline re-check
+      // ran for this segment; `breathing_polarity_flip` flags the most dangerous
+      // corrected mishear (有呼吸 <-> 没有呼吸).
+      review: segmentMeta.review
+        ? {
+            triggered: segmentMeta.review.triggered === true,
+            corrected: segmentMeta.review.corrected === true,
+            breathing_polarity_flip: segmentMeta.review.polarity_flip === true,
+            polarity_before: segmentMeta.review.polarity_before ?? null,
+            polarity_after: segmentMeta.review.polarity_after ?? null,
+          }
+        : null,
+    });
+  }
+
+  emitOpenQuestionAnswerMetrics({ result, answer, action, turnSeq, ttsStats, startedAt }) {
+    if (!this.metricsEnabled || this.closed) {
+      return;
+    }
+    const metrics = answer?.openQuestionMetrics || {};
+    const guidance = normalizeGuidanceResult(result);
+    this.emitJson({
+      type: "metrics",
+      session_id: this.sessionId,
+      turn_seq: turnSeq,
+      current_stage: action?.stage ?? guidance.state?.current_stage ?? null,
+      auto_advance: false,
+      timings: {
+        stt_ms: null,
+        intent_resolution_ms: null,
+        agent_pipeline_ms: null,
+        gemma_ms: numberOrNull(metrics.wait_ms),
+        open_question_answer_wait_ms: numberOrNull(metrics.wait_ms),
+        tts_ms: numberOrNull(ttsStats.ms),
+        tts_first_chunk_ms: numberOrNull(ttsStats.firstChunkMs),
+        total_ms: Date.now() - startedAt,
+      },
+      tts: {
+        provider: ttsStats.provider ?? null,
+        cache_hit: typeof ttsStats.cacheHit === "boolean" ? ttsStats.cacheHit : null,
+        spoke: ttsStats.spoke === true,
+      },
+      intent: {
+        source: answer?.source || null,
+        intent: action?.intent ?? null,
+        fast_path: null,
+      },
+      gemma: {
+        skipped: false,
+        skip_reason: null,
+        stale: false,
+        live: true,
+        open_question: true,
+        open_question_cache_hit: metrics.cache_hit === true,
+        timeout_ms: numberOrNull(metrics.timeout_ms),
+      },
+      open_question: {
+        segment: "answer",
+        cache_hit: metrics.cache_hit === true,
+        fallback: answer?.fallback === true,
+        reason: answer?.reason || metrics.reason || null,
+        wait_ms: numberOrNull(metrics.wait_ms),
+        timeout_ms: numberOrNull(metrics.timeout_ms),
+      },
+      guidance_source: answer?.source || "gemma_open_question",
+      review: null,
+    });
   }
 
   // Bounded proactive follow-up (Live only). Reuses the same turnSeq so a fresh
   // user turn (barge-in) supersedes the chain. Stops at S6 (waiting for user),
   // when no further transition applies, or after MAX_AUTO_ADVANCE_STEPS.
-  async runAutoAdvance(initialResult, turnSeq) {
+  async runAutoAdvance(initialResult, turnSeq, options = {}) {
     let result = initialResult;
 
     for (let step = 0; step < MAX_AUTO_ADVANCE_STEPS; step += 1) {
@@ -565,7 +776,8 @@ export class LiveSession extends EventEmitter {
 
       const next = await this.runGuidanceTurn(
         { ...this.context, ...followUp, sessionId: this.sessionId },
-        turnSeq
+        turnSeq,
+        { autoAdvance: true, deferAutoAdvanceSpeech: options.deferAutoAdvanceSpeech === true }
       );
       if (next === null) {
         break;
@@ -751,10 +963,12 @@ export class LiveSession extends EventEmitter {
   }
 
   // Prefer the TTS-free guidance core so the hot path never pays for a throwaway
-  // full synthesis; fall back to handleTurn for services that only expose it.
-  runGuidance(payload) {
+  // full synthesis; fall back to handleTurn for services that only expose it. The
+  // shared `timings` object is threaded into createGuidance (stt/intent/gemma stage
+  // timers) so the per-turn metrics event can report a full latency breakdown.
+  runGuidance(payload, timings = {}) {
     if (typeof this.service.createGuidance === "function") {
-      return this.service.createGuidance(payload);
+      return this.service.createGuidance(payload, undefined, timings);
     }
     return this.service.handleTurn(payload);
   }
@@ -780,6 +994,8 @@ export class LiveSession extends EventEmitter {
     this.resetBargeInEnergy();
     this.reconnect.reset();
     this.context = {};
+    this.lastAcceptedFinalText = "";
+    this.lastAcceptedFinalAt = 0;
     // Reset the autonomous tick bookkeeping so a fresh session starts a fresh
     // observation window; re-arm only if the loop is enabled.
     clearTimeout(this.tickTimer);
@@ -815,7 +1031,7 @@ export class LiveSession extends EventEmitter {
     this.removeAllListeners();
   }
 
-  async speakGuidance(guidance, turnSeq) {
+  async speakGuidance(guidance, turnSeq, stats = null) {
     const text = guidance.guidanceAction?.tts?.text || guidance.stateAction?.tts?.text || "";
     if (!text) {
       return;
@@ -825,6 +1041,7 @@ export class LiveSession extends EventEmitter {
     const speechSeq = ++this.currentSpeechSeq;
     this.speaking = true;
     let begun = false;
+    const speakStartedAt = Date.now();
 
     try {
       for await (const item of this.tts.speak(text)) {
@@ -833,6 +1050,15 @@ export class LiveSession extends EventEmitter {
         }
         if (!begun) {
           begun = true;
+          // Record TTS provenance for the metrics event: provider name + whether the
+          // first spoken chunk came from the pre-rendered/WA cache vs live synthesis,
+          // plus time-to-first-audio (the latency that matters for streaming TTS).
+          if (stats) {
+            stats.spoke = true;
+            stats.firstChunkMs = Date.now() - speakStartedAt;
+            stats.provider = item.provider ?? null;
+            stats.cacheHit = item.provider === "tts_cache";
+          }
           this.emitJson({
             type: "audio_begin",
             session_id: this.sessionId,
@@ -865,6 +1091,9 @@ export class LiveSession extends EventEmitter {
         this.emitError(error?.message || "Streaming TTS failed.", error?.code || "tts_stream_failed");
       }
     } finally {
+      if (stats) {
+        stats.ms = Date.now() - speakStartedAt;
+      }
       if (!begun && !this.closed && speechSeq === this.currentSpeechSeq && turnSeq === this.turnSeq) {
         this.emitJson({
           type: "audio_unavailable",
@@ -923,7 +1152,18 @@ export class LiveSession extends EventEmitter {
       response_type: answer.responseType || null,
       open_question_answer: true,
     });
-    await this.speakGuidance({ guidanceAction: action }, turnSeq);
+    const answerWaitMs = numberOrNull(answer?.openQuestionMetrics?.wait_ms) ?? 0;
+    const answerSegmentStartedAt = Date.now() - answerWaitMs;
+    const ttsStats = {};
+    await this.speakGuidance({ guidanceAction: action }, turnSeq, ttsStats);
+    this.emitOpenQuestionAnswerMetrics({
+      result,
+      answer,
+      action,
+      turnSeq,
+      ttsStats,
+      startedAt: answerSegmentStartedAt,
+    });
   }
 
   clearBufferedAudio() {
@@ -988,6 +1228,47 @@ function normalizeGuidanceResult(result = {}) {
   return { guidanceAction, stateAction, state, transcript, intent, guidanceSource, responseType };
 }
 
+function shouldSuppressGuidanceSpeech(guidance = {}, segmentMeta = {}) {
+  if (segmentMeta.deferAutoAdvanceSpeech !== true) {
+    return false;
+  }
+  if (shouldBridgeGuidanceSpeech(guidance, segmentMeta)) {
+    return false;
+  }
+  const stage = guidance.state?.current_stage || guidance.guidanceAction?.stage || null;
+  return AUTO_ADVANCE_STAGES.has(stage);
+}
+
+function shouldBridgeGuidanceSpeech(guidance = {}, segmentMeta = {}) {
+  if (segmentMeta.deferAutoAdvanceSpeech !== true || segmentMeta.autoAdvance !== true) {
+    return false;
+  }
+  const stage = guidance.state?.current_stage || guidance.guidanceAction?.stage || null;
+  return stage === AgentStage.S6_CPR_READY;
+}
+
+function withGuidanceTts(guidance = {}, text = "") {
+  if (!guidance.guidanceAction) {
+    return guidance;
+  }
+  return {
+    ...guidance,
+    guidanceAction: {
+      ...guidance.guidanceAction,
+      tts: {
+        ...(guidance.guidanceAction.tts || {}),
+        text,
+      },
+      reason_codes: [
+        ...(Array.isArray(guidance.guidanceAction.reason_codes)
+          ? guidance.guidanceAction.reason_codes
+          : []),
+        "auto_advance_bridge_tts",
+      ],
+    },
+  };
+}
+
 function hasWakePhrasePrior(state = {}) {
   const scope = state.scope ?? {};
   return scope.entry_source === "wake_phrase" || Boolean(scope.wake_phrase);
@@ -1005,6 +1286,12 @@ function normalizeType(value) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
+function normalizeAsrFinalText(value) {
+  return typeof value === "string"
+    ? value.trim().toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, "")
+    : "";
+}
+
 function sanitizeContext(input = {}) {
   return withoutControlFields(input);
 }
@@ -1019,6 +1306,7 @@ function withoutControlFields(input = {}) {
     channels,
     bitsPerSample,
     bits_per_sample,
+    review,
     ...rest
   } = input;
   return rest;
@@ -1032,6 +1320,34 @@ const CRITICAL_BREATHING_PATTERN =
 
 function isCriticalBreathingFinal(text) {
   return CRITICAL_BREATHING_PATTERN.test(typeof text === "string" ? text : "");
+}
+
+// Breathing polarity for the safety re-check audit trail. "absent" means a
+// CPR-indicating reading (没有呼吸 / 濒死喘息 / no breathing); "present" means a
+// non-CPR reading (有呼吸 / 正常呼吸). The present pattern uses a `没` negative
+// lookbehind so "没有呼吸" is never misread as present. Anything ambiguous
+// (no cue, or both cues) stays `null` so we never *assert* a polarity we cannot
+// defend — a conservative default that never flips a reading to "has breathing".
+const BREATHING_ABSENT_PATTERN =
+  /(没有?(?:正常)?呼吸|无(?:正常)?呼吸|不正常呼吸|呼吸(?:不正常|微弱|很弱|停止)|没气|没喘气|濒死|喘息|gasping|agonal|no\s+normal\s+breathing|no\s+breathing|not\s+breathing|abnormal\s+breathing)/i;
+// Present cues must not fire on a negated phrase ("没有正常呼吸" contains the
+// literal substring "正常呼吸"), so every Chinese cue is guarded by a 没/无/不
+// negative lookbehind, and the bare "normal breathing" form is dropped on the
+// English side (it would otherwise match "no normal breathing").
+const BREATHING_PRESENT_PATTERN =
+  /((?<![没无不])有正常呼吸|(?<![没无不])有呼吸|(?<![没无不])在呼吸|呼吸正常|breathing\s+normally|breathes\s+normally)/i;
+
+export function breathingPolarity(text) {
+  const value = typeof text === "string" ? text : "";
+  const absent = BREATHING_ABSENT_PATTERN.test(value);
+  const present = BREATHING_PRESENT_PATTERN.test(value);
+  if (absent && !present) {
+    return "absent";
+  }
+  if (present && !absent) {
+    return "present";
+  }
+  return null;
 }
 
 function resolveFinalReviewer(options = {}) {
@@ -1079,4 +1395,12 @@ function firstPositive(...values) {
 function numberOr(value, fallback) {
   const num = Number(value);
   return Number.isFinite(num) && num >= 0 ? num : fallback;
+}
+
+// Metrics-friendly numeric coercion: a finite number passes through, anything else
+// (missing stage timer, mock TTS without a measurement) becomes null so the metrics
+// event always carries the key with an explicit "not measured" value.
+function numberOrNull(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
 }

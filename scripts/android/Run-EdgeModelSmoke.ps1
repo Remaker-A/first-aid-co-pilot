@@ -46,6 +46,10 @@ function Invoke-AdbProcess([string[]]$AdbArgs, [int]$TimeoutSeconds, [switch]$Al
   $startInfo.RedirectStandardOutput = $true
   $startInfo.RedirectStandardError = $true
   $startInfo.UseShellExecute = $false
+  # adb emits UTF-8; decode as UTF-8 so Chinese prompts/answers survive instead
+  # of being mangled by the console's legacy (GBK) code page.
+  $startInfo.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+  $startInfo.StandardErrorEncoding = [System.Text.Encoding]::UTF8
 
   $process = [System.Diagnostics.Process]::Start($startInfo)
   if (!$process.WaitForExit($TimeoutSeconds * 1000)) {
@@ -133,9 +137,18 @@ $start.Text | Out-Host
 $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSec)
 while ([DateTime]::UtcNow -lt $deadline) {
   Start-Sleep -Seconds 5
-  $json = Invoke-AdbText -AdbArgs @("shell", "cat", $remoteJson) -AllowFailure
+  # exec-out is binary-safe (no PTY/CRLF translation), so multi-byte UTF-8 in the
+  # JSON (e.g. Chinese Gemma prompts/answers) is not corrupted on the way back.
+  $json = Invoke-AdbText -AdbArgs @("exec-out", "cat", $remoteJson) -AllowFailure
   if ($json.ExitCode -eq 0 -and $json.Text.TrimStart().StartsWith("{")) {
-    $result = $json.Text | ConvertFrom-Json
+    $result = $null
+    try {
+      $result = $json.Text | ConvertFrom-Json
+    } catch {
+      # A checkpoint may be read mid-write; treat as not-ready and poll again.
+      Write-Step "waiting for a complete $remoteJson"
+      continue
+    }
     if ($result.phase -ne "finished") {
       Write-Step "checkpoint phase=$($result.phase)"
       continue
@@ -155,13 +168,13 @@ while ([DateTime]::UtcNow -lt $deadline) {
 }
 
 Write-Step "timed out; recent model logs follow"
-$last = Invoke-AdbText -AdbArgs @("shell", "cat", $remoteJson) -AllowFailure
+$last = Invoke-AdbText -AdbArgs @("exec-out", "cat", $remoteJson) -AllowFailure
 if ($last.ExitCode -eq 0 -and $last.Text.TrimStart().StartsWith("{")) {
   Write-Step "last checkpoint"
   $last.Text | Out-Host
 }
 Write-Step "last sherpa trace"
-Invoke-AdbText -AdbArgs @("shell", "cat", $remoteTrace) -AllowFailure |
+Invoke-AdbText -AdbArgs @("exec-out", "cat", $remoteTrace) -AllowFailure |
   ForEach-Object { $_.Text } |
   Out-Host
 Invoke-AdbText -AdbArgs @("logcat", "-d", "-t", "300", "EdgeModelSmoke:I", "SherpaSpeechEngine:I", "EdgeTextToSpeech:I", "AndroidRuntime:E", "libc:E", "DEBUG:E", "*:S") -AllowFailure |

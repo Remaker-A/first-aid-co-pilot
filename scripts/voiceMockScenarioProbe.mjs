@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import { loadEnv } from "../src/config/loadEnv.js";
 import { createVoiceDemoService, synthesizeSpeech } from "../src/index.js";
+import { TtsAudioCache, DEFAULT_TTS_CACHE_DIR } from "../src/voice/ttsCache.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
@@ -252,6 +253,28 @@ const ACCEPTANCE_STEPS = [
       intent: "answer_current_cpr_question",
       eventSource: "stt",
       ttsIncludes: ["继续按压", "AED", "语音"],
+      guidanceSourceAny: ["rule_fast_path"],
+      responseType: "question_answer",
+      liveDriverSource: "rule_fast_path",
+      maxTotalMs: 12000,
+    },
+  },
+  {
+    // P0-1 regression: a misheard AED question ("除颤仪" -> "出差移") that the regex
+    // classifier cannot catch must still resolve to the fixed AED safety answer via
+    // the phonetic safety net (intentResolver -> phoneticIntent), not slide into an
+    // open-question ack. Exercises both text and tts-stt (round-trip) paths.
+    id: "ask_aed_help_phonetic",
+    label: "Rescue a misheard AED question via the phonetic safety net",
+    spokenText: "出差移来了怎么办",
+    idealAnswer: "继续按压。让旁边的人打开 AED，跟着它的语音做。",
+    advanceMs: 1500,
+    payload: {},
+    expect: {
+      stage: "S7_CPR_LOOP",
+      intent: "answer_current_cpr_question",
+      eventSource: "stt",
+      ttsIncludes: ["AED", "语音", "继续按压"],
       guidanceSourceAny: ["rule_fast_path"],
       responseType: "question_answer",
       liveDriverSource: "rule_fast_path",
@@ -545,8 +568,16 @@ const ACCEPTANCE_STEPS = [
 await main();
 
 async function main() {
+  // Drive output TTS through the shipped WA bundle so standard guidance phrases
+  // replay from the pre-rendered cache (~0ms) instead of live synthesis. provider
+  // "mock" makes any bundle miss a cheap, deterministic fallback so a tts_cache
+  // provider unambiguously means a real bundle hit.
+  const ttsCache = new TtsAudioCache({ bundleDir: DEFAULT_TTS_CACHE_DIR });
+  await ttsCache.loadBundle();
+  const bundleAudioRendered = await readBundleAudioRendered();
   const service = createVoiceDemoService({
     now: () => new Date(fakeNowMs).toISOString(),
+    tts: { cache: ttsCache, provider: "mock" },
   });
   const results = [];
 
@@ -570,7 +601,7 @@ async function main() {
     });
   }
 
-  const summary = summarize(results, inputMode, sessionId);
+  const summary = summarize(results, inputMode, sessionId, bundleAudioRendered);
   await fs.mkdir(artifactsDir, { recursive: true });
   const outputPath = path.join(
     artifactsDir,
@@ -704,7 +735,7 @@ function projectResponse(response, elapsedMs) {
   };
 }
 
-function summarize(results, inputMode, sessionId) {
+function summarize(results, inputMode, sessionId, bundleAudioRendered = false) {
   const failed = results.filter((result) => !result.ok);
   const totalMs = Date.now() - startedAt;
   const slowest = [...results].sort((left, right) => right.actual.totalMs - left.actual.totalMs)[0] || null;
@@ -713,14 +744,28 @@ function summarize(results, inputMode, sessionId) {
   const sttSources = [...new Set(results.map((result) => result.actual.sttSource).filter(Boolean))];
   const ttsProviders = [...new Set(results.map((result) => result.actual.ttsProvider).filter(Boolean))];
 
+  // WA bundle hit rate: how often a standard guidance phrase replayed from the
+  // pre-rendered cache. When the shipped bundle has audio, at least one standard
+  // phrase must hit; a manifest-only checkout (no WAVs) makes this vacuously true.
+  const ttsTurns = results.filter((result) => result.actual.ttsText);
+  const bundleHits = ttsTurns.filter((result) => result.actual.ttsProvider === "tts_cache");
+  const bundleHitRate = ttsTurns.length > 0 ? bundleHits.length / ttsTurns.length : 0;
+  const bundleHitOk = !bundleAudioRendered || bundleHits.length > 0;
+
   return {
-    ok: failed.length === 0,
+    ok: failed.length === 0 && bundleHitOk,
     input_mode: inputMode,
     session_id: sessionId,
     total_steps: results.length,
     passed: results.length - failed.length,
     failed: failed.length,
     runtime_ms: totalMs,
+    tts_bundle_audio_rendered: bundleAudioRendered,
+    tts_bundle_hits: bundleHits.length,
+    tts_bundle_turns: ttsTurns.length,
+    tts_bundle_hit_rate: Number(bundleHitRate.toFixed(4)),
+    tts_bundle_hit_ok: bundleHitOk,
+    tts_bundle_hit_steps: bundleHits.map((result) => result.id),
     slowest_step: slowest ? {
       id: slowest.id,
       total_ms: slowest.actual.totalMs,
@@ -736,11 +781,27 @@ function summarize(results, inputMode, sessionId) {
   };
 }
 
+async function readBundleAudioRendered() {
+  try {
+    const manifest = JSON.parse(
+      await fs.readFile(path.join(DEFAULT_TTS_CACHE_DIR, "manifest.json"), "utf8")
+    );
+    return manifest.audio_rendered === true;
+  } catch {
+    return false;
+  }
+}
+
 function printSummary(summary, results, outputPath) {
   console.log(`Voice mock scenario probe: ${summary.ok ? "PASS" : "FAIL"}`);
   console.log(`input=${summary.input_mode} session=${summary.session_id}`);
   console.log(`steps=${summary.passed}/${summary.total_steps} runtime=${summary.runtime_ms}ms`);
   console.log(`stt=${summary.stt_sources.join(",") || "none"} tts=${summary.tts_providers.join(",") || "none"}`);
+  console.log(
+    `tts_bundle=${summary.tts_bundle_hits}/${summary.tts_bundle_turns} hits ` +
+    `(${Math.round(summary.tts_bundle_hit_rate * 100)}%) audio_rendered=${summary.tts_bundle_audio_rendered} ` +
+    `${summary.tts_bundle_hit_ok ? "ok" : "FAIL"}`
+  );
   console.log(`gemma_used=${summary.gemma_used_steps.join(",") || "none"}`);
   console.log(`slowest=${summary.slowest_step?.id || "none"} ${summary.slowest_step?.total_ms ?? 0}ms`);
   console.log(`report=${outputPath}`);

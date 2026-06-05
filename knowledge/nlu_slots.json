@@ -24,6 +24,8 @@
     "S4_SUSPECTED_ARREST",
     "S5_CALL_EMERGENCY",
     "S6_CPR_READY"
+    ,"S7_CPR_LOOP"
+    ,"S8_ASSISTANCE"
   ],
   "escalation_markers": {
     "uncertain": [
@@ -131,6 +133,34 @@
         "ask_next_step",
         "step_done",
         "compressions_reported"
+      ],
+      "slots": {}
+    },
+    "S7_CPR_LOOP": {
+      "allowed_intents": [
+        "aed_available",
+        "ask_aed_help",
+        "ask_aed_cpr_alternation",
+        "paramedics_arrived",
+        "emergency_team_arrived",
+        "ask_can_stop",
+        "ask_cpr_quality",
+        "ask_next_step",
+        "ask_emergency_call",
+        "continue_cpr"
+      ],
+      "slots": {}
+    },
+    "S8_ASSISTANCE": {
+      "allowed_intents": [
+        "aed_available",
+        "ask_aed_help",
+        "ask_aed_cpr_alternation",
+        "paramedics_arrived",
+        "emergency_team_arrived",
+        "ask_can_stop",
+        "ask_next_step",
+        "continue_cpr"
       ],
       "slots": {}
     }

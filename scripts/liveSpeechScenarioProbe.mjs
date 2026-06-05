@@ -185,6 +185,14 @@ const STEPS = [
         },
       ],
       maxStage: "S7_CPR_LOOP",
+      // P2-6/P2-7: the metrics event must attribute the readiness start to the
+      // deterministic flow fast path (both intent + guidance source) and report the
+      // WA-cache TTS hit, not drift to state_machine_critical.
+      metrics: {
+        guidanceSource: "rule_flow_fast_path",
+        intentSource: "rule_flow_fast_path",
+        cacheHit: true,
+      },
     },
   },
   {
@@ -207,6 +215,7 @@ const STEPS = [
           ttsIncludesAny: ["100 到 120", "100到120"],
         },
       ],
+      metrics: { guidanceSource: "rule_fast_path" },
     },
   },
   {
@@ -228,6 +237,7 @@ const STEPS = [
           ttsIncludes: ["不要停", "继续按压"],
         },
       ],
+      metrics: { guidanceSource: "rule_fast_path" },
     },
   },
   {
@@ -251,6 +261,7 @@ const STEPS = [
           ttsIncludesAny: ["打开 AED", "打开AED", "AED"],
         },
       ],
+      metrics: { guidanceSource: "rule_fast_path" },
     },
   },
 ];
@@ -323,11 +334,13 @@ function buildLiveSession() {
   });
 
   // Mock streaming TTS: yields one tiny PCM16 frame per utterance so we can
-  // assert the audio_begin -> PCM -> audio_end envelope without real audio.
+  // assert the audio_begin -> PCM -> audio_end envelope without real audio. The
+  // `provider` field mirrors the real streamer so the metrics event reports a
+  // deterministic TTS source (here a WA-cache hit) without touching sherpa.
   const tts = {
     cancel() {},
     async *speak() {
-      yield { chunk: Buffer.from([1, 0]), sampleRate: 16000, channels: 1, bitsPerSample: 16 };
+      yield { chunk: Buffer.from([1, 0]), sampleRate: 16000, channels: 1, bitsPerSample: 16, provider: "tts_cache" };
     },
   };
 
@@ -336,6 +349,8 @@ function buildLiveSession() {
     service,
     tts,
     disableStreamingStt: true,
+    // P2-6: assert the per-turn `metrics` event the live WS path emits.
+    emitMetrics: true,
   });
 
   const jsonEvents = [];
@@ -473,6 +488,54 @@ function evaluateStep(step, turnJson, turnAudio) {
     }
   }
 
+  // P2-6: one `metrics` event per guidance segment, each carrying the latency
+  // breakdown + TTS cache provider + intent source + gemma skip/stale fields.
+  const metricsEvents = turnJson.filter((event) => event.type === "metrics");
+  if (Array.isArray(expect.segments)) {
+    addCheck(
+      checks,
+      "metrics_count",
+      metricsEvents.length === expect.segments.length,
+      String(expect.segments.length),
+      String(metricsEvents.length)
+    );
+    for (const [i, metric] of metricsEvents.entries()) {
+      const tag = `metrics${i + 1}`;
+      const issues = metricsShapeIssues(metric);
+      addCheck(checks, `${tag}:shape`, issues.length === 0, "stt/intent/gemma/tts/total + provider/source/skip", issues.join(",") || "ok");
+    }
+  }
+  if (expect.metrics) {
+    const metric = metricsEvents[0] || null;
+    if (expect.metrics.guidanceSource) {
+      addCheck(
+        checks,
+        "metrics:guidance_source",
+        metric?.guidance_source === expect.metrics.guidanceSource,
+        expect.metrics.guidanceSource,
+        metric?.guidance_source ?? "<none>"
+      );
+    }
+    if (expect.metrics.intentSource) {
+      addCheck(
+        checks,
+        "metrics:intent_source",
+        metric?.intent?.source === expect.metrics.intentSource,
+        expect.metrics.intentSource,
+        metric?.intent?.source ?? "<none>"
+      );
+    }
+    if (typeof expect.metrics.cacheHit === "boolean") {
+      addCheck(
+        checks,
+        "metrics:tts_cache_hit",
+        metric?.tts?.cache_hit === expect.metrics.cacheHit,
+        String(expect.metrics.cacheHit),
+        String(metric?.tts?.cache_hit)
+      );
+    }
+  }
+
   if (expect.finalStage) {
     const finalStage = lastStage(turnJson);
     addCheck(checks, "final_stage", finalStage === expect.finalStage, expect.finalStage, finalStage ?? "<none>");
@@ -547,6 +610,35 @@ function extractSegments(turnJson) {
   return segments;
 }
 
+// A well-formed `metrics` event must carry the full latency breakdown keys
+// (present, numeric-or-null), the TTS provenance, the intent source and the gemma
+// skip flag. Returns the list of missing/invalid fields ([] when valid).
+function metricsShapeIssues(metric) {
+  const issues = [];
+  const timings = metric?.timings;
+  if (!timings || typeof timings !== "object") {
+    return ["timings"];
+  }
+  for (const key of ["stt_ms", "intent_resolution_ms", "gemma_ms", "tts_ms", "total_ms"]) {
+    if (!(key in timings)) {
+      issues.push(`timings.${key}`);
+    }
+  }
+  if (typeof timings.total_ms !== "number") {
+    issues.push("total_ms!number");
+  }
+  if (!metric?.tts || !("provider" in metric.tts) || !("cache_hit" in metric.tts)) {
+    issues.push("tts.provider/cache_hit");
+  }
+  if (!metric?.intent || !("source" in metric.intent)) {
+    issues.push("intent.source");
+  }
+  if (!metric?.gemma || typeof metric.gemma.skipped !== "boolean") {
+    issues.push("gemma.skipped");
+  }
+  return issues;
+}
+
 function toolTypesOf(action) {
   const tools = Array.isArray(action?.tool_actions)
     ? action.tool_actions
@@ -584,6 +676,16 @@ function projectTurn(turnJson, turnAudio) {
       call_brief_script: segment.callBriefScript || null,
       cpr_started: segment.state?.cpr_state?.started ?? null,
     })),
+    metrics: turnJson
+      .filter((event) => event.type === "metrics")
+      .map((event) => ({
+        guidance_source: event.guidance_source ?? null,
+        intent_source: event.intent?.source ?? null,
+        tts_provider: event.tts?.provider ?? null,
+        tts_cache_hit: event.tts?.cache_hit ?? null,
+        gemma_skipped: event.gemma?.skipped ?? null,
+        total_ms: event.timings?.total_ms ?? null,
+      })),
     audio_frames: turnAudio.length,
   };
 }
@@ -592,6 +694,10 @@ function summarize(results, session) {
   const failed = results.filter((result) => !result.ok);
   const segmentsCovered = results.reduce(
     (sum, result) => sum + (result.actual.segments?.length || 0),
+    0
+  );
+  const metricsEmitted = results.reduce(
+    (sum, result) => sum + (result.actual.metrics?.length || 0),
     0
   );
   const stagesCovered = [
@@ -608,6 +714,7 @@ function summarize(results, session) {
     passed: results.length - failed.length,
     failed: failed.length,
     segments_asserted: segmentsCovered,
+    metrics_emitted: metricsEmitted,
     stages_covered: stagesCovered,
     core_regression: core ? { id: core.id, ok: core.ok } : null,
     failed_steps: failed.map((result) => result.id),
@@ -617,7 +724,7 @@ function summarize(results, session) {
 function printSummary(summary, results, outputPath) {
   console.log(`Live speech flow probe: ${summary.ok ? "PASS" : "FAIL"}`);
   console.log(`session=${summary.session_id} steps=${summary.passed}/${summary.total_steps}`);
-  console.log(`segments_asserted=${summary.segments_asserted} stages=${summary.stages_covered.join(",")}`);
+  console.log(`segments_asserted=${summary.segments_asserted} metrics_emitted=${summary.metrics_emitted} stages=${summary.stages_covered.join(",")}`);
   if (summary.core_regression) {
     console.log(
       `core_regression(S6->S7 rule_flow_fast_path)=${summary.core_regression.ok ? "PASS" : "FAIL"} (${summary.core_regression.id})`

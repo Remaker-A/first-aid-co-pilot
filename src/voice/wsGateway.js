@@ -4,6 +4,10 @@ import { createLiveSession } from "./liveSession.js";
 
 const WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 const MAX_FRAME_BYTES = 16 * 1024 * 1024;
+// Lossy audio backpressure threshold: if the socket already has more than this
+// many bytes queued (slow/stalled client), new PCM audio frames are dropped
+// instead of piling up unbounded. Control/JSON frames are never dropped.
+const DEFAULT_MAX_AUDIO_BACKLOG_BYTES = 1024 * 1024;
 
 export function attachVoiceWsGateway(server, options = {}) {
   const gateway = createVoiceWsGateway(options);
@@ -16,10 +20,15 @@ export function attachVoiceWsGateway(server, options = {}) {
 export function createVoiceWsGateway(options = {}) {
   const sessions = new Set();
   const path = options.path || "/ws/live";
+  // Optional shared per-turn metrics aggregator. When provided, every session's
+  // `metrics` event is folded in so /api/metrics can expose latency p50/p95,
+  // TTS cache hit-rate, intent fallback mix, and safety re-check counts.
+  const metricsAggregator = options.metricsAggregator || null;
 
   return {
     path,
     sessions,
+    metricsAggregator,
     handleUpgrade(req, socket, head = Buffer.alloc(0)) {
       const url = new URL(req.url || "/", "http://localhost");
       if (url.pathname !== path) {
@@ -27,12 +36,17 @@ export function createVoiceWsGateway(options = {}) {
         return;
       }
 
-      const connection = acceptWebSocket(req, socket, head);
+      const connection = acceptWebSocket(req, socket, head, {
+        maxAudioBacklogBytes: options.maxAudioBacklogBytes,
+      });
       if (!connection) {
         return;
       }
 
       const session = createLiveSession({
+        // Per-turn latency metrics are on for the live WS path so the client gets a
+        // `metrics` event every turn; a caller can still force it off via sessionOptions.
+        emitMetrics: true,
         ...(options.sessionOptions || {}),
         autonomousTick: true,
         tick: {
@@ -53,7 +67,12 @@ export function createVoiceWsGateway(options = {}) {
       });
       sessions.add(session);
 
-      session.on("json", (message) => connection.sendJson(message));
+      session.on("json", (message) => {
+        if (metricsAggregator && message?.type === "metrics") {
+          metricsAggregator.record(message);
+        }
+        connection.sendJson(message);
+      });
       session.on("audio", (chunk) => connection.sendBinary(chunk));
       connection.on("text", async (text) => {
         let message;
@@ -85,11 +104,17 @@ export function createVoiceWsGateway(options = {}) {
 }
 
 export class MiniWebSocketConnection extends EventEmitter {
-  constructor(socket, head = Buffer.alloc(0)) {
+  constructor(socket, head = Buffer.alloc(0), options = {}) {
     super();
     this.socket = socket;
     this.buffer = Buffer.from(head || Buffer.alloc(0));
     this.closed = false;
+    this.maxAudioBacklogBytes = numberOrDefault(
+      options.maxAudioBacklogBytes,
+      DEFAULT_MAX_AUDIO_BACKLOG_BYTES
+    );
+    this.droppedAudioFrames = 0;
+    this.droppedAudioBytes = 0;
 
     socket.on("data", (chunk) => this.handleData(chunk));
     socket.on("error", (error) => this.emit("error", error));
@@ -108,6 +133,19 @@ export class MiniWebSocketConnection extends EventEmitter {
   }
 
   sendBinary(bytes) {
+    // Lossy backpressure for audio only: a slow/stalled client must not let PCM
+    // frames pile up unbounded in the socket write buffer. Time-sensitive audio
+    // is shed once the socket is backlogged past the threshold; control/JSON
+    // frames go through sendText and are never dropped here.
+    if (this.closed || this.socket.destroyed) {
+      return;
+    }
+    const backlog = Number(this.socket.writableLength) || 0;
+    if (backlog > this.maxAudioBacklogBytes) {
+      this.droppedAudioFrames += 1;
+      this.droppedAudioBytes += bytes?.length || 0;
+      return;
+    }
     this.sendFrame(0x2, Buffer.from(bytes));
   }
 
@@ -250,7 +288,7 @@ export class MiniWebSocketConnection extends EventEmitter {
   }
 }
 
-function acceptWebSocket(req, socket, head) {
+function acceptWebSocket(req, socket, head, options = {}) {
   const key = req.headers["sec-websocket-key"];
   const upgrade = String(req.headers.upgrade || "").toLowerCase();
   if (upgrade !== "websocket" || typeof key !== "string" || !key.trim()) {
@@ -270,7 +308,7 @@ function acceptWebSocket(req, socket, head) {
     ].join("\r\n")
   );
 
-  return new MiniWebSocketConnection(socket, head);
+  return new MiniWebSocketConnection(socket, head, options);
 }
 
 function rejectUpgrade(socket, statusCode, message) {
@@ -290,4 +328,9 @@ function unmask(payload, mask) {
   for (let i = 0; i < payload.length; i += 1) {
     payload[i] ^= mask[i % 4];
   }
+}
+
+function numberOrDefault(value, fallback) {
+  const num = Number(value);
+  return Number.isFinite(num) && num > 0 ? num : fallback;
 }

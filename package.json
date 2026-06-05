@@ -19,6 +19,7 @@
     "probe:voice": "node scripts/voiceMockScenarioProbe.mjs --input=text",
     "probe:voice:stt": "node scripts/voiceMockScenarioProbe.mjs --input=tts-stt",
     "probe:live": "node scripts/liveSpeechScenarioProbe.mjs",
+    "render:tts-cache": "node scripts/speech/prerenderTtsCache.mjs --audio --sync-android",
     "voice:serve": "node src/voice/server.js",
     "test": "node --test",
     "test:watch": "node --test --watch"

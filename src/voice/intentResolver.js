@@ -3,6 +3,7 @@ import { createNluFrame as createDecisionNluFrame } from "../gemma/decisionFrame
 import { nluCacheKey } from "../gemma/nluCache.js";
 import { getNluConfidenceFloors, getNluStageConfig } from "../knowledge/knowledgeBase.js";
 import { classifyIntent } from "./stt.js";
+import { resolvePhoneticIntent } from "./phoneticIntent.js";
 
 const DEFAULT_REGEX_CONFIDENCE_FLOOR = 0.85;
 const DEFAULT_SLOT_CONFIDENCE_FLOOR = 0.6;
@@ -70,16 +71,30 @@ export async function resolveUserIntent({
   const text = normalizeText(transcript);
   const classification = normalizeClassification(options.classification || classifyIntent(text));
   const flowIntent = !classification.intent ? resolveFlowProgressIntent(text, stage) : null;
+  // 音近安全网：仅当正则 miss 且无流程快路径时，对 CPR-live(S6-S8) 的少数关键闭集
+  // 提问（除颤仪/能否停/呼叫120）做音近模糊匹配，把被听岔（如"除颤仪"→"出差移"）的
+  // 提问拉回 liveDriver 的固定安全答句，而非滑入开放问答 ack。绝不覆盖已确信的正则
+  // 意图、绝不臆造观察事实（呼吸/反应仍走原 NLU 安全守卫）。
+  const phoneticMatch =
+    !classification.intent && !flowIntent ? resolvePhoneticIntent(text, stage, options) : null;
   // 安全护栏：模糊/疑问语气的"呼吸缺失"（如"我看不太清楚他有没有呼吸"）不得仅凭
   // 正则子串匹配就当成确定 CPR 触发事实；源头降级为 clarify_breathing（与 NLU 开关
   // 无关都安全），NLU 开启时下方仍会升级交给 Gemma 解析。
   const uncertainBreathing = !flowIntent && isUncertainBreathingClaim(text, classification.intent);
-  const effectiveIntent = flowIntent || (uncertainBreathing ? "clarify_breathing" : classification.intent);
-  const baseConfidence = flowIntent ? 0.9 : classification.score;
+  const effectiveIntent =
+    flowIntent || phoneticMatch?.intent || (uncertainBreathing ? "clarify_breathing" : classification.intent);
+  const baseConfidence = flowIntent ? 0.9 : phoneticMatch ? phoneticMatch.score : classification.score;
+  const resolvedSource = flowIntent
+    ? "rule_flow_fast_path"
+    : phoneticMatch
+      ? "phonetic_fuzzy"
+      : isIntentNluEnabled(options)
+        ? "stt"
+        : "regex";
   const regexResult = createResolvedIntent({
     intent: effectiveIntent,
     confidence: baseConfidence,
-    source: flowIntent ? "rule_flow_fast_path" : (isIntentNluEnabled(options) ? "stt" : "regex"),
+    source: resolvedSource,
     slots: slotsFromIntent(effectiveIntent, baseConfidence),
     needsClarification: uncertainBreathing || !effectiveIntent,
     escalated: false,
@@ -90,6 +105,13 @@ export async function resolveUserIntent({
   // never escalate or wait on the model.
   if (flowIntent) {
     return { ...regexResult, escalationReason: "flow_fast_path" };
+  }
+
+  // Phonetic safety-net hit (regex miss + CPR-live): adopt the critical closed-set
+  // intent deterministically. Like the flow fast-path, it does not wait on or
+  // escalate to the local model — the fixed safety answer must be immediate.
+  if (phoneticMatch) {
+    return { ...regexResult, escalationReason: "phonetic_fuzzy_fast_path" };
   }
 
   const escalation = shouldEscalateToNlu({

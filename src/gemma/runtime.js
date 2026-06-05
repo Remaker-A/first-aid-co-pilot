@@ -13,6 +13,7 @@ import { createGemmaFallbackPatch } from "./fallbackPolicy.js";
 import { requestGemma } from "./gemmaServer.js";
 import {
   DEFAULT_GEMMA_MODEL_FILE_PATTERN,
+  DEFAULT_GEMMA_TIMEOUT_MS,
   GEMMA_PLACEHOLDER_MIN_BYTES,
   describeGemmaModelSetup,
   describeMissingGemmaModel,
@@ -172,6 +173,13 @@ export class GemmaRuntime {
 
   async run(frame, callOptions = {}) {
     const config = resolveGemmaConfig(this.options);
+    const timeoutMs = resolveGemmaCallTimeoutMs(callOptions, this.options, config);
+    const realtimeBudget = hasExplicitRealtimeBudget(callOptions);
+    const requestConfig = {
+      ...config,
+      timeoutMs,
+      serveRequestTimeoutMs: timeoutMs
+    };
     const modelFile = await resolveModelFile(config);
 
     if (!modelFile) {
@@ -188,7 +196,7 @@ export class GemmaRuntime {
       ? null
       : buildCombinedPrompt(frame, messages, promptOptions);
     const args = buildLiteRtLmArgs({
-      ...config,
+      ...requestConfig,
       modelFile,
       messages,
       prompt
@@ -198,13 +206,16 @@ export class GemmaRuntime {
     if (config.daemon) {
       try {
         result = await this.serverRunner({
-          config,
+          config: requestConfig,
           messages,
           prompt,
           modelFile,
-          timeoutMs: config.serveRequestTimeoutMs,
+          timeoutMs,
         });
-      } catch {
+      } catch (error) {
+        if (realtimeBudget) {
+          return createFallbackResult(frame, classifyRunnerError(error), error);
+        }
         result = null;
       }
     }
@@ -212,15 +223,15 @@ export class GemmaRuntime {
     if (!result) {
       try {
         result = await this.runner({
-          command: config.command,
+          command: requestConfig.command,
           args,
-          timeoutMs: config.timeoutMs,
-          cwd: config.cwd,
-          env: config.env,
+          timeoutMs,
+          cwd: requestConfig.cwd,
+          env: requestConfig.env,
           messages,
           prompt,
           modelFile,
-          backend: config.backend
+          backend: requestConfig.backend
         });
       } catch (error) {
         return createFallbackResult(frame, classifyRunnerError(error), error);
@@ -229,7 +240,7 @@ export class GemmaRuntime {
 
     if (result?.timedOut) {
       return createFallbackResult(frame, "timeout", {
-        message: `Gemma CLI exceeded ${config.timeoutMs}ms.`
+        message: `Gemma CLI exceeded ${timeoutMs}ms.`
       });
     }
 
@@ -365,6 +376,26 @@ export function resolveGemmaNluTimeoutMs(options = {}) {
   return Number.isFinite(value) && value > 0
     ? Math.floor(value)
     : DEFAULT_GEMMA_NLU_TIMEOUT_MS;
+}
+
+export function resolveGemmaCallTimeoutMs(callOptions = {}, runtimeOptions = {}, config = {}) {
+  const value = Number(
+    callOptions.timeoutMs ??
+    callOptions.gemmaTimeoutMs ??
+    runtimeOptions.callTimeoutMs ??
+    runtimeOptions.gemmaCallTimeoutMs
+  );
+
+  return Number.isFinite(value) && value > 0
+    ? Math.floor(value)
+    : Number.isFinite(config.timeoutMs) && config.timeoutMs > 0
+      ? Math.floor(config.timeoutMs)
+      : DEFAULT_GEMMA_TIMEOUT_MS;
+}
+
+function hasExplicitRealtimeBudget(callOptions = {}) {
+  const value = Number(callOptions.timeoutMs ?? callOptions.gemmaTimeoutMs);
+  return Number.isFinite(value) && value > 0;
 }
 
 export function resolveGemmaNarrativeTimeoutMs(options = {}, config = {}) {
@@ -627,6 +658,10 @@ function createNluFallbackResult(frame, fallbackReason, error) {
 function classifyRunnerError(error) {
   if (error?.code === "ENOENT") {
     return "cli_not_found";
+  }
+
+  if (error?.name === "AbortError" || /abort|timeout|timed out/i.test(String(error?.message || ""))) {
+    return "timeout";
   }
 
   return "cli_failed";
