@@ -7,6 +7,16 @@ param(
   [int]$InstallTimeoutSec = 180,
   [ValidateSet("all", "gemma", "tts", "asr")]
   [string]$Mode = "all",
+  [int]$Runs = 1,
+  [int]$Threads = 2,
+  [string]$TtsText = "",
+  [string]$AsrSample = "",
+  [int]$AsrMaxMs = 0,
+  [string]$GemmaPrompt = "",
+  [int]$GemmaGateMs = 0,
+  [int]$GemmaBudgetMs = 0,
+  [int]$GemmaTimeoutMs = 0,
+  [switch]$AllowSmokeFailure,
   [switch]$InstallApk
 )
 
@@ -39,7 +49,11 @@ function Invoke-AdbProcess([string[]]$AdbArgs, [int]$TimeoutSeconds, [switch]$Al
 
   $process = [System.Diagnostics.Process]::Start($startInfo)
   if (!$process.WaitForExit($TimeoutSeconds * 1000)) {
-    $process.Kill($true)
+    try {
+      $process.Kill($true)
+    } catch [System.Management.Automation.MethodException] {
+      $process.Kill()
+    }
     throw "adb timed out after ${TimeoutSeconds}s: $($AdbArgs -join ' '). If a vivo install verification prompt is visible, complete it on the phone, then rerun with -InstallApk omitted."
   }
   $text = (($process.StandardOutput.ReadToEnd(), $process.StandardError.ReadToEnd()) -join "`n").Trim()
@@ -81,7 +95,34 @@ Invoke-AdbText -AdbArgs @("shell", "rm", "-f", $remoteJson, $remoteTrace) | Out-
 Invoke-AdbText -AdbArgs @("logcat", "-c") | Out-Null
 
 Write-Step "launching $component mode=$Mode"
-$start = Invoke-AdbText -AdbArgs @("shell", "am", "start", "-n", $component, "--es", "mode", $Mode) -AllowFailure
+$startArgs = @(
+  "shell", "am", "start", "-n", $component,
+  "--es", "mode", $Mode,
+  "--ei", "runs", "$Runs",
+  "--ei", "threads", "$Threads"
+)
+if (![string]::IsNullOrWhiteSpace($TtsText)) {
+  $startArgs += @("--es", "ttsText", $TtsText)
+}
+if (![string]::IsNullOrWhiteSpace($AsrSample)) {
+  $startArgs += @("--es", "asrSample", $AsrSample)
+}
+if ($AsrMaxMs -gt 0) {
+  $startArgs += @("--ei", "asrMaxMs", "$AsrMaxMs")
+}
+if (![string]::IsNullOrWhiteSpace($GemmaPrompt)) {
+  $startArgs += @("--es", "gemmaPrompt", $GemmaPrompt)
+}
+if ($GemmaGateMs -gt 0) {
+  $startArgs += @("--ei", "gemmaGateMs", "$GemmaGateMs")
+}
+if ($GemmaBudgetMs -gt 0) {
+  $startArgs += @("--ei", "gemmaBudgetMs", "$GemmaBudgetMs")
+}
+if ($GemmaTimeoutMs -gt 0) {
+  $startArgs += @("--ei", "gemmaTimeoutMs", "$GemmaTimeoutMs")
+}
+$start = Invoke-AdbText -AdbArgs $startArgs -AllowFailure
 if ($start.ExitCode -ne 0 -or $start.Text -match "Error type|Exception|not found|does not exist") {
   Write-Host "[edge-smoke] ERROR: could not launch smoke activity. Install the latest debug APK first."
   $start.Text | Out-Host
@@ -102,6 +143,10 @@ while ([DateTime]::UtcNow -lt $deadline) {
     $json.Text | Out-Host
     if ($result.ok -eq $true) {
       Write-Step "smoke passed"
+      exit 0
+    }
+    if ($AllowSmokeFailure) {
+      Write-Step "smoke completed with ok=false"
       exit 0
     }
     throw "smoke completed but reported failure"

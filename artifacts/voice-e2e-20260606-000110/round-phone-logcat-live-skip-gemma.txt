@@ -1,0 +1,357 @@
+--------- beginning of main
+06-06 00:07:09.720 I/.gms.persistent( 3989): Background concurrent copying GC freed 57504(3095KB) AllocSpace objects, 3(60KB) LOS objects, 49% free, 13MB(RS:11MB + LOS:1896KB)/27MB, paused 127us,41us total 514.957ms
+06-06 00:07:09.860 I/Fitness ( 3989): (REDACTED) FitCleanupIntentOperation received Intent %s
+06-06 00:07:09.872 I/ProximityAuth( 3989): [RecentAppsMediator] Package added: (user=UserHandle{0}) com.firstaid.copilot.debug
+06-06 00:07:09.912 I/Auth    ( 5058): [SupervisedAccountIntentOperation] onHandleIntent(): android.intent.action.PACKAGE_ADDED
+06-06 00:07:09.997 I/FontLog ( 3989): (REDACTED) Package %s has no metadata
+06-06 00:07:10.004 W/SQLiteLog( 5058): (28) double-quoted string literal: "com.firstaid.copilot.debug"
+06-06 00:07:10.090 I/Icing   ( 5058): IndexChimeraService.getServiceInterface callingPackage=com.google.android.gms componentName=AppsCorpus serviceId=36
+06-06 00:07:10.163 D/BoundBrokerSvc( 3989): onBind: Intent { act=com.google.android.gms.icing.LIGHTWEIGHT_INDEX_SERVICE dat=chimera-action:/... cmp=com.google.android.gms/.chimera.PersistentApiService }
+06-06 00:07:10.163 D/BoundBrokerSvc( 3989): Loading bound service for intent: Intent { act=com.google.android.gms.icing.LIGHTWEIGHT_INDEX_SERVICE dat=chimera-action:/... cmp=com.google.android.gms/.chimera.PersistentApiService }
+06-06 00:07:10.302 I/d.copilot.debug(24129): Late-enabling -Xcheck:jni
+06-06 00:07:10.305 D/BoundBrokerSvc( 5058): onBind: Intent { act=com.google.android.gms.feedback.internal.IFeedbackService dat=chimera-action:/... cmp=com.google.android.gms/.chimera.GmsBoundBrokerService }
+06-06 00:07:10.305 D/BoundBrokerSvc( 5058): Loading bound service for intent: Intent { act=com.google.android.gms.feedback.internal.IFeedbackService dat=chimera-action:/... cmp=com.google.android.gms/.chimera.GmsBoundBrokerService }
+06-06 00:07:10.350 I/Icing   ( 5058): Usage reports ok 2, Failed Usage reports 0, indexed 0, rejected 0
+06-06 00:07:10.356 I/Icing   ( 5058): IndexChimeraService.getServiceInterface callingPackage=com.google.android.gms componentName=null serviceId=30
+--------- beginning of system
+06-06 00:07:10.373 V/ActivityThread(24129): updateVmProcessStateForGc sceneId =1 state=197376
+06-06 00:07:10.373 I/d.copilot.debug(24129): Open vivo delay for GC JIT .
+06-06 00:07:10.386 D/CompatibilityChangeReporter(24129): Compat change id reported: 171979766; UID 10299; state: ENABLED
+06-06 00:07:10.398 W/ziparchive(24129): Unable to open '/data/app/~~2EsGhjYSGjii4ZJXbO6wOA==/com.firstaid.copilot.debug-UoLVO9-fUUckmKfj8jQsuw==/base.dm': No such file or directory
+06-06 00:07:10.398 W/ziparchive(24129): Unable to open '/data/app/~~2EsGhjYSGjii4ZJXbO6wOA==/com.firstaid.copilot.debug-UoLVO9-fUUckmKfj8jQsuw==/base.dm': No such file or directory
+06-06 00:07:10.424 I/Icing   ( 5058): Usage reports ok 0, Failed Usage reports 0, indexed 0, rejected 0
+06-06 00:07:10.439 I/Icing   ( 5058): Indexing com.google.android.gms-apps from com.google.android.gms
+06-06 00:07:10.456 I/Icing   ( 5058): Indexing done com.google.android.gms-apps
+06-06 00:07:10.461 I/Icing   ( 5058): Indexing com.google.android.gms-apps from com.google.android.gms
+06-06 00:07:10.465 I/Icing   ( 5058): Indexing done com.google.android.gms-apps
+06-06 00:07:10.931 V/GraphicsEnvironment(24129): ANGLE Developer option for 'com.firstaid.copilot.debug' set to: 'default'
+06-06 00:07:10.931 V/GraphicsEnvironment(24129): ANGLE GameManagerService for com.firstaid.copilot.debug: false
+06-06 00:07:10.931 V/GraphicsEnvironment(24129): App is not on the allowlist for updatable production driver.
+06-06 00:07:10.938 D/NetworkSecurityConfig(24129): Using Network Security Config from resource network_security_config debugBuild: true
+06-06 00:07:10.940 D/NetworkSecurityConfig(24129): Using Network Security Config from resource network_security_config debugBuild: true
+06-06 00:07:10.972 W/libc    (24129): Access denied finding property "ro.vendor.perf.scroll_opt.heavy_app"
+06-06 00:07:10.982 I/MSYNC3-VariableRefreshRate(24129): Variable refreshrate is disabled
+06-06 00:07:10.986 I/PowerHalWrapper(24129): PowerHalWrapper.getInstance 
+06-06 00:07:10.989 D/VivoConfigStore(24129): init begin
+06-06 00:07:10.996 D/VivoConfigStore(24129): key:vivo.software.nightmode isCached is true and value is true
+06-06 00:07:11.024 D/VivoConfigStore(24129): key:vivo.software.multilandscape isCached is true and value is true
+06-06 00:07:11.026 D/VivoConfigStore(24129): key:vivo.software.ml.freedrag isCached is false and normal value is false
+06-06 00:07:11.026 D/VivoConfigStore(24129): key:vivo.software.virtualmultilands isCached is true and value is true
+06-06 00:07:11.028 D/VivoConfigStore(24129): key:vivo.software.multiwindowresidentbar isCached is false and normal value is false
+06-06 00:07:11.029 D/VivoConfigStore(24129): key:vivo.software.hovermode isCached is false and normal value is false
+06-06 00:07:11.047 D/VivoConfigStore(24129): key:vivo.software.multiwindow isCached is true and value is true
+06-06 00:07:11.048 D/VivoConfigStore(24129): key:vivo.software.freeform isCached is true and value is true
+06-06 00:07:11.133 D/VivoConfigStore(24129): key:vivo.software.immersive isCached is false and normal value is false
+06-06 00:07:11.133 D/VivoConfigStore(24129): key:vivo.software.multiwindow isCached is true and value is true
+06-06 00:07:11.624 I/TextToSpeech(24129): Connected to TTS engine
+06-06 00:07:11.628 I/TextToSpeech(24129): Setting up the connection to TTS engine...
+06-06 00:07:11.644 I/EdgeTextToSpeech(24129): Bundled TTS cache ready: 0/48 phrases (Asset)
+06-06 00:07:11.655 W/d.copilot.debug(24129): Method boolean androidx.compose.runtime.snapshots.SnapshotStateList.conditionalUpdate(boolean, kotlin.jvm.functions.Function1) failed lock verification and will run slower.
+06-06 00:07:11.655 W/d.copilot.debug(24129): Common causes for lock verification issues are non-optimized dex code
+06-06 00:07:11.655 W/d.copilot.debug(24129): and incorrect proguard optimizations.
+06-06 00:07:11.655 W/d.copilot.debug(24129): Method boolean androidx.compose.runtime.snapshots.SnapshotStateList.conditionalUpdate$default(androidx.compose.runtime.snapshots.SnapshotStateList, boolean, kotlin.jvm.functions.Function1, int, java.lang.Object) failed lock verification and will run slower.
+06-06 00:07:11.656 W/d.copilot.debug(24129): Method java.lang.Object androidx.compose.runtime.snapshots.SnapshotStateList.mutate(kotlin.jvm.functions.Function1) failed lock verification and will run slower.
+06-06 00:07:11.656 W/d.copilot.debug(24129): Method void androidx.compose.runtime.snapshots.SnapshotStateList.update(boolean, kotlin.jvm.functions.Function1) failed lock verification and will run slower.
+06-06 00:07:11.656 W/d.copilot.debug(24129): Method void androidx.compose.runtime.snapshots.SnapshotStateList.update$default(androidx.compose.runtime.snapshots.SnapshotStateList, boolean, kotlin.jvm.functions.Function1, int, java.lang.Object) failed lock verification and will run slower.
+06-06 00:07:11.768 D/BufferQueueConsumer(24129): [](id:5e4100000000,api:0,p:-1,c:24129) connect: controlledByApp=false
+06-06 00:07:11.770 E/FBI     (24129): Can't load library: dlopen failed: library "libmagtsync.so" not found
+06-06 00:07:11.785 D/skia    (24129): GrGLMakeAssembledInterface verStr OpenGL ES 3.2 v1.r32p1-01eac0.0a0b917d9265b4c01be9925306306139
+06-06 00:07:11.785 D/skia    (24129): GrGLMakeAssembledGLESInterface verStr OpenGL ES 3.2 v1.r32p1-01eac0.0a0b917d9265b4c01be9925306306139
+06-06 00:07:11.786 D/skia    (24129): extensions init verString=OpenGL ES 3.2 v1.r32p1-01eac0.0a0b917d9265b4c01be9925306306139
+06-06 00:07:11.791 I/BLASTBufferQueue(24129): QoSAllocBuff Successful. Ret 0 
+06-06 00:07:11.838 I/mali    (24129): [DebugProp] GPU Debug-Mechanism Disable !
+06-06 00:07:11.930 D/BLASTBufferQueue(24129): [VRI[MainActivity]#0](f:0,a:1) acquireNextBufferLocked size=720x1612 mFrameNumber=1 applyTransaction=true mTimestamp=50265863054611(auto) mPendingTransactions.size=0 graphicBufferId=103633265885189 transform=0
+06-06 00:07:11.933 W/Parcel  (24129): Expecting binder but got null!
+06-06 00:07:11.947 I/OpenGLRenderer(24129): Davey! duration=953ms; Flags=1, FrameTimelineVsyncId=21435679, IntendedVsync=50264911321636, Vsync=50265060869803, InputEventId=0, HandleInputStart=50265069953764, AnimationStart=50265069962072, PerformTraversalsStart=50265070215303, DrawStart=50265736492841, FrameDeadline=50264931321636, FrameInterval=50265069836841, FrameStartTime=16616463, SyncQueued=50265751331534, SyncStart=50265751464534, IssueDrawCommandsStart=50265754918995, SwapBuffers=50265860339611, FrameCompleted=50265864831303, DequeueBufferDuration=16231, QueueBufferDuration=481154, GpuCompleted=50265864831303, SwapBuffersCompleted=50265864097688, DisplayPresentTime=0, CommandSubmissionCompleted=50265860339611, 
+06-06 00:07:11.959 I/ActivityTaskManager( 1553): Displayed com.firstaid.copilot.debug/com.firstaid.copilot.MainActivity: +1s747ms
+06-06 00:07:11.960 I/WebSocketAgentChannel(24129): Connecting live WebSocket url=ws://127.0.0.1:8787/ws/live session=android_live_108ebb8f mode=demo_assisted
+06-06 00:07:11.976 W/libc    (24129): Access denied finding property "ro.hardware.chipname"
+06-06 00:07:11.986 D/TrafficStats(24129): tagSocket(137) with statsTag=0xffffffff, statsUid=-1
+06-06 00:07:11.987 D/Linux   (24129): [Posix_connect Debug]Process com.firstaid.copilot.debug :8787 
+06-06 00:07:11.989 D/TrafficStats(24129): tagSocket(139) with statsTag=0xffffffff, statsUid=-1
+06-06 00:07:11.991 D/Linux   (24129): [Posix_connect Debug]Process com.firstaid.copilot.debug :8787 
+06-06 00:07:12.017 I/WebSocketAgentChannel(24129): Live WebSocket opened code=101
+06-06 00:07:12.072 I/SherpaSpeechEngine(24129): ASR create start modelDir=/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models/speech/stt-stream/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20
+06-06 00:07:12.085 V/ImeFocusController(24129): onWindowFocus: DecorView@3974861[MainActivity] softInputMode=STATE_UNSPECIFIED|ADJUST_PAN|IS_FORWARD_NAVIGATION
+06-06 00:07:12.085 V/ImeFocusController(24129): Restarting due to isRestartOnNextWindowFocus as true
+06-06 00:07:12.086 D/ImeFocusController(24129): onViewFocusChanged, view=DecorView@3974861[MainActivity], mServedView=null
+06-06 00:07:12.087 V/ImeFocusController(24129): checkFocus: view=null next=DecorView@3974861[MainActivity] immDelegate=delegate{837df89 displayId=0} force=true package=<none>
+06-06 00:07:12.116 I/FontLog ( 3989): (REDACTED) Received query %s, URI %s
+06-06 00:07:12.117 I/FontLog ( 3989): (REDACTED) Query [%s] resolved to %s
+06-06 00:07:12.119 I/FontLog ( 3989): (REDACTED) Fetch %s end status %s
+06-06 00:07:12.127 I/FontLog ( 3989): (REDACTED) Pulling font file for id = %d, cache size = %d
+06-06 00:07:12.139 I/FontLog ( 3989): (REDACTED) Pulling font file for id = %d, cache size = %d
+06-06 00:07:12.161 V/ActivityThread(24129): updateVmProcessStateForGc sceneId =1 state=196608
+06-06 00:07:12.161 I/d.copilot.debug(24129): Close vivo delay for GC JIT .
+06-06 00:07:12.791 I/d.copilot.debug(24129): Compiler allocated 5703KB to compile void android.view.ViewRootImpl.performTraversals()
+06-06 00:07:13.169 D/TrafficStats( 3989): tagSocket(90) with statsTag=0x34000609, statsUid=10163
+06-06 00:07:13.170 D/Linux   ( 3989): [Posix_connect Debug]Process com.google.android.gms.persistent :443 
+06-06 00:07:14.547 I/SherpaSpeechEngine(24129): ASR create done
+06-06 00:07:14.550 I/SherpaSpeechEngine(24129): ASR accept waveform samples=3200
+06-06 00:07:14.551 I/SherpaSpeechEngine(24129): ASR decode done iterations=0
+06-06 00:07:14.594 I/SherpaSpeechEngine(24129): ASR create start modelDir=/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models/speech/stt-stream/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20
+06-06 00:07:16.547 I/SherpaSpeechEngine(24129): ASR create done
+06-06 00:07:16.556 I/SherpaSpeechEngine(24129): TTS create start model=/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models/speech/tts/model.int8.onnx
+06-06 00:07:16.569 W/sherpa-onnx(24129): /home/runner/work/sherpa-onnx/sherpa-onnx/sherpa-onnx/jni/offline-tts.cc:operator():481
+06-06 00:07:16.569 W/sherpa-onnx(24129): config:
+06-06 00:07:16.569 W/sherpa-onnx(24129): OfflineTtsConfig(model=OfflineTtsModelConfig(vits=OfflineTtsVitsModelConfig(model="/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models/speech/tts/model.int8.onnx", lexicon="/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models/speech/tts/lexicon.txt", tokens="/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models/speech/tts/tokens.txt", data_dir="", noise_scale=0.667, noise_scale_w=0.8, length_scale=1), matcha=OfflineTtsMatchaModelConfig(acoustic_model="", vocoder="", lexicon="", tokens="", data_dir="", noise_scale=1, length_scale=1), kokoro=OfflineTtsKokoroModelConfig(model="", voices="", tokens="", lexicon="", data_dir="", length_scale=1, lang=""), zipvoice=OfflineTtsZipvoiceModelConfig(tokens="", encoder="", decoder="", vocoder="", data_dir="", lexicon="", feat_scale=0.1, t_shift=0.5, target_rms=0.1, guidance_scale=1), kitten=OfflineTtsKittenModelConfig(model="", voices="", tokens="", data_dir="", length_scale=1), pocket=OfflineTtsPocketModelConfig(lm_flo
+06-06 00:07:17.009 D/ProfileInstaller(24129): Installing profile for com.firstaid.copilot.debug
+06-06 00:07:18.428 W/ProcessState(24334): Extra binder thread started, but 0 threads requested. Do not use *startThreadPool when zero threads are requested.
+06-06 00:07:18.466 I/DMABUFHEAPS(24334): Using DMA-BUF heap named: mtk_mm
+06-06 00:07:18.466 I/DMABUFHEAPS(24334): Using DMA-BUF heap named: mtk_mm-uncached
+06-06 00:07:18.466 I/DMABUFHEAPS(24334): Using DMA-BUF heap named: mtk_svp_region-aligned
+06-06 00:07:18.466 I/DMABUFHEAPS(24334): Using DMA-BUF heap named: mtk_prot_region
+06-06 00:07:18.466 I/DMABUFHEAPS(24334): Using DMA-BUF heap named: mtk_2d_fr_region
+06-06 00:07:18.467 I/DMABUFHEAPS(24334): Using DMA-BUF heap named: mtk_wfd_region-aligned
+06-06 00:07:18.467 D/OpenGLRenderer(24334): Bitmap::compress format:Png w:720 h:1612 quality:100 app_apk:screencap 
+06-06 00:07:18.467 W/libc    (24334): Access denied finding property "vendor.vivo.imageencoder.dump"
+06-06 00:07:18.621 W/RefBase (24334): RefBase: Explicit destruction, weak count = 0 (in 0x7ed99f7468). Use sp<> to manage this object.
+06-06 00:07:18.628 D/RefBase (24334): #00 pc 000000000010cc18  /apex/com.android.runtime/lib64/bionic/libc.so (__cxa_finalize+280)
+06-06 00:07:18.628 D/RefBase (24334): #01 pc 00000000000fee08  /apex/com.android.runtime/lib64/bionic/libc.so (exit+24)
+06-06 00:07:18.628 D/RefBase (24334): #02 pc 00000000000927f4  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+100)
+06-06 00:07:18.792 E/appproc (24337): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath failed , error(Permission denied)
+06-06 00:07:18.793 E/appproc (24337): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:07:18.793 E/appproc (24337): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath2 failed , error(Permission denied)
+06-06 00:07:18.793 E/appproc (24337): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:07:18.793 E/appproc (24337): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath3 failed , error(Permission denied)
+06-06 00:07:18.793 E/appproc (24337): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:07:18.793 E/appproc (24337): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath4 failed , error(Permission denied)
+06-06 00:07:18.793 E/appproc (24337): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:07:18.793 D/AndroidRuntime(24337): >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-06 00:07:18.799 I/AndroidRuntime(24337): Using default boot image
+06-06 00:07:18.799 I/AndroidRuntime(24337): Leaving lock profiling enabled
+06-06 00:07:18.801 W/app_process(24337): ART APEX data files are untrusted.
+06-06 00:07:18.929 D/app_process(24337): Time zone APEX ICU file found: /apex/com.android.tzdata/etc/icu/icu_tzdata.dat
+06-06 00:07:18.929 D/app_process(24337): I18n APEX ICU file found: /apex/com.android.i18n/etc/icu/icudt70l.dat
+06-06 00:07:18.938 E/app_process(24337): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:07:18.939 E/app_process(24337): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:07:18.939 E/System  (24337): openDexFile load detect error
+06-06 00:07:18.939 E/System  (24337): java.lang.reflect.InvocationTargetException
+06-06 00:07:18.939 E/System  (24337): 	at java.lang.reflect.Method.invoke(Native Method)
+06-06 00:07:18.939 E/System  (24337): 	at dalvik.system.DexFile.openDexFile(DexFile.java:387)
+06-06 00:07:18.939 E/System  (24337): 	at dalvik.system.DexFile.<init>(DexFile.java:118)
+06-06 00:07:18.939 E/System  (24337): 	at dalvik.system.DexFile.<init>(DexFile.java:91)
+06-06 00:07:18.939 E/System  (24337): 	at dalvik.system.DexPathList.loadDexFile(DexPathList.java:438)
+06-06 00:07:18.939 E/System  (24337): 	at dalvik.system.DexPathList.makeDexElements(DexPathList.java:397)
+06-06 00:07:18.939 E/System  (24337): 	at dalvik.system.DexPathList.<init>(DexPathList.java:166)
+06-06 00:07:18.939 E/System  (24337): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:160)
+06-06 00:07:18.939 E/System  (24337): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:105)
+06-06 00:07:18.939 E/System  (24337): 	at dalvik.system.PathClassLoader.<init>(PathClassLoader.java:71)
+06-06 00:07:18.939 E/System  (24337): 	at java.lang.ClassLoader.createSystemClassLoader(ClassLoader.java:224)
+06-06 00:07:18.939 E/System  (24337): 	at java.lang.ClassLoader.-$$Nest$smcreateSystemClassLoader(Unknown Source:0)
+06-06 00:07:18.939 E/System  (24337): 	at java.lang.ClassLoader$SystemClassLoader.<clinit>(ClassLoader.java:183)
+06-06 00:07:18.939 E/System  (24337): 	at java.lang.ClassLoader.getSystemClassLoader(ClassLoader.java:1098)
+06-06 00:07:18.939 E/System  (24337): Caused by: java.lang.UnsatisfiedLinkError: No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:07:18.939 E/System  (24337): 	at android.os.Trace.nativeGetEnabledTags(Native Method)
+06-06 00:07:18.939 E/System  (24337): 	at android.os.Trace.isTagEnabled(Trace.java:163)
+06-06 00:07:18.939 E/System  (24337): 	at android.os.Trace.endSection(Trace.java:398)
+06-06 00:07:18.939 E/System  (24337): 	at com.vivo.framework.securitydetect.DynamicLoadDetectManager.reportDexLoaded(DynamicLoadDetectManager.java:156)
+06-06 00:07:18.939 E/System  (24337): 	... 14 more
+06-06 00:07:18.943 E/app_process(24337): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:07:18.943 E/app_process(24337): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:07:18.943 E/System  (24337): openDexFile load detect error
+06-06 00:07:18.944 E/System  (24337): java.lang.reflect.InvocationTargetException
+06-06 00:07:18.944 E/System  (24337): 	at java.lang.reflect.Method.invoke(Native Method)
+06-06 00:07:18.944 E/System  (24337): 	at dalvik.system.DexFile.openDexFile(DexFile.java:387)
+06-06 00:07:18.944 E/System  (24337): 	at dalvik.system.DexFile.<init>(DexFile.java:118)
+06-06 00:07:18.944 E/System  (24337): 	at dalvik.system.DexFile.<init>(DexFile.java:91)
+06-06 00:07:18.944 E/System  (24337): 	at dalvik.system.DexPathList.loadDexFile(DexPathList.java:438)
+06-06 00:07:18.944 E/System  (24337): 	at dalvik.system.DexPathList.makeDexElements(DexPathList.java:397)
+06-06 00:07:18.944 E/System  (24337): 	at dalvik.system.DexPathList.<init>(DexPathList.java:166)
+06-06 00:07:18.944 E/System  (24337): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:160)
+06-06 00:07:18.944 E/System  (24337): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:105)
+06-06 00:07:18.944 E/System  (24337): 	at dalvik.system.PathClassLoader.<init>(PathClassLoader.java:71)
+06-06 00:07:18.944 E/System  (24337): 	at java.lang.ClassLoader.createSystemClassLoader(ClassLoader.java:224)
+06-06 00:07:18.944 E/System  (24337): 	at java.lang.ClassLoader.-$$Nest$smcreateSystemClassLoader(Unknown Source:0)
+06-06 00:07:18.944 E/System  (24337): 	at java.lang.ClassLoader$SystemClassLoader.<clinit>(ClassLoader.java:183)
+06-06 00:07:18.944 E/System  (24337): 	at java.lang.ClassLoader.getSystemClassLoader(ClassLoader.java:1098)
+06-06 00:07:18.944 E/System  (24337): Caused by: java.lang.UnsatisfiedLinkError: No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:07:18.944 E/System  (24337): 	at android.os.Trace.nativeGetEnabledTags(Native Method)
+06-06 00:07:18.944 E/System  (24337): 	at android.os.Trace.isTagEnabled(Trace.java:163)
+06-06 00:07:18.944 E/System  (24337): 	at android.os.Trace.endSection(Trace.java:398)
+06-06 00:07:18.944 E/System  (24337): 	at com.vivo.framework.securitydetect.DynamicLoadDetectManager.reportDexLoaded(DynamicLoadDetectManager.java:156)
+06-06 00:07:18.944 E/System  (24337): 	... 14 more
+06-06 00:07:18.945 W/app_process(24337): ClassLoaderContext classpath size mismatch. expected=0, found=1 (PCL[] | PCL[/system/framework/android.test.runner.jar*2259575933])
+06-06 00:07:18.953 I/VivoSystemFrameworkFactory(24337): Instance implClass com.vivo.VivoSystemFrameworkFactoryImpl
+06-06 00:07:18.977 D/AndroidRuntime(24337): Calling main entry com.android.commands.uiautomator.Launcher
+06-06 00:07:18.982 W/ziparchive(24337): Unable to open '/system/framework/mediatek-framework.dm': No such file or directory
+06-06 00:07:18.982 W/ziparchive(24337): Unable to open '/system/framework/mediatek-framework.dm': No such file or directory
+06-06 00:07:18.986 W/uiautomator(24337): type=1400 audit(0.0:3427663): avc: denied { read } for name="user_cpu_freq" dev="sysfs" ino=49317 scontext=u:r:shell:s0 tcontext=u:object_r:sysfs_user_cpu_freq:s0 tclass=file permissive=0
+06-06 00:07:20.018 W/uiautomator(24337): type=1400 audit(0.0:3427664): avc: denied { read } for name="u:object_r:qemu_sf_lcd_density_prop:s0" dev="tmpfs" ino=280 scontext=u:r:shell:s0 tcontext=u:object_r:qemu_sf_lcd_density_prop:s0 tclass=file permissive=0
+06-06 00:07:20.020 W/libc    (24337): Access denied finding property "qemu.sf.lcd_density"
+06-06 00:07:20.020 W/libc    (24337): Access denied finding property "qemu.sf.lcd_density"
+06-06 00:07:20.018 W/uiautomator(24337): type=1400 audit(0.0:3427665): avc: denied { read } for name="u:object_r:qemu_sf_lcd_density_prop:s0" dev="tmpfs" ino=280 scontext=u:r:shell:s0 tcontext=u:object_r:qemu_sf_lcd_density_prop:s0 tclass=file permissive=0
+06-06 00:07:20.083 W/AccessibilityNodeInfoDumper(24337): Fetch time: 59ms
+06-06 00:07:20.123 D/AndroidRuntime(24337): Shutting down VM
+06-06 00:07:20.944 W/RefBase (24337): RefBase: Explicit destruction, weak count = 0 (in 0x70c8fa1468). Use sp<> to manage this object.
+06-06 00:07:20.949 D/RefBase (24337): #00 pc 000000000010cc18  /apex/com.android.runtime/lib64/bionic/libc.so (__cxa_finalize+280)
+06-06 00:07:20.949 D/RefBase (24337): #01 pc 00000000000fee08  /apex/com.android.runtime/lib64/bionic/libc.so (exit+24)
+06-06 00:07:20.949 D/RefBase (24337): #02 pc 00000000000927f4  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+100)
+06-06 00:07:22.659 I/SherpaSpeechEngine(24129): TTS create done
+06-06 00:07:22.660 I/SherpaSpeechEngine(24129): TTS generate start chars=4
+06-06 00:07:25.357 D/BoundBrokerSvc( 5058): onUnbind: Intent { act=com.google.android.gms.feedback.internal.IFeedbackService dat=chimera-action:/... cmp=com.google.android.gms/.chimera.GmsBoundBrokerService }
+06-06 00:07:25.417 D/BoundBrokerSvc( 3989): onUnbind: Intent { act=com.google.android.gms.icing.LIGHTWEIGHT_INDEX_SERVICE dat=chimera-action:/... cmp=com.google.android.gms/.chimera.PersistentApiService }
+06-06 00:07:26.193 I/SherpaSpeechEngine(24129): TTS generate done
+06-06 00:07:26.199 I/SherpaSpeechEngine(24129): TTS save done bytes=71724
+06-06 00:07:26.200 I/EdgeTextToSpeech(24129): Sherpa TTS cached '继续按压' in 9644ms
+06-06 00:08:10.054 D/BoundBrokerSvc( 5058): onUnbind: Intent { act=com.google.android.gms.common.BIND_SHARED_PREFS pkg=com.google.android.gms }
+06-06 00:08:41.751 I/LiveAudioPlayer(24129): Live audio cancel with no active stream reason=new_turn
+06-06 00:08:41.760 V/VivoAudioPolicyProxyNative(24129): VivoAudioPolicyProxy getInstanceInter: binding to vivoaudiopolicy service success!
+06-06 00:08:41.761 D/AudioRecord(24129): set(): 0xb400007660931840, inputSource 6, sampleRate 16000, format 0x1, channelMask 0x10, frameCount 2560, notificationFrames 0, sessionId 0, transferType 0, flags 0, attributionSource AttributionSourceState{pid: -1, uid: 10299, packageName: com.firstaid.copilot.debug, attributionTag: (null), token: , renouncedPermissions: [], next: []} uid -1, pid -1, latency 200
+06-06 00:08:41.761 D/AudioSystem(24129): getpackName client name com.firstaid.copilot.debug(24129)
+06-06 00:08:41.763 I/AudioRecord(24129): set(): getPolicyInputSourceForVoip mAttributes input source= 6,flags:0
+06-06 00:08:41.763 D/AudioRecord(24129): getpackName client name com.firstaid.copilot.debug(24129)
+06-06 00:08:41.763 D/AudioRecord(24129): getpackName client name com.firstaid.copilot.debug(24129)
+06-06 00:08:41.763 D/AudioRecord(24129): getpackName client name com.firstaid.copilot.debug(24129)
+06-06 00:08:41.787 D/AudioRecord(24129): openRecord_l: 0xb400007660931840, mCblk = 0x780e4ca000
+06-06 00:08:41.796 I/AudioEffect(24129): queryNumberEffects(): *numEffects = 25, ret = 0
+06-06 00:08:41.811 I/AudioEffect(24129): set 0xb400007630928360 uuid: 0x74bbab4500 timeLow 7b491460
+06-06 00:08:41.819 I/AudioEffect(24129): set() 0xb400007630928360 OK effect: Acoustic Echo Canceler id: 299 status 0 enabled 0 pid 24129
+06-06 00:08:41.820 I/AudioEffect(24129): enable 0xb400007630928360
+06-06 00:08:41.822 I/AudioEffect(24129): queryNumberEffects(): *numEffects = 25, ret = 0
+06-06 00:08:41.830 W/vivo.PerfThread(24129): type=1400 audit(0.0:3427666): avc: denied { read } for name="thermal" dev="sysfs" ino=10150 scontext=u:r:untrusted_app:s0:c43,c257,c512,c768 tcontext=u:object_r:sysfs_thermal:s0 tclass=dir permissive=0 app=com.firstaid.copilot.debug
+06-06 00:08:41.833 I/AudioEffect(24129): set 0xb4000076307d8520 uuid: 0x74bbab4500 timeLow 58b4b260
+06-06 00:08:41.839 I/AudioEffect(24129): set() 0xb4000076307d8520 OK effect: Noise Suppression id: 307 status 0 enabled 0 pid 24129
+06-06 00:08:41.839 I/AudioEffect(24129): enable 0xb4000076307d8520
+06-06 00:08:41.846 D/AudioRecord(24129): start(223): 0xb400007660931840, sync event 0 trigger session 0
+06-06 00:08:41.846 D/AudioRecord(24129): getpackName client name com.firstaid.copilot.debug(24129)
+06-06 00:08:41.878 D/AudioRecord(24129): start(223): return status 0
+06-06 00:08:42.450 I/d.copilot.debug(24129): Compiler allocated 4515KB to compile void com.firstaid.copilot.live.ui.LiveCprCoachScreenKt.LiveCprCoachScreen(com.firstaid.copilot.live.LiveSessionViewModel, kotlin.jvm.functions.Function0, androidx.compose.runtime.Composer, int, int)
+06-06 00:08:46.937 W/ProcessState(24404): Extra binder thread started, but 0 threads requested. Do not use *startThreadPool when zero threads are requested.
+06-06 00:08:46.975 I/DMABUFHEAPS(24404): Using DMA-BUF heap named: mtk_mm
+06-06 00:08:46.975 I/DMABUFHEAPS(24404): Using DMA-BUF heap named: mtk_mm-uncached
+06-06 00:08:46.975 I/DMABUFHEAPS(24404): Using DMA-BUF heap named: mtk_svp_region-aligned
+06-06 00:08:46.975 I/DMABUFHEAPS(24404): Using DMA-BUF heap named: mtk_prot_region
+06-06 00:08:46.975 I/DMABUFHEAPS(24404): Using DMA-BUF heap named: mtk_2d_fr_region
+06-06 00:08:46.975 I/DMABUFHEAPS(24404): Using DMA-BUF heap named: mtk_wfd_region-aligned
+06-06 00:08:46.975 D/OpenGLRenderer(24404): Bitmap::compress format:Png w:720 h:1612 quality:100 app_apk:screencap 
+06-06 00:08:46.975 W/libc    (24404): Access denied finding property "vendor.vivo.imageencoder.dump"
+06-06 00:08:47.076 W/RefBase (24404): RefBase: Explicit destruction, weak count = 0 (in 0x7c0d9cf468). Use sp<> to manage this object.
+06-06 00:08:47.080 D/RefBase (24404): #00 pc 000000000010cc18  /apex/com.android.runtime/lib64/bionic/libc.so (__cxa_finalize+280)
+06-06 00:08:47.080 D/RefBase (24404): #01 pc 00000000000fee08  /apex/com.android.runtime/lib64/bionic/libc.so (exit+24)
+06-06 00:08:47.080 D/RefBase (24404): #02 pc 00000000000927f4  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+100)
+06-06 00:08:47.255 E/appproc (24407): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath failed , error(Permission denied)
+06-06 00:08:47.255 E/appproc (24407): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:08:47.255 E/appproc (24407): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath2 failed , error(Permission denied)
+06-06 00:08:47.255 E/appproc (24407): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:08:47.255 E/appproc (24407): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath3 failed , error(Permission denied)
+06-06 00:08:47.255 E/appproc (24407): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:08:47.255 E/appproc (24407): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath4 failed , error(Permission denied)
+06-06 00:08:47.255 E/appproc (24407): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:08:47.255 D/AndroidRuntime(24407): >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-06 00:08:47.259 I/AndroidRuntime(24407): Using default boot image
+06-06 00:08:47.259 I/AndroidRuntime(24407): Leaving lock profiling enabled
+06-06 00:08:47.262 W/app_process(24407): ART APEX data files are untrusted.
+06-06 00:08:47.373 D/app_process(24407): Time zone APEX ICU file found: /apex/com.android.tzdata/etc/icu/icu_tzdata.dat
+06-06 00:08:47.373 D/app_process(24407): I18n APEX ICU file found: /apex/com.android.i18n/etc/icu/icudt70l.dat
+06-06 00:08:47.382 E/app_process(24407): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:08:47.382 E/app_process(24407): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:08:47.382 E/System  (24407): openDexFile load detect error
+06-06 00:08:47.382 E/System  (24407): java.lang.reflect.InvocationTargetException
+06-06 00:08:47.382 E/System  (24407): 	at java.lang.reflect.Method.invoke(Native Method)
+06-06 00:08:47.382 E/System  (24407): 	at dalvik.system.DexFile.openDexFile(DexFile.java:387)
+06-06 00:08:47.382 E/System  (24407): 	at dalvik.system.DexFile.<init>(DexFile.java:118)
+06-06 00:08:47.382 E/System  (24407): 	at dalvik.system.DexFile.<init>(DexFile.java:91)
+06-06 00:08:47.382 E/System  (24407): 	at dalvik.system.DexPathList.loadDexFile(DexPathList.java:438)
+06-06 00:08:47.382 E/System  (24407): 	at dalvik.system.DexPathList.makeDexElements(DexPathList.java:397)
+06-06 00:08:47.382 E/System  (24407): 	at dalvik.system.DexPathList.<init>(DexPathList.java:166)
+06-06 00:08:47.382 E/System  (24407): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:160)
+06-06 00:08:47.382 E/System  (24407): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:105)
+06-06 00:08:47.382 E/System  (24407): 	at dalvik.system.PathClassLoader.<init>(PathClassLoader.java:71)
+06-06 00:08:47.382 E/System  (24407): 	at java.lang.ClassLoader.createSystemClassLoader(ClassLoader.java:224)
+06-06 00:08:47.382 E/System  (24407): 	at java.lang.ClassLoader.-$$Nest$smcreateSystemClassLoader(Unknown Source:0)
+06-06 00:08:47.382 E/System  (24407): 	at java.lang.ClassLoader$SystemClassLoader.<clinit>(ClassLoader.java:183)
+06-06 00:08:47.382 E/System  (24407): 	at java.lang.ClassLoader.getSystemClassLoader(ClassLoader.java:1098)
+06-06 00:08:47.382 E/System  (24407): Caused by: java.lang.UnsatisfiedLinkError: No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:08:47.382 E/System  (24407): 	at android.os.Trace.nativeGetEnabledTags(Native Method)
+06-06 00:08:47.382 E/System  (24407): 	at android.os.Trace.isTagEnabled(Trace.java:163)
+06-06 00:08:47.382 E/System  (24407): 	at android.os.Trace.endSection(Trace.java:398)
+06-06 00:08:47.382 E/System  (24407): 	at com.vivo.framework.securitydetect.DynamicLoadDetectManager.reportDexLoaded(DynamicLoadDetectManager.java:156)
+06-06 00:08:47.382 E/System  (24407): 	... 14 more
+06-06 00:08:47.386 E/app_process(24407): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:08:47.386 E/app_process(24407): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:08:47.386 E/System  (24407): openDexFile load detect error
+06-06 00:08:47.387 E/System  (24407): java.lang.reflect.InvocationTargetException
+06-06 00:08:47.387 E/System  (24407): 	at java.lang.reflect.Method.invoke(Native Method)
+06-06 00:08:47.387 E/System  (24407): 	at dalvik.system.DexFile.openDexFile(DexFile.java:387)
+06-06 00:08:47.387 E/System  (24407): 	at dalvik.system.DexFile.<init>(DexFile.java:118)
+06-06 00:08:47.387 E/System  (24407): 	at dalvik.system.DexFile.<init>(DexFile.java:91)
+06-06 00:08:47.387 E/System  (24407): 	at dalvik.system.DexPathList.loadDexFile(DexPathList.java:438)
+06-06 00:08:47.387 E/System  (24407): 	at dalvik.system.DexPathList.makeDexElements(DexPathList.java:397)
+06-06 00:08:47.387 E/System  (24407): 	at dalvik.system.DexPathList.<init>(DexPathList.java:166)
+06-06 00:08:47.387 E/System  (24407): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:160)
+06-06 00:08:47.387 E/System  (24407): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:105)
+06-06 00:08:47.387 E/System  (24407): 	at dalvik.system.PathClassLoader.<init>(PathClassLoader.java:71)
+06-06 00:08:47.387 E/System  (24407): 	at java.lang.ClassLoader.createSystemClassLoader(ClassLoader.java:224)
+06-06 00:08:47.387 E/System  (24407): 	at java.lang.ClassLoader.-$$Nest$smcreateSystemClassLoader(Unknown Source:0)
+06-06 00:08:47.387 E/System  (24407): 	at java.lang.ClassLoader$SystemClassLoader.<clinit>(ClassLoader.java:183)
+06-06 00:08:47.387 E/System  (24407): 	at java.lang.ClassLoader.getSystemClassLoader(ClassLoader.java:1098)
+06-06 00:08:47.387 E/System  (24407): Caused by: java.lang.UnsatisfiedLinkError: No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:08:47.387 E/System  (24407): 	at android.os.Trace.nativeGetEnabledTags(Native Method)
+06-06 00:08:47.387 E/System  (24407): 	at android.os.Trace.isTagEnabled(Trace.java:163)
+06-06 00:08:47.387 E/System  (24407): 	at android.os.Trace.endSection(Trace.java:398)
+06-06 00:08:47.387 E/System  (24407): 	at com.vivo.framework.securitydetect.DynamicLoadDetectManager.reportDexLoaded(DynamicLoadDetectManager.java:156)
+06-06 00:08:47.387 E/System  (24407): 	... 14 more
+06-06 00:08:47.388 W/app_process(24407): ClassLoaderContext classpath size mismatch. expected=0, found=1 (PCL[] | PCL[/system/framework/android.test.runner.jar*2259575933])
+06-06 00:08:47.392 I/VivoSystemFrameworkFactory(24407): Instance implClass com.vivo.VivoSystemFrameworkFactoryImpl
+06-06 00:08:47.413 D/AndroidRuntime(24407): Calling main entry com.android.commands.uiautomator.Launcher
+06-06 00:08:47.417 W/ziparchive(24407): Unable to open '/system/framework/mediatek-framework.dm': No such file or directory
+06-06 00:08:47.417 W/ziparchive(24407): Unable to open '/system/framework/mediatek-framework.dm': No such file or directory
+06-06 00:08:47.422 W/uiautomator(24407): type=1400 audit(0.0:3427667): avc: denied { read } for name="user_cpu_freq" dev="sysfs" ino=49317 scontext=u:r:shell:s0 tcontext=u:object_r:sysfs_user_cpu_freq:s0 tclass=file permissive=0
+06-06 00:08:48.463 W/libc    (24407): Access denied finding property "qemu.sf.lcd_density"
+06-06 00:08:48.462 W/uiautomator(24407): type=1400 audit(0.0:3427668): avc: denied { read } for name="u:object_r:qemu_sf_lcd_density_prop:s0" dev="tmpfs" ino=280 scontext=u:r:shell:s0 tcontext=u:object_r:qemu_sf_lcd_density_prop:s0 tclass=file permissive=0
+06-06 00:08:48.462 W/uiautomator(24407): type=1400 audit(0.0:3427669): avc: denied { read } for name="u:object_r:qemu_sf_lcd_density_prop:s0" dev="tmpfs" ino=280 scontext=u:r:shell:s0 tcontext=u:object_r:qemu_sf_lcd_density_prop:s0 tclass=file permissive=0
+06-06 00:08:48.464 W/libc    (24407): Access denied finding property "qemu.sf.lcd_density"
+06-06 00:08:48.495 W/AccessibilityNodeInfoDumper(24407): Fetch time: 25ms
+06-06 00:08:48.528 D/AndroidRuntime(24407): Shutting down VM
+06-06 00:08:49.377 W/RefBase (24407): RefBase: Explicit destruction, weak count = 0 (in 0x7037dc0468). Use sp<> to manage this object.
+06-06 00:08:49.382 D/RefBase (24407): #00 pc 000000000010cc18  /apex/com.android.runtime/lib64/bionic/libc.so (__cxa_finalize+280)
+06-06 00:08:49.382 D/RefBase (24407): #01 pc 00000000000fee08  /apex/com.android.runtime/lib64/bionic/libc.so (exit+24)
+06-06 00:08:49.382 D/RefBase (24407): #02 pc 00000000000927f4  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+100)
+06-06 00:09:24.248 D/TrafficStats( 3989): tagSocket(92) with statsTag=0x34000609, statsUid=10163
+06-06 00:09:24.249 D/Linux   ( 3989): [Posix_connect Debug]Process com.google.android.gms.persistent :443 
+06-06 00:09:44.958 W/getprop (24481): type=1400 audit(0.0:3427691): avc: denied { open } for path="/dev/__properties__/u:object_r:vendor_camera_software_moonlight_prop:s0" dev="tmpfs" ino=437 scontext=u:r:shell:s0 tcontext=u:object_r:vendor_camera_software_moonlight_prop:s0 tclass=file permissive=0
+06-06 00:09:51.070 W/getprop (24491): type=1400 audit(0.0:3427692): avc: denied { open } for path="/dev/__properties__/u:object_r:vendor_camera_software_moonlight_prop:s0" dev="tmpfs" ino=437 scontext=u:r:shell:s0 tcontext=u:object_r:vendor_camera_software_moonlight_prop:s0 tclass=file permissive=0
+06-06 00:09:51.270 W/getprop (24496): type=1400 audit(0.0:3427693): avc: denied { open } for path="/dev/__properties__/u:object_r:vendor_camera_software_moonlight_prop:s0" dev="tmpfs" ino=437 scontext=u:r:shell:s0 tcontext=u:object_r:vendor_camera_software_moonlight_prop:s0 tclass=file permissive=0
+06-06 00:09:51.516 I/abb     (24240): StartCommandInProcess(7061636b61676500696e7374616c6c2d package.install- [truncated])
+06-06 00:09:51.555 I/abb     (24240): StartCommandInProcess(7061636b61676500696e7374616c6c2d package.install- [truncated])
+06-06 00:10:07.253 I/abb     (24240): StartCommandInProcess(7061636b61676500696e7374616c6c2d package.install- [truncated])
+06-06 00:10:07.672 I/BatteryStatsImpl( 2497): ********** CLEARING HISTORY!
+06-06 00:10:07.816 I/ActivityTaskManager( 1553): Displayed com.android.packageinstaller/.PackageInstallerActivity: +278ms
+06-06 00:10:08.330 D/BLASTBufferQueue(24129): [VRI[MainActivity]#0](f:0,a:1) destructor()
+06-06 00:10:08.330 D/BufferQueueConsumer(24129): [VRI[MainActivity]#0(BLAST Consumer)0](id:5e4100000000,api:0,p:-1,c:24129) disconnect
+06-06 00:11:35.318 D/TrafficStats( 3989): tagSocket(90) with statsTag=0x34000609, statsUid=10163
+06-06 00:11:35.320 D/Linux   ( 3989): [Posix_connect Debug]Process com.google.android.gms.persistent :443 
+06-06 00:12:56.049 D/BufferQueueConsumer(24129): [](id:5e4100000001,api:0,p:-1,c:24129) connect: controlledByApp=false
+06-06 00:12:56.053 I/BLASTBufferQueue(24129): QoSAllocBuff Successful. Ret 0 
+06-06 00:12:56.080 D/BLASTBufferQueue(24129): [VRI[MainActivity]#1](f:0,a:1) acquireNextBufferLocked size=720x1612 mFrameNumber=1 applyTransaction=true mTimestamp=50610013026323(auto) mPendingTransactions.size=0 graphicBufferId=103633265885195 transform=0
+06-06 00:12:56.120 V/ImeFocusController(24129): onWindowFocus: DecorView@3974861[MainActivity] softInputMode=STATE_UNSPECIFIED|ADJUST_PAN
+06-06 00:12:56.120 V/ImeFocusController(24129): Restarting due to isRestartOnNextWindowFocus as true
+06-06 00:12:56.121 D/ImeFocusController(24129): onViewFocusChanged, view=DecorView@3974861[MainActivity], mServedView=DecorView@3974861[MainActivity]
+06-06 00:12:56.121 V/ImeFocusController(24129): checkFocus: view=DecorView@3974861[MainActivity] next=DecorView@3974861[MainActivity] immDelegate=delegate{837df89 displayId=0} force=true package=com.firstaid.copilot.debug
+06-06 00:12:56.452 I/BatteryStatsImpl( 2497): ********** CLEARING HISTORY!
+06-06 00:12:56.509 I/d.copilot.debug(24757): Late-enabling -Xcheck:jni
+06-06 00:12:56.716 I/.gms.persistent( 3989): Background concurrent copying GC freed 19123(1174KB) AllocSpace objects, 1(20KB) LOS objects, 49% free, 13MB(RS:11MB + LOS:1896KB)/27MB, paused 58us,33us total 185.762ms
+06-06 00:12:56.941 I/abb     (24240): StartCommandInProcess(7061636b61676500696e7374616c6c2d package.install- [truncated])
+06-06 00:12:56.985 I/abb     (24240): StartCommandInProcess(7061636b61676500696e7374616c6c2d package.install- [truncated])
+06-06 00:12:57.096 I/abb     (24240): StartCommandInProcess(7061636b61676500696e7374616c6c2d package.install- [truncated])
+06-06 00:12:57.253 I/Fitness ( 3989): (REDACTED) FitCleanupIntentOperation received Intent %s
+06-06 00:12:57.286 W/SQLiteLog( 5058): (28) double-quoted string literal: "com.firstaid.copilot.debug"
+06-06 00:12:57.298 I/Auth    ( 5058): [SupervisedAccountIntentOperation] onHandleIntent(): android.intent.action.PACKAGE_ADDED
+06-06 00:12:57.301 I/ProximityAuth( 3989): [RecentAppsMediator] Package added: (user=UserHandle{0}) com.firstaid.copilot.debug
+06-06 00:12:57.316 D/BoundBrokerSvc( 5058): onBind: Intent { act=com.google.android.gms.common.BIND_SHARED_PREFS pkg=com.google.android.gms }
+06-06 00:12:57.316 D/BoundBrokerSvc( 5058): Loading bound service for intent: Intent { act=com.google.android.gms.common.BIND_SHARED_PREFS pkg=com.google.android.gms }
+06-06 00:12:57.363 I/FontLog ( 3989): (REDACTED) Package %s has no metadata
+06-06 00:12:57.680 I/Icing   ( 5058): IndexChimeraService.getServiceInterface callingPackage=com.google.android.gms componentName=AppsCorpus serviceId=36
+06-06 00:12:57.753 D/BoundBrokerSvc( 5058): onBind: Intent { act=com.google.android.gms.feedback.internal.IFeedbackService dat=chimera-action:/... cmp=com.google.android.gms/.chimera.GmsBoundBrokerService }
+06-06 00:12:57.754 D/BoundBrokerSvc( 5058): Loading bound service for intent: Intent { act=com.google.android.gms.feedback.internal.IFeedbackService dat=chimera-action:/... cmp=com.google.android.gms/.chimera.GmsBoundBrokerService }
+06-06 00:12:57.792 D/BoundBrokerSvc( 3989): onBind: Intent { act=com.google.android.gms.icing.LIGHTWEIGHT_INDEX_SERVICE dat=chimera-action:/... cmp=com.google.android.gms/.chimera.PersistentApiService }
+06-06 00:12:57.792 D/BoundBrokerSvc( 3989): Loading bound service for intent: Intent { act=com.google.android.gms.icing.LIGHTWEIGHT_INDEX_SERVICE dat=chimera-action:/... cmp=com.google.android.gms/.chimera.PersistentApiService }
+06-06 00:12:57.914 I/Icing   ( 5058): Usage reports ok 2, Failed Usage reports 0, indexed 0, rejected 0
+06-06 00:12:57.985 I/Icing   ( 5058): IndexChimeraService.getServiceInterface callingPackage=com.google.android.gms componentName=null serviceId=30
+06-06 00:12:57.987 I/Icing   ( 5058): Indexing com.google.android.gms-apps from com.google.android.gms
+06-06 00:12:58.048 I/Icing   ( 5058): Usage reports ok 0, Failed Usage reports 0, indexed 0, rejected 0
+06-06 00:12:58.050 I/Icing   ( 5058): Indexing done com.google.android.gms-apps
+06-06 00:12:58.053 I/Icing   ( 5058): Indexing com.google.android.gms-apps from com.google.android.gms
+06-06 00:12:58.054 I/Icing   ( 5058): Indexing done com.google.android.gms-apps
+06-06 00:12:58.227 I/ActivityTaskManager( 1553): Displayed com.android.packageinstaller/.PackageInstallerActivity: +278ms

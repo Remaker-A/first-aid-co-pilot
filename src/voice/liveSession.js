@@ -86,16 +86,17 @@ export class LiveSession extends EventEmitter {
     this.tickEnabled = tick.enabled === true || options.autonomousTick === true;
     this.tickIntervalMs = numberOr(tick.intervalMs ?? options.tickIntervalMs, 4000);
     this.observationWindowMs = numberOr(tick.observationWindowMs, 12000);
+    this.wakeWindowMs = numberOr(tick.wakeWindowMs, 5000);
     this.encouragementIntervalMs = numberOr(tick.encouragementIntervalMs, 20000);
-    // S7 encouragement injection is a skeleton only: the encouragement wording
-    // and its arbitration live in liveDriver/ruleFeedbackEngine (another worker),
-    // so injection stays gated off even when the tick is enabled.
+    this.encourageQuietMs = numberOr(tick.encourageQuietMs, 12000);
     this.tickEncourageEnabled = tick.encourage === true;
     this.tickTimer = null;
     this.currentStage = null;
     this.stageEnteredAt = 0;
     this.tickProtectedStage = null;
     this.lastEncouragementAt = 0;
+    this.lastCorrectionAt = 0;
+    this.wakePhrasePrior = false;
   }
 
   start(input = {}) {
@@ -126,6 +127,9 @@ export class LiveSession extends EventEmitter {
         return;
       case "context":
         this.context = sanitizeContext(message.payload || message.context || message.event || {});
+        return;
+      case "turn":
+        await this.processTurn(message.payload || message.event || message);
         return;
       case "inject":
         await this.processTurn(message.payload || message.event || message);
@@ -469,6 +473,10 @@ export class LiveSession extends EventEmitter {
     const result = await this.runGuidanceTurn(payload, turnSeq);
     if (result !== null) {
       await this.runAutoAdvance(result, turnSeq);
+      // WB open question: after the immediate ack (the user turn above), stream the
+      // controlled Q&A answer that was generated asynchronously. Same turnSeq, so a
+      // barge-in / new user turn supersedes a still-pending answer.
+      await this.speakOpenQuestionAnswer(result, turnSeq);
     }
     // Re-arm the autonomous tick relative to the latest activity so the
     // observation window measures "quiet since the last turn settled".
@@ -495,6 +503,12 @@ export class LiveSession extends EventEmitter {
     }
 
     const guidance = normalizeGuidanceResult(result);
+    if (guidance.state) {
+      this.wakePhrasePrior = hasWakePhrasePrior(guidance.state);
+    }
+    if (isRecentCorrectionGuidance(guidance)) {
+      this.lastCorrectionAt = Date.now();
+    }
     const finalText = guidance.transcript || payload.text || "";
     this.emitJson({
       type: "final",
@@ -652,6 +666,9 @@ export class LiveSession extends EventEmitter {
     }
     const now = Date.now();
     const inStageMs = now - (this.stageEnteredAt || now);
+    const observationWindowMs = this.wakePhrasePrior
+      ? this.wakeWindowMs
+      : this.observationWindowMs;
 
     // (a) Stage A observation windows. S2/S3 stay HARD gates: an explicit "有反应"
     // / "正常呼吸" has already routed to MONITOR, so a session still parked here is
@@ -659,7 +676,7 @@ export class LiveSession extends EventEmitter {
     // S6 confirm gate (never auto-starting CPR). One protective push per entry.
     if (
       (stage === AgentStage.S2_CHECK_RESPONSE || stage === AgentStage.S3_CHECK_BREATHING) &&
-      inStageMs >= this.observationWindowMs &&
+      inStageMs >= observationWindowMs &&
       this.tickProtectedStage !== stage
     ) {
       const followUp = this.buildProtectiveAdvanceEvent(stage);
@@ -670,24 +687,30 @@ export class LiveSession extends EventEmitter {
       return;
     }
 
-    // (b) Stage B silence-default + low-frequency encouragement. SKELETON: silence
-    // is the default (we emit nothing). Encouragement wording/arbitration lives in
-    // liveDriver/ruleFeedbackEngine (another worker), so the injection is gated off
-    // (tickEncourageEnabled) until that path is owned. The cadence bookkeeping is
-    // here so wiring it later is a one-liner; the deterministic rule-feedback
-    // corrections still fire on real cpr_quality turns regardless of this tick.
+    // (b) Stage B silence-default + low-frequency encouragement. Silence remains
+    // default; encouragement is injected only after a quiet, correction-free gap.
     if (stage === AgentStage.S7_CPR_LOOP) {
       if (
         this.tickEncourageEnabled &&
-        now - this.lastEncouragementAt >= this.encouragementIntervalMs
+        now - this.lastEncouragementAt >= this.encouragementIntervalMs &&
+        now - this.lastCorrectionAt >= this.encourageQuietMs
       ) {
         this.lastEncouragementAt = now;
-        // TODO(leader / voice-worker): inject a low-frequency "encourage_rescuer"
-        // synthetic turn here once the encouragement guidance is owned, e.g.
-        //   await this.processTurn(this.buildEncouragementTickEvent());
+        await this.processTurn(this.buildEncouragementTickEvent());
       }
       return;
     }
+  }
+
+  buildEncouragementTickEvent() {
+    return {
+      eventSource: "system",
+      eventType: "encourage_tick",
+      metadata: {
+        encourage_tick: true,
+        autonomous_tick: true,
+      },
+    };
   }
 
   // Synthetic "observation window expired" event. Carries no user text and a
@@ -765,6 +788,8 @@ export class LiveSession extends EventEmitter {
     this.stageEnteredAt = 0;
     this.tickProtectedStage = null;
     this.lastEncouragementAt = 0;
+    this.lastCorrectionAt = 0;
+    this.wakePhrasePrior = false;
     this.sttSession?.reset?.({ sampleRate: this.pcmSampleRate });
     const sessionId = message.sessionId || message.session_id || this.sessionId;
     await this.service.reset?.(sessionId);
@@ -840,10 +865,65 @@ export class LiveSession extends EventEmitter {
         this.emitError(error?.message || "Streaming TTS failed.", error?.code || "tts_stream_failed");
       }
     } finally {
+      if (!begun && !this.closed && speechSeq === this.currentSpeechSeq && turnSeq === this.turnSeq) {
+        this.emitJson({
+          type: "audio_unavailable",
+          session_id: this.sessionId,
+          turn_seq: turnSeq,
+          action_id: actionId,
+          reason: "tts_stream_empty",
+        });
+      }
       if (speechSeq === this.currentSpeechSeq) {
         this.speaking = false;
       }
     }
+  }
+
+  // Stream the asynchronously-generated open-question answer as a follow-up segment
+  // once the immediate ack has finished. The answer promise always resolves to a
+  // safe action (or a silent fallback); on timeout/illegal/barge-in we simply speak
+  // nothing further.
+  async speakOpenQuestionAnswer(result, turnSeq) {
+    const channel = result?.openQuestionAnswer || result?.open_question_answer;
+    if (!channel || typeof channel.promise?.then !== "function") {
+      return;
+    }
+    if (this.closed || turnSeq !== this.turnSeq) {
+      return;
+    }
+
+    // Snapshot the speech sequence so a bare barge-in (which cancels playback and
+    // bumps currentSpeechSeq without starting a new turn) also suppresses a still
+    // pending answer.
+    const speechSeqAtStart = this.currentSpeechSeq;
+    let answer;
+    try {
+      answer = await channel.promise;
+    } catch {
+      return;
+    }
+
+    if (this.closed || turnSeq !== this.turnSeq || this.currentSpeechSeq !== speechSeqAtStart) {
+      return; // a newer turn / barge-in superseded this open question
+    }
+
+    const action = answer?.action || null;
+    const text = action?.tts?.text || "";
+    if (!action || !text) {
+      return; // timeout/illegal safety fallback may be silent
+    }
+
+    this.emitJson({
+      type: "guidance",
+      session_id: this.sessionId,
+      turn_seq: turnSeq,
+      action,
+      source: answer.source || "gemma_open_question",
+      response_type: answer.responseType || null,
+      open_question_answer: true,
+    });
+    await this.speakGuidance({ guidanceAction: action }, turnSeq);
   }
 
   clearBufferedAudio() {
@@ -906,6 +986,19 @@ function normalizeGuidanceResult(result = {}) {
   const guidanceSource = result.guidance_source || result.guidanceDecision?.source || null;
   const responseType = result.response_type || result.guidanceDecision?.responseType || null;
   return { guidanceAction, stateAction, state, transcript, intent, guidanceSource, responseType };
+}
+
+function hasWakePhrasePrior(state = {}) {
+  const scope = state.scope ?? {};
+  return scope.entry_source === "wake_phrase" || Boolean(scope.wake_phrase);
+}
+
+function isRecentCorrectionGuidance(guidance = {}) {
+  return (
+    guidance.guidanceSource === "rule_feedback" ||
+    guidance.guidanceSource === "rule_feedback_critical" ||
+    guidance.responseType === "critical_correction"
+  );
 }
 
 function normalizeType(value) {

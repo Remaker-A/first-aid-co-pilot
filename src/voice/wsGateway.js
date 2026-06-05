@@ -34,6 +34,16 @@ export function createVoiceWsGateway(options = {}) {
 
       const session = createLiveSession({
         ...(options.sessionOptions || {}),
+        autonomousTick: true,
+        tick: {
+          intervalMs: 4000,
+          observationWindowMs: 12000,
+          wakeWindowMs: 5000,
+          encourage: true,
+          encouragementIntervalMs: 25000,
+          encourageQuietMs: 12000,
+          ...(options.sessionOptions?.tick || {}),
+        },
         service: options.service,
         ttsOptions: options.ttsOptions || options.sessionOptions?.ttsOptions,
         sttOptions: options.sttOptions || options.sessionOptions?.sttOptions,

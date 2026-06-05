@@ -1,0 +1,183 @@
+{
+  "ok": false,
+  "mode": "all",
+  "runs": 3,
+  "threads": 2,
+  "modelRoot": "\/storage\/emulated\/0\/Android\/media\/com.firstaid.copilot.debug\/models",
+  "summary": "Gemma=Ready ASR=Ready TTS=Ready sherpa=Ready",
+  "gemmaReady": true,
+  "asrReady": true,
+  "ttsReady": true,
+  "phase": "finished",
+  "updatedAtMs": 1780673585841,
+  "gemma": {
+    "ok": true,
+    "latencyMs": 38402,
+    "backend": "CPU",
+    "prompt": "你是急救语音助手。用一句不超过15个字的中文回答：成人心肺复苏的按压频率是多少？",
+    "generateOk": false,
+    "generateLatencyMs": 11,
+    "generateText": "",
+    "generateError": "java.lang.reflect.InvocationTargetException: Failed to create conversation: FAILED_PRECONDITION: A session already exists. Only one session is supported at a time. Please delete the existing session before creating a new one.",
+    "warmGenerateOk": false,
+    "warmGenerateLatencyMs": 10000,
+    "runs": [
+      {
+        "ok": false,
+        "latencyMs": 14,
+        "text": "",
+        "error": "java.lang.reflect.InvocationTargetException: Failed to create conversation: FAILED_PRECONDITION: A session already exists. Only one session is supported at a time. Please delete the existing session before creating a new one."
+      },
+      {
+        "ok": false,
+        "latencyMs": 11,
+        "text": "",
+        "error": "java.lang.reflect.InvocationTargetException: Failed to create conversation: FAILED_PRECONDITION: A session already exists. Only one session is supported at a time. Please delete the existing session before creating a new one."
+      },
+      {
+        "ok": false,
+        "latencyMs": 11,
+        "text": "",
+        "error": "java.lang.reflect.InvocationTargetException: Failed to create conversation: FAILED_PRECONDITION: A session already exists. Only one session is supported at a time. Please delete the existing session before creating a new one."
+      }
+    ],
+    "latency": {
+      "count": 0,
+      "avgMs": null,
+      "minMs": null,
+      "maxMs": null,
+      "p50Ms": null,
+      "p95Ms": null
+    },
+    "gate": {
+      "gateMs": 1200,
+      "budgetMs": 1500,
+      "totalRuns": 3,
+      "okRuns": 0,
+      "withinBudgetRuns": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "nearRealtimeCapable": false,
+      "recommendation": "ack_then_async"
+    }
+  },
+  "gemmaRuns": [
+    {
+      "ok": false,
+      "latencyMs": 14,
+      "text": "",
+      "error": "java.lang.reflect.InvocationTargetException: Failed to create conversation: FAILED_PRECONDITION: A session already exists. Only one session is supported at a time. Please delete the existing session before creating a new one."
+    },
+    {
+      "ok": false,
+      "latencyMs": 11,
+      "text": "",
+      "error": "java.lang.reflect.InvocationTargetException: Failed to create conversation: FAILED_PRECONDITION: A session already exists. Only one session is supported at a time. Please delete the existing session before creating a new one."
+    },
+    {
+      "ok": false,
+      "latencyMs": 11,
+      "text": "",
+      "error": "java.lang.reflect.InvocationTargetException: Failed to create conversation: FAILED_PRECONDITION: A session already exists. Only one session is supported at a time. Please delete the existing session before creating a new one."
+    }
+  ],
+  "tts": {
+    "ok": true,
+    "text": "继续按压",
+    "warmLatencyMs": 8335,
+    "cachedStartLatencyMs": 68,
+    "latencyMs": 2705,
+    "avgLatencyMs": 2981,
+    "minLatencyMs": 2667,
+    "maxLatencyMs": 3571,
+    "sampleRate": 44100,
+    "bytes": 66604,
+    "runs": [
+      {
+        "ok": true,
+        "latencyMs": 2667,
+        "sampleRate": 44100,
+        "bytes": 66604
+      },
+      {
+        "ok": true,
+        "latencyMs": 3571,
+        "sampleRate": 44100,
+        "bytes": 66604
+      },
+      {
+        "ok": true,
+        "latencyMs": 2705,
+        "sampleRate": 44100,
+        "bytes": 66604
+      }
+    ]
+  },
+  "ttsRuns": [
+    {
+      "ok": true,
+      "latencyMs": 2667,
+      "sampleRate": 44100,
+      "bytes": 66604
+    },
+    {
+      "ok": true,
+      "latencyMs": 3571,
+      "sampleRate": 44100,
+      "bytes": 66604
+    },
+    {
+      "ok": true,
+      "latencyMs": 2705,
+      "sampleRate": 44100,
+      "bytes": 66604
+    }
+  ],
+  "asrInputBytes": 321700,
+  "asr": {
+    "ok": true,
+    "sample": "0.wav",
+    "inputMs": 10053,
+    "inputBytes": 321700,
+    "warmLatencyMs": 3359,
+    "latencyMs": 1353,
+    "avgLatencyMs": 1349,
+    "minLatencyMs": 1342,
+    "maxLatencyMs": 1353,
+    "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三",
+    "runs": [
+      {
+        "ok": true,
+        "latencyMs": 1352,
+        "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三"
+      },
+      {
+        "ok": true,
+        "latencyMs": 1342,
+        "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三"
+      },
+      {
+        "ok": true,
+        "latencyMs": 1353,
+        "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三"
+      }
+    ]
+  },
+  "asrRuns": [
+    {
+      "ok": true,
+      "latencyMs": 1352,
+      "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三"
+    },
+    {
+      "ok": true,
+      "latencyMs": 1342,
+      "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三"
+    },
+    {
+      "ok": true,
+      "latencyMs": 1353,
+      "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三"
+    }
+  ]
+}

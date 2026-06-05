@@ -44,6 +44,10 @@ data class LiveUiState(
     val partialTranscript: String? = null,
     val lastUserTranscript: String? = null,
     val lastAssistantText: String? = null,
+    val isLiveAudioPlaying: Boolean = false,
+    val activeAudioActionId: String? = null,
+    val lastLiveTurnSeq: Int? = null,
+    val suppressLocalTts: Boolean = false,
 
     // --- Response metadata (honest source badge + debugging) ---
     val responseType: String? = null,

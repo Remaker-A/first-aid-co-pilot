@@ -1,0 +1,1983 @@
+{
+  "schema_version": "tts_cache.v1",
+  "knowledge_version": "adult_cpr_mvp_2026_05_30",
+  "generated_at": "2026-06-05T14:55:04.681Z",
+  "sample_rate_hint": 22050,
+  "max_clause_chars": 34,
+  "audio_rendered": false,
+  "counts": {
+    "total": 139,
+    "phrases": 48,
+    "clauses": 91
+  },
+  "entries": [
+    {
+      "kind": "phrase",
+      "text": "按压可以，继续保持 100 到 120 次每分钟。",
+      "normalized": "按压可以，继续保持 一百 到 一百二十 次每分钟。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "按压可以，继续保持 一百 到 一百二十 次每分钟。␟␟",
+      "speak_text": "按压可以，继续保持 100 到 120 次每分钟。",
+      "file": "wav/phrase-3578e519fab4f473.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "不要停，继续按压；等 AED 或急救人员接手、或他恢复正常呼吸再停。",
+      "normalized": "不要停，继续按压；等 AED 或急救人员接手、或他恢复正常呼吸再停。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "不要停，继续按压；等 AED 或急救人员接手、或他恢复正常呼吸再停。␟␟",
+      "speak_text": "不要停，继续按压；等 AED 或急救人员接手、或他恢复正常呼吸再停。",
+      "file": "wav/phrase-1247117cb6a44af7.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "不要停，继续按压。",
+      "normalized": "不要停，继续按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "urgent",
+      "key": "不要停，继续按压。␟␟",
+      "speak_text": "不要停，继续按压。",
+      "file": "wav/phrase-d8c25695833cc8ef.wav",
+      "sources": [
+        "safety:do_not_stop"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "打开 AED，跟着它的语音做，先继续按压。",
+      "normalized": "打开 AED，跟着它的语音做，先继续按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "打开 AED，跟着它的语音做，先继续按压。␟␟",
+      "speak_text": "打开 AED，跟着它的语音做，先继续按压。",
+      "file": "wav/phrase-c6b5647f2f1e843b.wav",
+      "sources": [
+        "safety:aed_continue_cpr"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "打开 AED，跟着它的语音做；先继续按压。",
+      "normalized": "打开 AED，跟着它的语音做；先继续按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "打开 AED，跟着它的语音做；先继续按压。␟␟",
+      "speak_text": "打开 AED，跟着它的语音做；先继续按压。",
+      "file": "wav/phrase-86a031043be169c9.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "跟着节拍按，快速有力。",
+      "normalized": "跟着节拍按，快速有力。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "跟着节拍按，快速有力。␟␟",
+      "speak_text": "跟着节拍按，快速有力。",
+      "file": "wav/phrase-418721aeb50703e1.wav",
+      "sources": [
+        "safety:metronome"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "还没进入胸外按压步骤；如果你已经开始按压，不要随意停止。",
+      "normalized": "还没进入胸外按压步骤；如果你已经开始按压，不要随意停止。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "还没进入胸外按压步骤；如果你已经开始按压，不要随意停止。␟␟",
+      "speak_text": "还没进入胸外按压步骤；如果你已经开始按压，不要随意停止。",
+      "file": "wav/phrase-969e41baad649794.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "急救员到达后，把位置让给他们，后面听他们的；我会生成交接报告。",
+      "normalized": "急救员到达后，把位置让给他们，后面听他们的；我会生成交接报告。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "急救员到达后，把位置让给他们，后面听他们的；我会生成交接报告。␟␟",
+      "speak_text": "急救员到达后，把位置让给他们，后面听他们的；我会生成交接报告。",
+      "file": "wav/phrase-75f349b0b853107d.wav",
+      "sources": [
+        "safety:handover"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "继续按压，不要停，我在。",
+      "normalized": "继续按压，不要停，我在。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "继续按压，不要停，我在。␟␟",
+      "speak_text": "继续按压，不要停，我在。",
+      "file": "wav/phrase-49a9a9ff81b98aee.wav",
+      "sources": [
+        "liveDriver:open_question"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "继续按压，跟着节拍保持节奏；我会继续看位置和节奏。",
+      "normalized": "继续按压，跟着节拍保持节奏；我会继续看位置和节奏。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "继续按压，跟着节拍保持节奏；我会继续看位置和节奏。␟␟",
+      "speak_text": "继续按压，跟着节拍保持节奏；我会继续看位置和节奏。",
+      "file": "wav/phrase-0307eca5acf72e76.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "看他的胸口。偶尔大口喘、或者完全不动，都算没有呼吸；看不清就按没有呼吸处理。",
+      "normalized": "看他的胸口。偶尔大口喘、或者完全不动，都算没有呼吸；看不清就按没有呼吸处理。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "看他的胸口。偶尔大口喘、或者完全不动，都算没有呼吸；看不清就按没有呼吸处理。␟␟",
+      "speak_text": "看他的胸口。偶尔大口喘、或者完全不动，都算没有呼吸；看不清就按没有呼吸处理。",
+      "file": "wav/phrase-c69f5e91590913a2.wav",
+      "sources": [
+        "safety:uncertain_breathing_high_risk"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "看他的胸口。只是偶尔大口喘，或者完全不动，都算没有呼吸。",
+      "normalized": "看他的胸口。只是偶尔大口喘，或者完全不动，都算没有呼吸。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "看他的胸口。只是偶尔大口喘，或者完全不动，都算没有呼吸。␟␟",
+      "speak_text": "看他的胸口。只是偶尔大口喘，或者完全不动，都算没有呼吸。",
+      "file": "wav/phrase-e343758a5e18364f.wav",
+      "sources": [
+        "safety:ask_breathing_check",
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "你做得很好，跟着节拍继续。",
+      "normalized": "你做得很好，跟着节拍继续。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_soft",
+      "key": "你做得很好，跟着节拍继续。␟␟",
+      "speak_text": "你做得很好，跟着节拍继续。",
+      "file": "wav/phrase-516a506455e4155d.wav",
+      "sources": [
+        "safety:encourage"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "请按疑似心脏骤停处理。现在开始胸外按压。",
+      "normalized": "请按疑似心脏骤停处理。现在开始胸外按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "请按疑似心脏骤停处理。现在开始胸外按压。␟␟",
+      "speak_text": "请按疑似心脏骤停处理。现在开始胸外按压。",
+      "file": "wav/phrase-c931eb50ac4490db.wav",
+      "sources": [
+        "safety:start_cpr"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "请按疑似心脏骤停处理。现在准备胸外按压。",
+      "normalized": "请按疑似心脏骤停处理。现在准备胸外按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "请按疑似心脏骤停处理。现在准备胸外按压。␟␟",
+      "speak_text": "请按疑似心脏骤停处理。现在准备胸外按压。",
+      "file": "wav/phrase-d765fe38132130de.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "请大声呼叫他，并轻拍双肩。",
+      "normalized": "请大声呼叫他，并轻拍双肩。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "请大声呼叫他，并轻拍双肩。␟␟",
+      "speak_text": "请大声呼叫他，并轻拍双肩。",
+      "file": "wav/phrase-8e75f8d7a600ec37.wav",
+      "sources": [
+        "safety:ask_response_check"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "请大声叫他，并轻拍双肩。",
+      "normalized": "请大声叫他，并轻拍双肩。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "请大声叫他，并轻拍双肩。␟␟",
+      "speak_text": "请大声叫他，并轻拍双肩。",
+      "file": "wav/phrase-92b362c491ef8514.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "让他平躺在硬地面，双手掌根放在胸口中央。手机靠在他胸侧、拍到你的手；放不稳就直接开始按压。",
+      "normalized": "让他平躺在硬地面，双手掌根放在胸口中央。手机靠在他胸侧、拍到你的手；放不稳就直接开始按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "让他平躺在硬地面，双手掌根放在胸口中央。手机靠在他胸侧、拍到你的手；放不稳就直接开始按压。␟␟",
+      "speak_text": "让他平躺在硬地面，双手掌根放在胸口中央。手机靠在他胸侧、拍到你的手；放不稳就直接开始按压。",
+      "file": "wav/phrase-af3f066794b307d4.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "让他平躺在硬的平面上。",
+      "normalized": "让他平躺在硬的平面上。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "让他平躺在硬的平面上。␟␟",
+      "speak_text": "让他平躺在硬的平面上。",
+      "file": "wav/phrase-5ca3da995e9b5427.wav",
+      "sources": [
+        "safety:place_on_hard_surface"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "如果旁边有人，请让他准备接替按压。",
+      "normalized": "如果旁边有人，请让他准备接替按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "如果旁边有人，请让他准备接替按压。␟␟",
+      "speak_text": "如果旁边有人，请让他准备接替按压。",
+      "file": "wav/phrase-10f9b889ef9e8dcb.wav",
+      "sources": [
+        "safety:fatigue_switch"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "如果手机能稳住，放在患者胸侧，屏幕朝向你；放不好不要耽误，立刻开始按压。",
+      "normalized": "如果手机能稳住，放在患者胸侧，屏幕朝向你；放不好不要耽误，立刻开始按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "如果手机能稳住，放在患者胸侧，屏幕朝向你；放不好不要耽误，立刻开始按压。␟␟",
+      "speak_text": "如果手机能稳住，放在患者胸侧，屏幕朝向你；放不好不要耽误，立刻开始按压。",
+      "file": "wav/phrase-e0e49e339813194c.wav",
+      "sources": [
+        "safety:phone_side_fixed"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "稍微慢一点，跟着节拍按。",
+      "normalized": "稍微慢一点，跟着节拍按。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "稍微慢一点，跟着节拍按。␟␟",
+      "speak_text": "稍微慢一点，跟着节拍按。",
+      "file": "wav/phrase-a92ef2904be14bc3.wav",
+      "sources": [
+        "safety:rate_slower"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "稍微慢一点，目标是 100 到 120 次每分钟，继续保持。",
+      "normalized": "稍微慢一点，目标是 一百 到 一百二十 次每分钟，继续保持。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "稍微慢一点，目标是 一百 到 一百二十 次每分钟，继续保持。␟␟",
+      "speak_text": "稍微慢一点，目标是 100 到 120 次每分钟，继续保持。",
+      "file": "wav/phrase-42119dffaff147a3.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "稍微再快一点，目标是 100 到 120 次每分钟，继续按压。",
+      "normalized": "稍微再快一点，目标是 一百 到 一百二十 次每分钟，继续按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "稍微再快一点，目标是 一百 到 一百二十 次每分钟，继续按压。␟␟",
+      "speak_text": "稍微再快一点，目标是 100 到 120 次每分钟，继续按压。",
+      "file": "wav/phrase-cacde73496550122.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "是否需要拨打 120，要先看反应和呼吸检查结果。",
+      "normalized": "是否需要拨打 幺二零，要先看反应和呼吸检查结果。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "是否需要拨打 幺二零，要先看反应和呼吸检查结果。␟␟",
+      "speak_text": "是否需要拨打 120，要先看反应和呼吸检查结果。",
+      "file": "wav/phrase-01d3be6d2c5b70fd.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "手臂伸直，用上半身向下压，继续保持这个节奏。",
+      "normalized": "手臂伸直，用上半身向下压，继续保持这个节奏。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "手臂伸直，用上半身向下压，继续保持这个节奏。␟␟",
+      "speak_text": "手臂伸直，用上半身向下压，继续保持这个节奏。",
+      "file": "wav/phrase-97b363b19a97ec76.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "手臂伸直，用上半身向下压。",
+      "normalized": "手臂伸直，用上半身向下压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "手臂伸直，用上半身向下压。␟␟",
+      "speak_text": "手臂伸直，用上半身向下压。",
+      "file": "wav/phrase-a15cd25cf6f5f5a2.wav",
+      "sources": [
+        "safety:straight_arms"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "手再往上一点，继续按压。",
+      "normalized": "手再往上一点，继续按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "手再往上一点，继续按压。␟␟",
+      "speak_text": "手再往上一点，继续按压。",
+      "file": "wav/phrase-daa162279bf95adc.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "手再往下一点，继续按压。",
+      "normalized": "手再往下一点，继续按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "手再往下一点，继续按压。␟␟",
+      "speak_text": "手再往下一点，继续按压。",
+      "file": "wav/phrase-25ac727370d2f4af.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "手再往下移一点。",
+      "normalized": "手再往下移一点。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "手再往下移一点。␟␟",
+      "speak_text": "手再往下移一点。",
+      "file": "wav/phrase-698a544261cf9fb3.wav",
+      "sources": [
+        "safety:hand_position_lower"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "双手掌根放到胸口中央，现在开始按。",
+      "normalized": "双手掌根放到胸口中央，现在开始按。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "双手掌根放到胸口中央，现在开始按。␟␟",
+      "speak_text": "双手掌根放到胸口中央，现在开始按。",
+      "file": "wav/phrase-efe32d5cd308dde6.wav",
+      "sources": [
+        "safety:start_compressions"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "双手掌根放回胸口中央，继续按压。",
+      "normalized": "双手掌根放回胸口中央，继续按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "双手掌根放回胸口中央，继续按压。␟␟",
+      "speak_text": "双手掌根放回胸口中央，继续按压。",
+      "file": "wav/phrase-94215365f2066dd8.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "双手掌根放在胸口中央。",
+      "normalized": "双手掌根放在胸口中央。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "双手掌根放在胸口中央。␟␟",
+      "speak_text": "双手掌根放在胸口中央。",
+      "file": "wav/phrase-4db9fd25a1dd3f46.wav",
+      "sources": [
+        "safety:hand_position",
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "他没有反应。现在检查呼吸。",
+      "normalized": "他没有反应。现在检查呼吸。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "他没有反应。现在检查呼吸。␟␟",
+      "speak_text": "他没有反应。现在检查呼吸。",
+      "file": "wav/phrase-4122920b9b705699.wav",
+      "sources": [
+        "safety:confirm_unresponsive"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "位置向右一点，继续按压。",
+      "normalized": "位置向右一点，继续按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "位置向右一点，继续按压。␟␟",
+      "speak_text": "位置向右一点，继续按压。",
+      "file": "wav/phrase-2530eefbdc34060f.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "位置向右一点。",
+      "normalized": "位置向右一点。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "位置向右一点。␟␟",
+      "speak_text": "位置向右一点。",
+      "file": "wav/phrase-9a0e00c80f6e81f1.wav",
+      "sources": [
+        "safety:hand_position_right"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "位置向左一点，继续按压。",
+      "normalized": "位置向左一点，继续按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "位置向左一点，继续按压。␟␟",
+      "speak_text": "位置向左一点，继续按压。",
+      "file": "wav/phrase-3659a47cde736fea.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "我还不能判断按压质量，因为现在还没进入胸外按压步骤。",
+      "normalized": "我还不能判断按压质量，因为现在还没进入胸外按压步骤。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "我还不能判断按压质量，因为现在还没进入胸外按压步骤。␟␟",
+      "speak_text": "我还不能判断按压质量，因为现在还没进入胸外按压步骤。",
+      "file": "wav/phrase-71d8b6d6ff8322d8.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "我将为你拨打 120，请保持手机免提。",
+      "normalized": "我将为你拨打 幺二零，请保持手机免提。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "我将为你拨打 幺二零，请保持手机免提。␟␟",
+      "speak_text": "我将为你拨打 120，请保持手机免提。",
+      "file": "wav/phrase-8c29cdbee6364c17.wav",
+      "sources": [
+        "safety:emergency_call"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "我将为你拨打 120，请保持手机免提。现在准备胸外按压。",
+      "normalized": "我将为你拨打 幺二零，请保持手机免提。现在准备胸外按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "我将为你拨打 幺二零，请保持手机免提。现在准备胸外按压。␟␟",
+      "speak_text": "我将为你拨打 120，请保持手机免提。现在准备胸外按压。",
+      "file": "wav/phrase-d99961e580ee2507.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "我在，按住别停，听我说。",
+      "normalized": "我在，按住别停，听我说。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "我在，按住别停，听我说。␟␟",
+      "speak_text": "我在，按住别停，听我说。",
+      "file": "wav/phrase-f00b777dd79f22f9.wav",
+      "sources": [
+        "liveDriver:open_question"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "先确认周围安全，再靠近患者。",
+      "normalized": "先确认周围安全，再靠近患者。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "先确认周围安全，再靠近患者。␟␟",
+      "speak_text": "先确认周围安全，再靠近患者。",
+      "file": "wav/phrase-98a89a6f056c1c10.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "先确认周围安全，再靠近他。",
+      "normalized": "先确认周围安全，再靠近他。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "先确认周围安全，再靠近他。␟␟",
+      "speak_text": "先确认周围安全，再靠近他。",
+      "file": "wav/phrase-26733918bc6bf48e.wav",
+      "sources": [
+        "safety:ask_scene_safety"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "现在不要停，马上继续按压。",
+      "normalized": "现在不要停，马上继续按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "现在不要停，马上继续按压。␟␟",
+      "speak_text": "现在不要停，马上继续按压。",
+      "file": "wav/phrase-809fbfa5943ce1e8.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "需要立刻拨打 120。拨通后保持免提，同时准备继续胸外按压。",
+      "normalized": "需要立刻拨打 幺二零。拨通后保持免提，同时准备继续胸外按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "需要立刻拨打 幺二零。拨通后保持免提，同时准备继续胸外按压。␟␟",
+      "speak_text": "需要立刻拨打 120。拨通后保持免提，同时准备继续胸外按压。",
+      "file": "wav/phrase-5ba9381e6bd39674.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "120 已经在呼叫中，保持手机免提，你继续胸外按压。",
+      "normalized": "幺二零 已经在呼叫中，保持手机免提，你继续胸外按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "幺二零 已经在呼叫中，保持手机免提，你继续胸外按压。␟␟",
+      "speak_text": "120 已经在呼叫中，保持手机免提，你继续胸外按压。",
+      "file": "wav/phrase-cc77621535e141b9.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "再快一点，跟着节拍按。",
+      "normalized": "再快一点，跟着节拍按。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "再快一点，跟着节拍按。␟␟",
+      "speak_text": "再快一点，跟着节拍按。",
+      "file": "wav/phrase-8fb6bf469a1552ef.wav",
+      "sources": [
+        "safety:rate_faster"
+      ]
+    },
+    {
+      "kind": "phrase",
+      "text": "AED 可以先放在旁边准备。还没进入胸外按压步骤。",
+      "normalized": "AED 可以先放在旁边准备。还没进入胸外按压步骤。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "AED 可以先放在旁边准备。还没进入胸外按压步骤。␟␟",
+      "speak_text": "AED 可以先放在旁边准备。还没进入胸外按压步骤。",
+      "file": "wav/phrase-8682ce10f1a7feca.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "按压可以，",
+      "normalized": "按压可以，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "按压可以，␟␟",
+      "speak_text": "按压可以，",
+      "file": "wav/clause-74ecbbd18d832f19.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "按住别停，",
+      "normalized": "按住别停，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "按住别停，␟␟",
+      "speak_text": "按住别停，",
+      "file": "wav/clause-03905887e6cbb027.wav",
+      "sources": [
+        "liveDriver:open_question"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "把位置让给他们，",
+      "normalized": "把位置让给他们，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "把位置让给他们，␟␟",
+      "speak_text": "把位置让给他们，",
+      "file": "wav/clause-810426a98e04512b.wav",
+      "sources": [
+        "safety:handover"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "保持手机免提，",
+      "normalized": "保持手机免提，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "保持手机免提，␟␟",
+      "speak_text": "保持手机免提，",
+      "file": "wav/clause-f4ab3c2151e4f5d9.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "并轻拍双肩。",
+      "normalized": "并轻拍双肩。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "并轻拍双肩。␟␟",
+      "speak_text": "并轻拍双肩。",
+      "file": "wav/clause-5caaad2ebe252312.wav",
+      "sources": [
+        "safety:ask_response_check",
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "拨通后保持免提，",
+      "normalized": "拨通后保持免提，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "拨通后保持免提，␟␟",
+      "speak_text": "拨通后保持免提，",
+      "file": "wav/clause-1cddc05782c6c812.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "不要随意停止。",
+      "normalized": "不要随意停止。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "不要随意停止。␟␟",
+      "speak_text": "不要随意停止。",
+      "file": "wav/clause-7caa085da442a470.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "不要停，",
+      "normalized": "不要停，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "urgent",
+      "key": "不要停，␟␟",
+      "speak_text": "不要停，",
+      "file": "wav/clause-4232b06a5a16e097.wav",
+      "sources": [
+        "safety:do_not_stop",
+        "liveDriver",
+        "liveDriver:open_question"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "打开 AED，",
+      "normalized": "打开 AED，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "打开 AED，␟␟",
+      "speak_text": "打开 AED，",
+      "file": "wav/clause-3db14946607935c1.wav",
+      "sources": [
+        "safety:aed_continue_cpr",
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "等 AED 或急救人员接手、",
+      "normalized": "等 AED 或急救人员接手、",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "等 AED 或急救人员接手、␟␟",
+      "speak_text": "等 AED 或急救人员接手、",
+      "file": "wav/clause-428054c66c3fed48.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "都算没有呼吸；",
+      "normalized": "都算没有呼吸；",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "都算没有呼吸；␟␟",
+      "speak_text": "都算没有呼吸；",
+      "file": "wav/clause-32a1220afe726a61.wav",
+      "sources": [
+        "safety:uncertain_breathing_high_risk"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "都算没有呼吸。",
+      "normalized": "都算没有呼吸。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "都算没有呼吸。␟␟",
+      "speak_text": "都算没有呼吸。",
+      "file": "wav/clause-a843a4fc30258635.wav",
+      "sources": [
+        "safety:ask_breathing_check",
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "放不好不要耽误，",
+      "normalized": "放不好不要耽误，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "放不好不要耽误，␟␟",
+      "speak_text": "放不好不要耽误，",
+      "file": "wav/clause-267cb1f7a8e3f477.wav",
+      "sources": [
+        "safety:phone_side_fixed"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "放不稳就直接开始按压。",
+      "normalized": "放不稳就直接开始按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "放不稳就直接开始按压。␟␟",
+      "speak_text": "放不稳就直接开始按压。",
+      "file": "wav/clause-479a71205cee4ef6.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "放在患者胸侧，",
+      "normalized": "放在患者胸侧，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "放在患者胸侧，␟␟",
+      "speak_text": "放在患者胸侧，",
+      "file": "wav/clause-c2c586f1e0045ad0.wav",
+      "sources": [
+        "safety:phone_side_fixed"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "跟着节拍按，",
+      "normalized": "跟着节拍按，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "跟着节拍按，␟␟",
+      "speak_text": "跟着节拍按，",
+      "file": "wav/clause-e01c19ae4fa76ac2.wav",
+      "sources": [
+        "safety:metronome"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "跟着节拍按。",
+      "normalized": "跟着节拍按。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "跟着节拍按。␟␟",
+      "speak_text": "跟着节拍按。",
+      "file": "wav/clause-9810b780c26af552.wav",
+      "sources": [
+        "safety:rate_faster",
+        "safety:rate_slower"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "跟着节拍保持节奏；",
+      "normalized": "跟着节拍保持节奏；",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "跟着节拍保持节奏；␟␟",
+      "speak_text": "跟着节拍保持节奏；",
+      "file": "wav/clause-2f47d0548f9421aa.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "跟着节拍继续。",
+      "normalized": "跟着节拍继续。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_soft",
+      "key": "跟着节拍继续。␟␟",
+      "speak_text": "跟着节拍继续。",
+      "file": "wav/clause-c136dae9b66d90d3.wav",
+      "sources": [
+        "safety:encourage"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "跟着它的语音做，",
+      "normalized": "跟着它的语音做，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "跟着它的语音做，␟␟",
+      "speak_text": "跟着它的语音做，",
+      "file": "wav/clause-1c4eff03c83ea4d4.wav",
+      "sources": [
+        "safety:aed_continue_cpr"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "跟着它的语音做；",
+      "normalized": "跟着它的语音做；",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "跟着它的语音做；␟␟",
+      "speak_text": "跟着它的语音做；",
+      "file": "wav/clause-4311c5e8767a578b.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "还没进入胸外按压步骤；",
+      "normalized": "还没进入胸外按压步骤；",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "还没进入胸外按压步骤；␟␟",
+      "speak_text": "还没进入胸外按压步骤；",
+      "file": "wav/clause-2eefec156817bd9e.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "还没进入胸外按压步骤。",
+      "normalized": "还没进入胸外按压步骤。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "还没进入胸外按压步骤。␟␟",
+      "speak_text": "还没进入胸外按压步骤。",
+      "file": "wav/clause-82b9da84350b8a4c.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "后面听他们的；",
+      "normalized": "后面听他们的；",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "后面听他们的；␟␟",
+      "speak_text": "后面听他们的；",
+      "file": "wav/clause-249678eba39ef8cc.wav",
+      "sources": [
+        "safety:handover"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "或他恢复正常呼吸再停。",
+      "normalized": "或他恢复正常呼吸再停。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "或他恢复正常呼吸再停。␟␟",
+      "speak_text": "或他恢复正常呼吸再停。",
+      "file": "wav/clause-921a2b37ebeadb8f.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "或者完全不动，",
+      "normalized": "或者完全不动，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "或者完全不动，␟␟",
+      "speak_text": "或者完全不动，",
+      "file": "wav/clause-ce7e702e58b65570.wav",
+      "sources": [
+        "safety:ask_breathing_check",
+        "safety:uncertain_breathing_high_risk",
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "急救员到达后，",
+      "normalized": "急救员到达后，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "急救员到达后，␟␟",
+      "speak_text": "急救员到达后，",
+      "file": "wav/clause-6a7b81f1290ef4ed.wav",
+      "sources": [
+        "safety:handover"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "继续按压，",
+      "normalized": "继续按压，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "继续按压，␟␟",
+      "speak_text": "继续按压，",
+      "file": "wav/clause-6b9cb4cb07d21143.wav",
+      "sources": [
+        "liveDriver",
+        "liveDriver:open_question"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "继续按压；",
+      "normalized": "继续按压；",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "继续按压；␟␟",
+      "speak_text": "继续按压；",
+      "file": "wav/clause-c6ac3a8712119636.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "继续按压。",
+      "normalized": "继续按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "urgent",
+      "key": "继续按压。␟␟",
+      "speak_text": "继续按压。",
+      "file": "wav/clause-973907c89c6c9a3b.wav",
+      "sources": [
+        "safety:do_not_stop",
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "继续保持 一百 到 一百二十 次每分钟。",
+      "normalized": "继续保持 一百 到 一百二十 次每分钟。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "继续保持 一百 到 一百二十 次每分钟。␟␟",
+      "speak_text": "继续保持 一百 到 一百二十 次每分钟。",
+      "file": "wav/clause-6513a960453eb8a3.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "继续保持。",
+      "normalized": "继续保持。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "继续保持。␟␟",
+      "speak_text": "继续保持。",
+      "file": "wav/clause-1e78ff887af37a0d.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "继续保持这个节奏。",
+      "normalized": "继续保持这个节奏。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "继续保持这个节奏。␟␟",
+      "speak_text": "继续保持这个节奏。",
+      "file": "wav/clause-018c102902d2c3ec.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "看不清就按没有呼吸处理。",
+      "normalized": "看不清就按没有呼吸处理。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "看不清就按没有呼吸处理。␟␟",
+      "speak_text": "看不清就按没有呼吸处理。",
+      "file": "wav/clause-c9e5e3007c33390b.wav",
+      "sources": [
+        "safety:uncertain_breathing_high_risk"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "看他的胸口。",
+      "normalized": "看他的胸口。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "看他的胸口。␟␟",
+      "speak_text": "看他的胸口。",
+      "file": "wav/clause-921b8cb52ffb6696.wav",
+      "sources": [
+        "safety:ask_breathing_check",
+        "safety:uncertain_breathing_high_risk",
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "快速有力。",
+      "normalized": "快速有力。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "快速有力。␟␟",
+      "speak_text": "快速有力。",
+      "file": "wav/clause-c04ccf743726c092.wav",
+      "sources": [
+        "safety:metronome"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "立刻开始按压。",
+      "normalized": "立刻开始按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "立刻开始按压。␟␟",
+      "speak_text": "立刻开始按压。",
+      "file": "wav/clause-d6e40920c192661d.wav",
+      "sources": [
+        "safety:phone_side_fixed"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "马上继续按压。",
+      "normalized": "马上继续按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "马上继续按压。␟␟",
+      "speak_text": "马上继续按压。",
+      "file": "wav/clause-b88b3584f21c1a47.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "目标是 一百 到 一百二十 次每分钟，",
+      "normalized": "目标是 一百 到 一百二十 次每分钟，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "目标是 一百 到 一百二十 次每分钟，␟␟",
+      "speak_text": "目标是 一百 到 一百二十 次每分钟，",
+      "file": "wav/clause-8da0e7cdbff62dba.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "你继续胸外按压。",
+      "normalized": "你继续胸外按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "你继续胸外按压。␟␟",
+      "speak_text": "你继续胸外按压。",
+      "file": "wav/clause-7166c789eab28c7e.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "你做得很好，",
+      "normalized": "你做得很好，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_soft",
+      "key": "你做得很好，␟␟",
+      "speak_text": "你做得很好，",
+      "file": "wav/clause-8d9c63619edf5668.wav",
+      "sources": [
+        "safety:encourage"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "偶尔大口喘、",
+      "normalized": "偶尔大口喘、",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "偶尔大口喘、␟␟",
+      "speak_text": "偶尔大口喘、",
+      "file": "wav/clause-7901886889a6c71d.wav",
+      "sources": [
+        "safety:uncertain_breathing_high_risk"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "拍到你的手；",
+      "normalized": "拍到你的手；",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "拍到你的手；␟␟",
+      "speak_text": "拍到你的手；",
+      "file": "wav/clause-5f7245863f150d61.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "屏幕朝向你；",
+      "normalized": "屏幕朝向你；",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "屏幕朝向你；␟␟",
+      "speak_text": "屏幕朝向你；",
+      "file": "wav/clause-e1e5cc57c1ad9cd9.wav",
+      "sources": [
+        "safety:phone_side_fixed"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "请按疑似心脏骤停处理。",
+      "normalized": "请按疑似心脏骤停处理。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "请按疑似心脏骤停处理。␟␟",
+      "speak_text": "请按疑似心脏骤停处理。",
+      "file": "wav/clause-fa2ad60f74d61926.wav",
+      "sources": [
+        "safety:start_cpr",
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "请保持手机免提。",
+      "normalized": "请保持手机免提。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "请保持手机免提。␟␟",
+      "speak_text": "请保持手机免提。",
+      "file": "wav/clause-5267605e49516f2b.wav",
+      "sources": [
+        "safety:emergency_call",
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "请大声呼叫他，",
+      "normalized": "请大声呼叫他，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "请大声呼叫他，␟␟",
+      "speak_text": "请大声呼叫他，",
+      "file": "wav/clause-9650214256bf8002.wav",
+      "sources": [
+        "safety:ask_response_check"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "请大声叫他，",
+      "normalized": "请大声叫他，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "请大声叫他，␟␟",
+      "speak_text": "请大声叫他，",
+      "file": "wav/clause-e142dae414469b79.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "请让他准备接替按压。",
+      "normalized": "请让他准备接替按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "请让他准备接替按压。␟␟",
+      "speak_text": "请让他准备接替按压。",
+      "file": "wav/clause-fc39913d5bce6c1b.wav",
+      "sources": [
+        "safety:fatigue_switch"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "让他平躺在硬地面，",
+      "normalized": "让他平躺在硬地面，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "让他平躺在硬地面，␟␟",
+      "speak_text": "让他平躺在硬地面，",
+      "file": "wav/clause-f7b8f22fd6591185.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "如果你已经开始按压，",
+      "normalized": "如果你已经开始按压，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "如果你已经开始按压，␟␟",
+      "speak_text": "如果你已经开始按压，",
+      "file": "wav/clause-bed24628499c63de.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "如果旁边有人，",
+      "normalized": "如果旁边有人，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "如果旁边有人，␟␟",
+      "speak_text": "如果旁边有人，",
+      "file": "wav/clause-c79b06ff546a3748.wav",
+      "sources": [
+        "safety:fatigue_switch"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "如果手机能稳住，",
+      "normalized": "如果手机能稳住，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "如果手机能稳住，␟␟",
+      "speak_text": "如果手机能稳住，",
+      "file": "wav/clause-91efda75496adc3f.wav",
+      "sources": [
+        "safety:phone_side_fixed"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "稍微慢一点，",
+      "normalized": "稍微慢一点，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "稍微慢一点，␟␟",
+      "speak_text": "稍微慢一点，",
+      "file": "wav/clause-50ae6fca88047c28.wav",
+      "sources": [
+        "safety:rate_slower",
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "稍微再快一点，",
+      "normalized": "稍微再快一点，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "稍微再快一点，␟␟",
+      "speak_text": "稍微再快一点，",
+      "file": "wav/clause-f6ef8b1c71479ca5.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "是否需要拨打 幺二零，",
+      "normalized": "是否需要拨打 幺二零，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "是否需要拨打 幺二零，␟␟",
+      "speak_text": "是否需要拨打 幺二零，",
+      "file": "wav/clause-54ee88888e5c4151.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "手臂伸直，",
+      "normalized": "手臂伸直，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "手臂伸直，␟␟",
+      "speak_text": "手臂伸直，",
+      "file": "wav/clause-0602c036edc461e3.wav",
+      "sources": [
+        "safety:straight_arms",
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "手机靠在他胸侧、",
+      "normalized": "手机靠在他胸侧、",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "手机靠在他胸侧、␟␟",
+      "speak_text": "手机靠在他胸侧、",
+      "file": "wav/clause-8533d00432088349.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "手再往上一点，",
+      "normalized": "手再往上一点，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "手再往上一点，␟␟",
+      "speak_text": "手再往上一点，",
+      "file": "wav/clause-8454de43dd2de181.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "手再往下一点，",
+      "normalized": "手再往下一点，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "手再往下一点，␟␟",
+      "speak_text": "手再往下一点，",
+      "file": "wav/clause-52d712eb30afe2a6.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "双手掌根放到胸口中央，",
+      "normalized": "双手掌根放到胸口中央，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "双手掌根放到胸口中央，␟␟",
+      "speak_text": "双手掌根放到胸口中央，",
+      "file": "wav/clause-2de3303654d40685.wav",
+      "sources": [
+        "safety:start_compressions"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "双手掌根放回胸口中央，",
+      "normalized": "双手掌根放回胸口中央，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "双手掌根放回胸口中央，␟␟",
+      "speak_text": "双手掌根放回胸口中央，",
+      "file": "wav/clause-4015bb3465462d69.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "他没有反应。",
+      "normalized": "他没有反应。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "他没有反应。␟␟",
+      "speak_text": "他没有反应。",
+      "file": "wav/clause-17adf639f433e3ed.wav",
+      "sources": [
+        "safety:confirm_unresponsive"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "听我说。",
+      "normalized": "听我说。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "听我说。␟␟",
+      "speak_text": "听我说。",
+      "file": "wav/clause-0c6e184742c4454d.wav",
+      "sources": [
+        "liveDriver:open_question"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "同时准备继续胸外按压。",
+      "normalized": "同时准备继续胸外按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "同时准备继续胸外按压。␟␟",
+      "speak_text": "同时准备继续胸外按压。",
+      "file": "wav/clause-ddccf576c2fb2eb5.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "位置向右一点，",
+      "normalized": "位置向右一点，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "位置向右一点，␟␟",
+      "speak_text": "位置向右一点，",
+      "file": "wav/clause-873d1cfe8f06e8ce.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "位置向左一点，",
+      "normalized": "位置向左一点，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "位置向左一点，␟␟",
+      "speak_text": "位置向左一点，",
+      "file": "wav/clause-d9d12f702bdced7d.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "我还不能判断按压质量，",
+      "normalized": "我还不能判断按压质量，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "我还不能判断按压质量，␟␟",
+      "speak_text": "我还不能判断按压质量，",
+      "file": "wav/clause-43539cbc8f54fac9.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "我会继续看位置和节奏。",
+      "normalized": "我会继续看位置和节奏。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "我会继续看位置和节奏。␟␟",
+      "speak_text": "我会继续看位置和节奏。",
+      "file": "wav/clause-b9fe2a1bde253a35.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "我会生成交接报告。",
+      "normalized": "我会生成交接报告。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "我会生成交接报告。␟␟",
+      "speak_text": "我会生成交接报告。",
+      "file": "wav/clause-0f339f7fbaeecdaf.wav",
+      "sources": [
+        "safety:handover"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "我将为你拨打 幺二零，",
+      "normalized": "我将为你拨打 幺二零，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "我将为你拨打 幺二零，␟␟",
+      "speak_text": "我将为你拨打 幺二零，",
+      "file": "wav/clause-d1a9d95e56e05e64.wav",
+      "sources": [
+        "safety:emergency_call",
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "我在，",
+      "normalized": "我在，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "我在，␟␟",
+      "speak_text": "我在，",
+      "file": "wav/clause-fab97c7b43094808.wav",
+      "sources": [
+        "liveDriver:open_question"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "我在。",
+      "normalized": "我在。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "我在。␟␟",
+      "speak_text": "我在。",
+      "file": "wav/clause-307973666840f2c4.wav",
+      "sources": [
+        "liveDriver:open_question"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "先继续按压。",
+      "normalized": "先继续按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "先继续按压。␟␟",
+      "speak_text": "先继续按压。",
+      "file": "wav/clause-4f9cb7d9a423745f.wav",
+      "sources": [
+        "safety:aed_continue_cpr",
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "先确认周围安全，",
+      "normalized": "先确认周围安全，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "先确认周围安全，␟␟",
+      "speak_text": "先确认周围安全，",
+      "file": "wav/clause-1879f00686094d7d.wav",
+      "sources": [
+        "safety:ask_scene_safety",
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "现在不要停，",
+      "normalized": "现在不要停，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "现在不要停，␟␟",
+      "speak_text": "现在不要停，",
+      "file": "wav/clause-437eddec92bc9535.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "现在检查呼吸。",
+      "normalized": "现在检查呼吸。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "现在检查呼吸。␟␟",
+      "speak_text": "现在检查呼吸。",
+      "file": "wav/clause-5c9b53f16c9d3484.wav",
+      "sources": [
+        "safety:confirm_unresponsive"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "现在开始按。",
+      "normalized": "现在开始按。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "现在开始按。␟␟",
+      "speak_text": "现在开始按。",
+      "file": "wav/clause-58add57a1e27edaf.wav",
+      "sources": [
+        "safety:start_compressions"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "现在开始胸外按压。",
+      "normalized": "现在开始胸外按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "现在开始胸外按压。␟␟",
+      "speak_text": "现在开始胸外按压。",
+      "file": "wav/clause-3291e94ff83d19e6.wav",
+      "sources": [
+        "safety:start_cpr"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "现在准备胸外按压。",
+      "normalized": "现在准备胸外按压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "现在准备胸外按压。␟␟",
+      "speak_text": "现在准备胸外按压。",
+      "file": "wav/clause-179e920cf02ad1b6.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "需要立刻拨打 幺二零。",
+      "normalized": "需要立刻拨打 幺二零。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "需要立刻拨打 幺二零。␟␟",
+      "speak_text": "需要立刻拨打 幺二零。",
+      "file": "wav/clause-eaf9c920d7637393.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "幺二零 已经在呼叫中，",
+      "normalized": "幺二零 已经在呼叫中，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "幺二零 已经在呼叫中，␟␟",
+      "speak_text": "幺二零 已经在呼叫中，",
+      "file": "wav/clause-596bdc46655e5ce5.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "要先看反应和呼吸检查结果。",
+      "normalized": "要先看反应和呼吸检查结果。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "要先看反应和呼吸检查结果。␟␟",
+      "speak_text": "要先看反应和呼吸检查结果。",
+      "file": "wav/clause-89f9014dc79a34b9.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "因为现在还没进入胸外按压步骤。",
+      "normalized": "因为现在还没进入胸外按压步骤。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "因为现在还没进入胸外按压步骤。␟␟",
+      "speak_text": "因为现在还没进入胸外按压步骤。",
+      "file": "wav/clause-96925b8fdc93b099.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "用上半身向下压，",
+      "normalized": "用上半身向下压，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "用上半身向下压，␟␟",
+      "speak_text": "用上半身向下压，",
+      "file": "wav/clause-5ffa427d7c532ae1.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "用上半身向下压。",
+      "normalized": "用上半身向下压。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "用上半身向下压。␟␟",
+      "speak_text": "用上半身向下压。",
+      "file": "wav/clause-3dcb9902841088a7.wav",
+      "sources": [
+        "safety:straight_arms"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "再靠近患者。",
+      "normalized": "再靠近患者。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "再靠近患者。␟␟",
+      "speak_text": "再靠近患者。",
+      "file": "wav/clause-6fc2af47b00f90ab.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "再靠近他。",
+      "normalized": "再靠近他。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "再靠近他。␟␟",
+      "speak_text": "再靠近他。",
+      "file": "wav/clause-6a0ea61c99e878af.wav",
+      "sources": [
+        "safety:ask_scene_safety"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "再快一点，",
+      "normalized": "再快一点，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "再快一点，␟␟",
+      "speak_text": "再快一点，",
+      "file": "wav/clause-7567b3bfcacb7529.wav",
+      "sources": [
+        "safety:rate_faster"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "只是偶尔大口喘，",
+      "normalized": "只是偶尔大口喘，",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "calm_firm",
+      "key": "只是偶尔大口喘，␟␟",
+      "speak_text": "只是偶尔大口喘，",
+      "file": "wav/clause-c4ba5886aab3f27f.wav",
+      "sources": [
+        "safety:ask_breathing_check",
+        "liveDriver"
+      ]
+    },
+    {
+      "kind": "clause",
+      "text": "AED 可以先放在旁边准备。",
+      "normalized": "AED 可以先放在旁边准备。",
+      "tone": "",
+      "speed": "",
+      "declared_tone": "",
+      "key": "AED 可以先放在旁边准备。␟␟",
+      "speak_text": "AED 可以先放在旁边准备。",
+      "file": "wav/clause-61de7d90e23becf3.wav",
+      "sources": [
+        "liveDriver"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.firstaid.copilot.execution.GuidanceFixtureContractTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-06-05T12:13:35.254Z" hostname="BYMAX" time="0.016">
+  <properties/>
+  <testcase name="manifestFixturesMatchExpectedAndroidChannels" classname="com.firstaid.copilot.execution.GuidanceFixtureContractTest" time="0.016"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

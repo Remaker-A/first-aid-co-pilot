@@ -1,0 +1,100 @@
+﻿{
+  "ok": true,
+  "mode": "asr",
+  "runs": 7,
+  "threads": 2,
+  "modelRoot": "\/storage\/emulated\/0\/Android\/media\/com.firstaid.copilot.debug\/models",
+  "summary": "Gemma=Ready ASR=Ready TTS=Ready sherpa=Ready",
+  "gemmaReady": true,
+  "asrReady": true,
+  "ttsReady": true,
+  "phase": "finished",
+  "updatedAtMs": 1780668841585,
+  "asrInputBytes": 48000,
+  "asr": {
+    "ok": true,
+    "sample": "0.wav",
+    "inputMs": 1500,
+    "inputBytes": 48000,
+    "warmLatencyMs": 2222,
+    "latencyMs": 181,
+    "avgLatencyMs": 182.57142857142858,
+    "minLatencyMs": 179,
+    "maxLatencyMs": 188,
+    "text": "昨天",
+    "runs": [
+      {
+        "ok": true,
+        "latencyMs": 185,
+        "text": "昨天"
+      },
+      {
+        "ok": true,
+        "latencyMs": 180,
+        "text": "昨天"
+      },
+      {
+        "ok": true,
+        "latencyMs": 180,
+        "text": "昨天"
+      },
+      {
+        "ok": true,
+        "latencyMs": 188,
+        "text": "昨天"
+      },
+      {
+        "ok": true,
+        "latencyMs": 185,
+        "text": "昨天"
+      },
+      {
+        "ok": true,
+        "latencyMs": 179,
+        "text": "昨天"
+      },
+      {
+        "ok": true,
+        "latencyMs": 181,
+        "text": "昨天"
+      }
+    ]
+  },
+  "asrRuns": [
+    {
+      "ok": true,
+      "latencyMs": 185,
+      "text": "昨天"
+    },
+    {
+      "ok": true,
+      "latencyMs": 180,
+      "text": "昨天"
+    },
+    {
+      "ok": true,
+      "latencyMs": 180,
+      "text": "昨天"
+    },
+    {
+      "ok": true,
+      "latencyMs": 188,
+      "text": "昨天"
+    },
+    {
+      "ok": true,
+      "latencyMs": 185,
+      "text": "昨天"
+    },
+    {
+      "ok": true,
+      "latencyMs": 179,
+      "text": "昨天"
+    },
+    {
+      "ok": true,
+      "latencyMs": 181,
+      "text": "昨天"
+    }
+  ]
+}

@@ -3,9 +3,14 @@ import { AgentStage } from "../domain/stages.js";
 import { createInitialSessionState } from "../domain/types.js";
 import { advanceStateMachine } from "../engine/stateMachine.js";
 import { validateAction } from "../engine/actionValidator.js";
+import {
+  recordGuidanceArbitration,
+  resolveGemmaAuthority
+} from "../engine/guidanceArbitration.js";
 import { sessionReducer } from "../engine/sessionReducer.js";
 import { createSessionLog } from "../report/sessionLog.js";
 import { generateHandoverReport } from "../report/handoverReportGenerator.js";
+import { generateHandoverNarrative } from "../report/handoverNarrative.js";
 import { createDecisionFrame } from "../gemma/decisionFrame.js";
 import { GemmaRuntime } from "../gemma/runtime.js";
 
@@ -177,13 +182,47 @@ export async function runAgentPipelineWithGemma({
     });
   }
 
+  const report = generateHandoverReport(log.toJSON(), state);
+  // WD 第五点：终态（S9）让 Gemma 把结构化交接报告"叙述化"。仅在到达交接阶段、
+  // 且 runtime 支持 generateNarrative 时触发；任何失败都安全回退确定性模板，
+  // 因此对只实现 generatePatch 的 runtime（或无模型）零影响。
+  const handover = await maybeGenerateHandoverNarrative({ report, state, runtime, sessionId });
+  if (handover) {
+    report.narrative = handover.narrative;
+    report.narrative_source = handover.source;
+    report.narrative_intent = handover.intent;
+  }
+
   return {
     state,
     actions,
     log: log.toJSON(),
-    report: generateHandoverReport(log.toJSON(), state),
-    gemma: { used: true, guidance }
+    report,
+    gemma: {
+      used: true,
+      guidance,
+      handover: handover
+        ? {
+            source: handover.source,
+            intent: handover.intent,
+            fallback_reason: handover.fallbackReason,
+            violations: handover.violations
+          }
+        : null
+    }
   };
+}
+
+async function maybeGenerateHandoverNarrative({ report, state, runtime, sessionId }) {
+  if (state?.current_stage !== AgentStage.S9_HANDOVER) {
+    return null;
+  }
+
+  if (!runtime || typeof runtime.generateNarrative !== "function") {
+    return null;
+  }
+
+  return generateHandoverNarrative({ report, state, runtime, sessionId });
 }
 
 async function supplementWithGemma({ stateAction, stateValidation, state, event, runtime, sessionId }) {
@@ -228,11 +267,41 @@ async function supplementWithGemma({ stateAction, stateValidation, state, event,
   // Gemma may only supplement when it produces a patch that passes the
   // ActionValidator. An invalid patch never overrides the rule-driven action.
   if (gemmaValidation.ok) {
-    if (gemmaValidation.action.intent !== stateAction.intent) {
+    // Tier-2 授权信封：状态机 intent 是 restricted -> 仅润色（换义丢弃）；是 autonomy
+    // 且 Gemma 选的也是 autonomy 子集 -> 允许在该阶段自选 intent。
+    const changedIntent = gemmaValidation.action.intent !== stateAction.intent;
+    const authority = resolveGemmaAuthority({
+      stage: state.current_stage,
+      stateIntent: stateAction.intent,
+      gemmaIntent: gemmaValidation.action.intent
+    });
+
+    if (changedIntent && !authority.allowIntentChange) {
+      recordGuidanceArbitration({
+        session_id: sessionId,
+        stage: state.current_stage ?? null,
+        state_intent: stateAction.intent,
+        gemma_intent: gemmaValidation.action.intent,
+        state_scope: authority.stateScope,
+        gemma_scope: authority.gemmaScope,
+        allow_intent_change: false,
+        chosen_source: "state_machine"
+      });
       return { action: stateAction, validation: stateValidation, source: "state_machine" };
     }
 
-    return { action: gemmaValidation.action, validation: gemmaValidation, source: "gemma_agent" };
+    const source = changedIntent ? "gemma_autonomy" : "gemma_agent";
+    recordGuidanceArbitration({
+      session_id: sessionId,
+      stage: state.current_stage ?? null,
+      state_intent: stateAction.intent,
+      gemma_intent: gemmaValidation.action.intent,
+      state_scope: authority.stateScope,
+      gemma_scope: authority.gemmaScope,
+      allow_intent_change: authority.allowIntentChange,
+      chosen_source: source
+    });
+    return { action: gemmaValidation.action, validation: gemmaValidation, source };
   }
 
   return {

@@ -1,0 +1,89 @@
+﻿{
+  "ok": true,
+  "mode": "tts",
+  "runs": 5,
+  "threads": 6,
+  "modelRoot": "\/storage\/emulated\/0\/Android\/media\/com.firstaid.copilot.debug\/models",
+  "summary": "Gemma=Ready ASR=Ready TTS=Ready sherpa=Ready",
+  "gemmaReady": true,
+  "asrReady": true,
+  "ttsReady": true,
+  "phase": "finished",
+  "updatedAtMs": 1780668798778,
+  "tts": {
+    "ok": true,
+    "text": "继续按压",
+    "warmLatencyMs": 8710,
+    "cachedStartLatencyMs": 66,
+    "latencyMs": 3246,
+    "avgLatencyMs": 3314.2,
+    "minLatencyMs": 3246,
+    "maxLatencyMs": 3484,
+    "sampleRate": 44100,
+    "bytes": 66604,
+    "runs": [
+      {
+        "ok": true,
+        "latencyMs": 3484,
+        "sampleRate": 44100,
+        "bytes": 66604
+      },
+      {
+        "ok": true,
+        "latencyMs": 3295,
+        "sampleRate": 44100,
+        "bytes": 66604
+      },
+      {
+        "ok": true,
+        "latencyMs": 3257,
+        "sampleRate": 44100,
+        "bytes": 66604
+      },
+      {
+        "ok": true,
+        "latencyMs": 3289,
+        "sampleRate": 44100,
+        "bytes": 66604
+      },
+      {
+        "ok": true,
+        "latencyMs": 3246,
+        "sampleRate": 44100,
+        "bytes": 66604
+      }
+    ]
+  },
+  "ttsRuns": [
+    {
+      "ok": true,
+      "latencyMs": 3484,
+      "sampleRate": 44100,
+      "bytes": 66604
+    },
+    {
+      "ok": true,
+      "latencyMs": 3295,
+      "sampleRate": 44100,
+      "bytes": 66604
+    },
+    {
+      "ok": true,
+      "latencyMs": 3257,
+      "sampleRate": 44100,
+      "bytes": 66604
+    },
+    {
+      "ok": true,
+      "latencyMs": 3289,
+      "sampleRate": 44100,
+      "bytes": 66604
+    },
+    {
+      "ok": true,
+      "latencyMs": 3246,
+      "sampleRate": 44100,
+      "bytes": 66604
+    }
+  ]
+}

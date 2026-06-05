@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import { synthesizeSpeech } from "./tts.js";
-import { normalizeForTts } from "./ttsText.js";
+import { buildTtsCacheKey, normalizeForTts } from "./ttsText.js";
+import { TtsAudioCache, parseWav } from "./ttsCache.js";
 
 const DEFAULT_SAMPLE_RATE = 16000;
 const DEFAULT_CHANNELS = 1;
@@ -21,6 +22,12 @@ export class StreamingTts {
     this.sampleRate = positiveInteger(options.sampleRate, DEFAULT_SAMPLE_RATE);
     this.channels = positiveInteger(options.channels, DEFAULT_CHANNELS);
     this.bitsPerSample = positiveInteger(options.bitsPerSample, DEFAULT_BITS_PER_SAMPLE);
+    // WA pre-synth cache: clause audio keyed by normalizeForTts(text)+tone+speed.
+    // Default is a per-instance LRU with no on-disk bundle so tests stay
+    // hermetic; the live path opts into the shipped bundle via cacheBundleDir.
+    this.cache = resolveCache(options);
+    this.cacheTone = options.cacheTone ?? this.ttsOptions.tone ?? null;
+    this.cacheSpeed = options.cacheSpeed ?? this.ttsOptions.speed ?? null;
     this.token = 0;
     this.cancelReason = null;
   }
@@ -41,27 +48,50 @@ export class StreamingTts {
     const clauses = splitTextIntoClauses(text, {
       maxClauseChars: options.maxClauseChars || this.maxClauseChars,
     });
+    const audioDefaults = {
+      sampleRate: this.sampleRate,
+      channels: this.channels,
+      bitsPerSample: this.bitsPerSample,
+    };
+    const tone = options.tone ?? this.cacheTone;
+    const speed = options.speed ?? this.cacheSpeed;
+
+    if (this.cache?.bundleDir && !this.cache.bundleLoaded) {
+      await this.cache.loadBundle();
+      this.assertCurrent(token);
+    }
 
     for (let clauseIndex = 0; clauseIndex < clauses.length; clauseIndex += 1) {
       this.assertCurrent(token);
       const clause = clauses[clauseIndex];
-      const result = await this.synthesize(clause, {
-        ...this.ttsOptions,
-        ...(options.ttsOptions || options.tts || {}),
-      });
-      this.assertCurrent(token);
+      const cacheKey = this.cache ? buildTtsCacheKey(clause, { tone, speed }) : null;
 
-      const audio = await wavPcmFromTtsResult(result, {
-        sampleRate: this.sampleRate,
-        channels: this.channels,
-        bitsPerSample: this.bitsPerSample,
-      });
+      let audio = null;
+      let provider = "tts_cache";
+      if (cacheKey) {
+        audio = await this.cache.getPcm(cacheKey, audioDefaults);
+        this.assertCurrent(token);
+      }
+
+      if (!audio) {
+        const result = await this.synthesize(clause, {
+          ...this.ttsOptions,
+          ...(options.ttsOptions || options.tts || {}),
+        });
+        this.assertCurrent(token);
+        provider = result?.provider || "unknown";
+        const bytes = await readTtsAudioBytes(result);
+        audio = decodeTtsAudio(bytes, audioDefaults);
+        if (cacheKey && bytes.length) {
+          this.cache.set(cacheKey, bytes, audio);
+        }
+      }
 
       for (const chunk of chunkBuffer(audio.pcm, options.chunkBytes || this.chunkBytes)) {
         this.assertCurrent(token);
         yield {
           type: "audio",
-          provider: result?.provider || "unknown",
+          provider,
           clause,
           clauseIndex,
           clauseCount: clauses.length,
@@ -100,19 +130,39 @@ export function splitTextIntoClauses(text = "", options = {}) {
 }
 
 export async function wavPcmFromTtsResult(result = {}, defaults = {}) {
-  const audio = result.audio || {};
-  const bytes = await readAudioBytes(audio);
+  const bytes = await readTtsAudioBytes(result);
+  return decodeTtsAudio(bytes, defaults);
+}
+
+export async function readTtsAudioBytes(result = {}) {
+  return readAudioBytes(result.audio || {});
+}
+
+function decodeTtsAudio(bytes, defaults = {}) {
   const parsed = parseWav(bytes);
   if (parsed) {
     return parsed;
   }
 
   return {
-    pcm: bytes,
+    pcm: Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes || []),
     sampleRate: positiveInteger(defaults.sampleRate, DEFAULT_SAMPLE_RATE),
     channels: positiveInteger(defaults.channels, DEFAULT_CHANNELS),
     bitsPerSample: positiveInteger(defaults.bitsPerSample, DEFAULT_BITS_PER_SAMPLE),
   };
+}
+
+function resolveCache(options = {}) {
+  if (options.cache === null || options.cache === false) {
+    return null;
+  }
+  if (options.cache) {
+    return options.cache;
+  }
+  return new TtsAudioCache({
+    maxEntries: options.cacheMaxEntries,
+    bundleDir: options.cacheBundleDir ?? null,
+  });
 }
 
 async function readAudioBytes(audio = {}) {
@@ -135,52 +185,6 @@ async function readAudioBytes(audio = {}) {
   }
 
   return Buffer.alloc(0);
-}
-
-function parseWav(buffer) {
-  if (!Buffer.isBuffer(buffer) || buffer.length < 44) {
-    return null;
-  }
-  if (buffer.toString("ascii", 0, 4) !== "RIFF" || buffer.toString("ascii", 8, 12) !== "WAVE") {
-    return null;
-  }
-
-  let offset = 12;
-  let sampleRate = DEFAULT_SAMPLE_RATE;
-  let channels = DEFAULT_CHANNELS;
-  let bitsPerSample = DEFAULT_BITS_PER_SAMPLE;
-  let dataStart = -1;
-  let dataSize = 0;
-
-  while (offset + 8 <= buffer.length) {
-    const id = buffer.toString("ascii", offset, offset + 4);
-    const size = buffer.readUInt32LE(offset + 4);
-    const start = offset + 8;
-    const end = Math.min(start + size, buffer.length);
-
-    if (id === "fmt " && size >= 16 && end <= buffer.length) {
-      channels = buffer.readUInt16LE(start + 2);
-      sampleRate = buffer.readUInt32LE(start + 4);
-      bitsPerSample = buffer.readUInt16LE(start + 14);
-    } else if (id === "data") {
-      dataStart = start;
-      dataSize = Math.max(0, end - start);
-      break;
-    }
-
-    offset = start + size + (size % 2);
-  }
-
-  if (dataStart < 0) {
-    return null;
-  }
-
-  return {
-    pcm: buffer.subarray(dataStart, dataStart + dataSize),
-    sampleRate,
-    channels,
-    bitsPerSample,
-  };
 }
 
 function* chunkBuffer(buffer, chunkBytes) {

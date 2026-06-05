@@ -63,6 +63,26 @@ export function normalizeForTts(text) {
   return value;
 }
 
+// Canonical cache key for pre-synthesized / cached TTS audio.
+//
+// The key MUST be built from the post-`normalizeForTts` text (the digits are
+// rewritten before synthesis, so "120" and "幺二零" must collapse to the same
+// key) plus the prosody dimensions that change the rendered waveform (tone and
+// speed). Whitespace is collapsed first so "继续 按压" and "继续按压" share audio.
+// `normalizeForTts` is idempotent, so calling this on an already-normalized
+// clause (the streaming path) yields the same key as calling it on the raw
+// phrase (the whole-utterance path).
+const TTS_CACHE_KEY_DELIMITER = "\u241f";
+
+export function buildTtsCacheKey(text, options = {}) {
+  const collapsed = typeof text === "string" ? text.trim().replace(/\s+/g, " ") : "";
+  const normalized = normalizeForTts(collapsed);
+  const tone = typeof options.tone === "string" ? options.tone.trim() : "";
+  const speed =
+    options.speed === undefined || options.speed === null ? "" : String(options.speed).trim();
+  return [normalized, tone, speed].join(TTS_CACHE_KEY_DELIMITER);
+}
+
 export function digitsSpoken(numStr) {
   return String(numStr)
     .replace(/\D/g, "")

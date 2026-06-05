@@ -101,5 +101,113 @@
     "add_unreviewed_medical_step",
     "promise_survival",
     "ask_user_to_decide_cpr"
-  ]
+  ],
+  "gemma_decision_scope_principle": "Tier-2 授权信封：每阶段把意图二分为 autonomy（Gemma 可自选 intent + 自由措辞 + 调语气）与 restricted（仅可润色同 intent，不可换义）。仲裁时按状态机选定的 intent 的 scope 决定是否放开 allowIntentChange：restricted 只润色；autonomy 轮允许 Gemma 在该阶段 autonomy 子集内自选。未显式列出的意图按 restricted 从严处理。",
+  "gemma_decision_scope": {
+    "S0_INIT": {
+      "autonomy": ["reassure_rescuer"],
+      "restricted": ["session_started", "check_permissions", "start_recording"]
+    },
+    "S1_SCENE_SAFE": {
+      "autonomy": ["reassure_rescuer"],
+      "restricted": [
+        "ask_scene_safety",
+        "scene_safe_confirmed",
+        "scene_safe",
+        "scene_unsafe",
+        "adult_likely",
+        "not_adult",
+        "warn_scene_danger",
+        "ensure_scene_safe",
+        "warn_scene_unsafe"
+      ]
+    },
+    "S2_CHECK_RESPONSE": {
+      "autonomy": ["reassure_rescuer"],
+      "restricted": [
+        "ask_response_check",
+        "parse_response_answer",
+        "patient_responsive",
+        "patient_unresponsive",
+        "adult_likely",
+        "not_adult",
+        "monitor_responsive_patient"
+      ]
+    },
+    "S3_CHECK_BREATHING": {
+      "autonomy": [],
+      "restricted": [
+        "ask_breathing_check",
+        "parse_breathing_answer",
+        "clarify_breathing",
+        "normal_breathing",
+        "normal_breathing_present",
+        "normal_breathing_absent",
+        "no_normal_breathing",
+        "breathing_absent",
+        "agonal_breathing",
+        "monitor_breathing_patient",
+        "monitor_after_rosc"
+      ]
+    },
+    "S4_SUSPECTED_ARREST": {
+      "autonomy": [],
+      "restricted": [
+        "state_suspected_arrest_handling",
+        "prepare_emergency_call",
+        "start_emergency_call_and_cpr"
+      ]
+    },
+    "S5_CALL_EMERGENCY": {
+      "autonomy": ["explain_call_status", "calm_rescuer"],
+      "restricted": [
+        "start_emergency_call",
+        "start_emergency_call_and_cpr",
+        "attach_gps",
+        "start_local_recording"
+      ]
+    },
+    "S6_CPR_READY": {
+      "autonomy": ["answer_position_question", "encourage_rescuer"],
+      "restricted": [
+        "guide_cpr_position",
+        "start_cpr_guidance",
+        "start_cpr_loop",
+        "step_done",
+        "compressions_reported"
+      ]
+    },
+    "S7_CPR_LOOP": {
+      "autonomy": ["answer_current_cpr_question", "encourage_rescuer", "calm_rescuer"],
+      "restricted": [
+        "correction.hand_position",
+        "correction.rate_low",
+        "correction.rate_high",
+        "correction.arm_bent",
+        "correction.interruption",
+        "continue_cpr",
+        "update_cpr_quality",
+        "step_done",
+        "compressions_reported",
+        "start_cpr_loop",
+        "continue_cpr_loop"
+      ]
+    },
+    "S8_ASSISTANCE": {
+      "autonomy": ["explain_aed_support", "calm_rescuer", "assist_rescuer_fatigue"],
+      "restricted": ["guide_rescuer_change", "continue_cpr", "assist_aed"]
+    },
+    "S9_HANDOVER": {
+      "autonomy": ["handover_summary_patch", "explain_handover"],
+      "restricted": ["generate_handover_report", "request_share_report", "request_share_video"]
+    },
+    "MONITOR_RESPONSE": {
+      "autonomy": ["reassure_rescuer"],
+      "restricted": ["monitor_patient", "call_help", "monitor_responsive_patient"]
+    },
+    "MONITOR_BREATHING": {
+      "autonomy": ["reassure_rescuer"],
+      "restricted": ["monitor_patient", "call_help", "monitor_breathing_patient", "monitor_after_rosc"]
+    }
+  }
 }

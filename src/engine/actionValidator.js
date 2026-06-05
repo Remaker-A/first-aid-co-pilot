@@ -1,4 +1,9 @@
-import { getForbiddenPhrases, getGemmaAllowedIntents } from "../knowledge/knowledgeBase.js";
+import {
+  getForbiddenIntents,
+  getForbiddenPhrases,
+  getGemmaAllowedIntents,
+  getValidatorRules
+} from "../knowledge/knowledgeBase.js";
 
 const PRIORITY_RANK = Object.freeze({
   silent: 0,
@@ -7,6 +12,39 @@ const PRIORITY_RANK = Object.freeze({
   high: 3,
   critical: 4
 });
+
+// Tier-1 不可违背硬 Guard 的来源：knowledge/safety_phrases.json 的 validator_rules
+// 与 allowed_intents.json 的 forbidden_intents。把"只声明"的规则变成强制校验，每条
+// 都有稳定的 reason code（见下方各 guard）。仅在模块加载时读取一次（与
+// KNOWLEDGE_FORBIDDEN_PHRASES 一致），单一事实源由 knowledgeBase 维护。
+const VALIDATOR_RULES = getValidatorRules();
+const KNOWLEDGE_FORBIDDEN_INTENTS = getForbiddenIntents();
+
+// 强制 TTS 字数上限（防 Gemma 长篇）。只统计中文（zh）字符，数字/空格/标点不计入，
+// 与 recommended_tts_max_zh_chars 的语义一致。仅约束 source=gemma_agent 的生成话术；
+// 状态机/规则反馈/liveDriver 的固定话术是审定过的标准句，豁免长度限制。
+const TTS_MAX_ZH_CHARS = ruleNumber(VALIDATOR_RULES.recommended_tts_max_zh_chars, 30);
+const CRITICAL_TTS_MAX_ZH_CHARS = ruleNumber(VALIDATOR_RULES.critical_stage_tts_max_zh_chars, 60);
+// 急救关键阶段允许更长的安抚/解释（60），其余阶段从严（30）。
+const CRITICAL_TTS_STAGES = new Set([
+  "S4_SUSPECTED_ARREST",
+  "S5_CALL_EMERGENCY",
+  "S6_CPR_READY",
+  "S7_CPR_LOOP",
+  "S8_ASSISTANCE"
+]);
+const ZH_CHAR_PATTERN = /[\u3400-\u4dbf\u4e00-\u9fff]/gu;
+
+// validator_rules 的布尔开关：默认强制（缺省视为 true），可在知识库显式关闭。
+const ENFORCE_GEMMA_NO_TOOLS = VALIDATOR_RULES.must_not_add_tool_actions_from_gemma !== false;
+const ENFORCE_NO_STATE_DECISION_CHANGE =
+  VALIDATOR_RULES.must_not_change_state_machine_decision !== false;
+const GEMMA_SOURCE = "gemma_agent";
+
+function ruleNumber(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : fallback;
+}
 
 const DEFAULT_ALLOWED_TOOL_TYPES_BY_STAGE = Object.freeze({
   S0_INIT: ["check_permissions", "start_recording"],
@@ -66,12 +104,27 @@ export function validateAction(candidate, state = {}, options = {}) {
     violations.push("forbidden_speech");
   }
 
+  // 显式拒绝 forbidden_intents（任何来源）：此前只靠"不在白名单"隐式挡，现在改为显式
+  // 拒绝并留下 intent_forbidden:<intent> 审计码，连状态机也不得发出禁忌意图（纵深防御）。
+  if (isForbiddenIntent(action.intent)) {
+    violations.push(`intent_forbidden:${action.intent}`);
+  }
+
   if (!isIntentAllowed(action, state, options)) {
     violations.push(`intent_not_allowed:${action.intent || ""}`);
   }
 
   if (isLowerPriorityInterruptingCritical(action, state)) {
     violations.push("low_priority_interrupts_critical");
+  }
+
+  // 禁止 Gemma 改写状态机决策：不得触碰 stage/next_stage（CPR 启动仍只由 cprStartRule
+  // 决定），并落实 gemma_may_create_tool_actions:false（任何 gemma 来源工具一律剥离）。
+  violations.push(...validateGemmaAuthorityGuards(action, candidate, state));
+
+  // 强制 TTS 字数上限（仅 gemma 来源）：超长即判违规并回退，防止 Gemma 长篇阻塞首响。
+  if (exceedsTtsCharLimit(action)) {
+    violations.push("tts_exceeds_max_chars");
   }
 
   const toolViolations = validateToolActions(action, state, options);
@@ -163,6 +216,76 @@ export function containsForbiddenSpeech(action) {
   }
 
   return KNOWLEDGE_FORBIDDEN_PHRASES.some((phrase) => phrase.length > 0 && text.includes(phrase));
+}
+
+// reason code: intent_forbidden:<intent>
+export function isForbiddenIntent(intent) {
+  return typeof intent === "string" && KNOWLEDGE_FORBIDDEN_INTENTS.includes(intent);
+}
+
+// Tier-1 硬 Guard（仅 source=gemma_agent）：
+//  - gemma_cannot_change_stage：候选携带 next_stage，或 stage 与状态机当前阶段不一致。
+//  - gemma_tool_action_forbidden:<type>：gemma 来源不得创建任何工具调用（双保险）。
+// 校验原始 candidate（normalizeAction 会丢弃 next_stage 等字段，故必须在归一化前取证）。
+export function validateGemmaAuthorityGuards(action, candidate = {}, state = {}) {
+  const violations = [];
+  if (action.source !== GEMMA_SOURCE) {
+    return violations;
+  }
+
+  if (ENFORCE_NO_STATE_DECISION_CHANGE && gemmaAttemptsStateDecisionChange(candidate, state)) {
+    violations.push("gemma_cannot_change_stage");
+  }
+
+  if (ENFORCE_GEMMA_NO_TOOLS) {
+    const tools = normalizeToolList(action.tool_actions ?? action.tool_action);
+    for (const tool of tools) {
+      violations.push(`gemma_tool_action_forbidden:${getToolType(tool) || "unknown"}`);
+    }
+  }
+
+  return violations;
+}
+
+function gemmaAttemptsStateDecisionChange(candidate = {}, state = {}) {
+  if (!candidate || typeof candidate !== "object") {
+    return false;
+  }
+
+  // Any attempt to set the next stage is a decision the state machine owns.
+  if (candidate.next_stage != null) {
+    return true;
+  }
+
+  // Smuggling a divergent stage to slip into another stage's allowed-intent set.
+  const currentStage = state.current_stage || null;
+  if (currentStage && typeof candidate.stage === "string" && candidate.stage !== currentStage) {
+    return true;
+  }
+
+  return false;
+}
+
+// reason code: tts_exceeds_max_chars （仅 gemma 来源；按中文字符计数）
+export function exceedsTtsCharLimit(action) {
+  if (action.source !== GEMMA_SOURCE) {
+    return false;
+  }
+
+  const limit = CRITICAL_TTS_STAGES.has(action.stage) ? CRITICAL_TTS_MAX_ZH_CHARS : TTS_MAX_ZH_CHARS;
+  if (!Number.isFinite(limit) || limit <= 0) {
+    return false;
+  }
+
+  return countZhChars(action.tts?.text) > limit;
+}
+
+function countZhChars(text) {
+  if (typeof text !== "string") {
+    return 0;
+  }
+  const matches = text.match(ZH_CHAR_PATTERN);
+  return matches ? matches.length : 0;
 }
 
 export function validateToolActions(action, state = {}, options = {}) {

@@ -34,7 +34,10 @@ class SherpaOnnxSpeechEngine(
     private var recognizer: Any? = null
     private var tts: Any? = null
 
-    fun runtimeAvailable(): Boolean = classAvailable("com.k2fsa.sherpa.onnx.OnlineRecognizer")
+    fun runtimeAvailable(): Boolean = sherpaClassAvailable("com.k2fsa.sherpa.onnx.OnlineRecognizer")
+
+    suspend fun prewarmAsr(timeoutMs: Long = 30_000L): EdgeSpeechResult =
+        transcribePcm16(ByteArray(ASR_PREWARM_PCM_BYTES), timeoutMs)
 
     suspend fun transcribePcm16(pcm16: ByteArray, timeoutMs: Long = 60_000L): EdgeSpeechResult {
         trace("asr_enter")
@@ -65,69 +68,39 @@ class SherpaOnnxSpeechEngine(
     }
 
     override fun close() {
-        recognizer.callQuietly("release")
-        tts.callQuietly("release")
+        recognizer.sherpaCallQuietly("release")
+        tts.sherpaCallQuietly("release")
         recognizer = null
         tts = null
     }
 
-    private fun createOnlineRecognizer(asrFiles: StreamingAsrFiles): Any {
-        trace("asr_create_start")
-        Log.i(TAG, "ASR create start modelDir=${asrFiles.modelDir.absolutePath}")
-        val featureConfig = newSherpa("FeatureConfig").apply {
-            call("setSampleRate", 16_000)
-            call("setFeatureDim", 80)
-            call("setDither", 0f)
-        }
-        val transducer = newSherpa("OnlineTransducerModelConfig").apply {
-            call("setEncoder", asrFiles.encoder.absolutePath)
-            call("setDecoder", asrFiles.decoder.absolutePath)
-            call("setJoiner", asrFiles.joiner.absolutePath)
-        }
-        val modelConfig = newSherpa("OnlineModelConfig").apply {
-            call("setTransducer", transducer)
-            call("setTokens", asrFiles.tokens.absolutePath)
-            call("setNumThreads", numThreads)
-            call("setProvider", "cpu")
-            call("setModelType", "zipformer")
-        }
-        val recognizerConfig = newSherpa("OnlineRecognizerConfig").apply {
-            call("setFeatConfig", featureConfig)
-            call("setModelConfig", modelConfig)
-            call("setEnableEndpoint", true)
-            call("setDecodingMethod", "greedy_search")
-        }
-        trace("asr_ctor_start")
-        return ctor("OnlineRecognizer", null, recognizerConfig).also {
-            trace("asr_ctor_done")
-            Log.i(TAG, "ASR create done")
-        }
-    }
+    private fun createOnlineRecognizer(asrFiles: StreamingAsrFiles): Any =
+        createSherpaOnlineRecognizer(asrFiles, numThreads, ::trace)
 
     private fun createOfflineTts(ttsFiles: TtsFiles): Any {
         trace("tts_create_start model=${ttsFiles.model.name} bytes=${ttsFiles.model.length()}")
         Log.i(TAG, "TTS create start model=${ttsFiles.model.absolutePath}")
         val vits = newSherpa("OfflineTtsVitsModelConfig").apply {
-            call("setModel", ttsFiles.model.absolutePath)
-            call("setLexicon", ttsFiles.lexicon.absolutePath)
-            call("setTokens", ttsFiles.tokens.absolutePath)
-            call("setDictDir", ttsFiles.dictDir.absolutePath)
+            sherpaCall("setModel", ttsFiles.model.absolutePath)
+            sherpaCall("setLexicon", ttsFiles.lexicon.absolutePath)
+            sherpaCall("setTokens", ttsFiles.tokens.absolutePath)
+            sherpaCall("setDictDir", ttsFiles.dictDir.absolutePath)
         }
         trace("tts_vits_config_done")
         val model = newSherpa("OfflineTtsModelConfig").apply {
-            call("setVits", vits)
-            call("setNumThreads", numThreads)
-            call("setProvider", "cpu")
+            sherpaCall("setVits", vits)
+            sherpaCall("setNumThreads", numThreads)
+            sherpaCall("setProvider", "cpu")
         }
         trace("tts_model_config_done")
         val config = newSherpa("OfflineTtsConfig").apply {
-            call("setModel", model)
-            call("setRuleFsts", ttsFiles.ruleFsts.joinToString(",") { it.absolutePath })
-            call("setMaxNumSentences", 2)
+            sherpaCall("setModel", model)
+            sherpaCall("setRuleFsts", ttsFiles.ruleFsts.joinToString(",") { it.absolutePath })
+            sherpaCall("setMaxNumSentences", 2)
         }
         trace("tts_config_done")
         trace("tts_ctor_start")
-        return ctor("OfflineTts", null, config).also {
+        return sherpaCtor("OfflineTts", null, config).also {
             trace("tts_ctor_done")
             Log.i(TAG, "TTS create done")
         }
@@ -141,33 +114,33 @@ class SherpaOnnxSpeechEngine(
         if (!runtimeAvailable()) {
             return EdgeSpeechResult(ok = false, error = "sherpa-onnx AAR is not packaged")
         }
-        val samples = pcm16ToFloat32(pcm16)
+        val samples = sherpaPcm16ToFloat32(pcm16)
         var text = ""
         val elapsed = measureTimeMillis {
             try {
                 val localRecognizer = recognizer ?: createOnlineRecognizer(asrFiles).also { recognizer = it }
-                val stream = localRecognizer.call("createStream", "")
+                val stream = localRecognizer.sherpaCall("createStream", "")
                     ?: throw IllegalStateException("sherpa-onnx did not create an ASR stream")
                 try {
                     Log.i(TAG, "ASR accept waveform samples=${samples.size}")
-                    stream.call("acceptWaveform", samples, 16_000)
-                    stream.call("inputFinished")
+                    stream.sherpaCall("acceptWaveform", samples, 16_000)
+                    stream.sherpaCall("inputFinished")
                     var guard = 0
-                    while (localRecognizer.call("isReady", stream) as Boolean && guard < 1024) {
-                        localRecognizer.call("decode", stream)
+                    while (localRecognizer.sherpaCall("isReady", stream) as Boolean && guard < 1024) {
+                        localRecognizer.sherpaCall("decode", stream)
                         guard += 1
                     }
                     Log.i(TAG, "ASR decode done iterations=$guard")
-                    val result = localRecognizer.call("getResult", stream)
+                    val result = localRecognizer.sherpaCall("getResult", stream)
                         ?: throw IllegalStateException("sherpa-onnx returned no ASR result")
-                    text = result.call("getText") as? String ?: ""
+                    text = result.sherpaCall("getText") as? String ?: ""
                 } finally {
-                    stream.callQuietly("release")
+                    stream.sherpaCallQuietly("release")
                 }
             } catch (error: Throwable) {
                 return EdgeSpeechResult(
                     ok = false,
-                    error = edgeErrorDetail(error, "ASR failed"),
+                    error = sherpaEdgeErrorDetail(error, "ASR failed"),
                 )
             }
         }
@@ -192,17 +165,17 @@ class SherpaOnnxSpeechEngine(
             try {
                 val localTts = tts ?: createOfflineTts(ttsFiles).also { tts = it }
                 Log.i(TAG, "TTS generate start chars=${text.length}")
-                val audio = localTts.call("generate", text, sid, speed)
+                val audio = localTts.sherpaCall("generate", text, sid, speed)
                     ?: throw IllegalStateException("sherpa-onnx returned no TTS audio")
                 Log.i(TAG, "TTS generate done")
-                sampleRate = audio.call("getSampleRate") as? Int
+                sampleRate = audio.sherpaCall("getSampleRate") as? Int
                 outputFile.parentFile?.mkdirs()
-                audio.call("save", outputFile.absolutePath)
+                audio.sherpaCall("save", outputFile.absolutePath)
                 Log.i(TAG, "TTS save done bytes=${outputFile.length()}")
             } catch (error: Throwable) {
                 return EdgeSpeechResult(
                     ok = false,
-                    error = edgeErrorDetail(error, "TTS failed"),
+                    error = sherpaEdgeErrorDetail(error, "TTS failed"),
                 )
             }
         }
@@ -240,13 +213,13 @@ class SherpaOnnxSpeechEngine(
             EdgeSpeechResult(
                 ok = false,
                 latencyMs = System.currentTimeMillis() - startedMs,
-                error = edgeErrorDetail(cause, "$label failed"),
+                error = sherpaEdgeErrorDetail(cause, "$label failed"),
             )
         } catch (error: Throwable) {
             EdgeSpeechResult(
                 ok = false,
                 latencyMs = System.currentTimeMillis() - startedMs,
-                error = edgeErrorDetail(error, "$label failed"),
+                error = sherpaEdgeErrorDetail(error, "$label failed"),
             )
         } finally {
             executor.shutdownNow()
@@ -263,18 +236,55 @@ class SherpaOnnxSpeechEngine(
     }
 }
 
-fun buildSherpaSpeechEngine(context: Context): SherpaOnnxSpeechEngine {
+fun buildSherpaSpeechEngine(context: Context, numThreads: Int = 2): SherpaOnnxSpeechEngine {
     val resolver = EdgeModelPathResolver(defaultEdgeModelRoots(context))
-    return SherpaOnnxSpeechEngine(context.applicationContext, resolver.resolve())
+    return SherpaOnnxSpeechEngine(context.applicationContext, resolver.resolve(), numThreads = numThreads)
 }
 
-private fun classAvailable(name: String): Boolean =
+internal fun createSherpaOnlineRecognizer(
+    asrFiles: StreamingAsrFiles,
+    numThreads: Int = 2,
+    trace: (String) -> Unit = {},
+): Any {
+    trace("asr_create_start")
+    Log.i(TAG, "ASR create start modelDir=${asrFiles.modelDir.absolutePath}")
+    val featureConfig = newSherpa("FeatureConfig").apply {
+        sherpaCall("setSampleRate", 16_000)
+        sherpaCall("setFeatureDim", 80)
+        sherpaCall("setDither", 0f)
+    }
+    val transducer = newSherpa("OnlineTransducerModelConfig").apply {
+        sherpaCall("setEncoder", asrFiles.encoder.absolutePath)
+        sherpaCall("setDecoder", asrFiles.decoder.absolutePath)
+        sherpaCall("setJoiner", asrFiles.joiner.absolutePath)
+    }
+    val modelConfig = newSherpa("OnlineModelConfig").apply {
+        sherpaCall("setTransducer", transducer)
+        sherpaCall("setTokens", asrFiles.tokens.absolutePath)
+        sherpaCall("setNumThreads", numThreads)
+        sherpaCall("setProvider", "cpu")
+        sherpaCall("setModelType", "zipformer")
+    }
+    val recognizerConfig = newSherpa("OnlineRecognizerConfig").apply {
+        sherpaCall("setFeatConfig", featureConfig)
+        sherpaCall("setModelConfig", modelConfig)
+        sherpaCall("setEnableEndpoint", true)
+        sherpaCall("setDecodingMethod", "greedy_search")
+    }
+    trace("asr_ctor_start")
+    return sherpaCtor("OnlineRecognizer", null, recognizerConfig).also {
+        trace("asr_ctor_done")
+        Log.i(TAG, "ASR create done")
+    }
+}
+
+internal fun sherpaClassAvailable(name: String): Boolean =
     runCatching { Class.forName(name) }.isSuccess
 
-private fun newSherpa(simpleName: String): Any =
+internal fun newSherpa(simpleName: String): Any =
     Class.forName("com.k2fsa.sherpa.onnx.$simpleName").getDeclaredConstructor().newInstance()
 
-private fun ctor(simpleName: String, vararg args: Any?): Any {
+internal fun sherpaCtor(simpleName: String, vararg args: Any?): Any {
     val clazz = Class.forName("com.k2fsa.sherpa.onnx.$simpleName")
     val ctor = clazz.constructors.firstOrNull { constructor ->
         constructor.parameterTypes.size == args.size &&
@@ -283,12 +293,12 @@ private fun ctor(simpleName: String, vararg args: Any?): Any {
     return ctor.newInstance(*args)
 }
 
-private fun Any?.callQuietly(name: String) {
+internal fun Any?.sherpaCallQuietly(name: String) {
     if (this == null) return
-    runCatching { call(name) }
+    runCatching { sherpaCall(name) }
 }
 
-private fun Any.call(name: String, vararg args: Any): Any? {
+internal fun Any.sherpaCall(name: String, vararg args: Any): Any? {
     val method = javaClass.methods.firstOrNull { method ->
         method.name == name &&
             method.parameterTypes.size == args.size &&
@@ -307,7 +317,7 @@ private fun Class<*>.accepts(arg: Any?): Boolean =
         else -> isAssignableFrom(arg.javaClass)
     }
 
-private fun pcm16ToFloat32(pcm16: ByteArray): FloatArray {
+internal fun sherpaPcm16ToFloat32(pcm16: ByteArray): FloatArray {
     val shorts = pcm16.size / 2
     val out = FloatArray(shorts)
     val buffer = ByteBuffer.wrap(pcm16).order(ByteOrder.LITTLE_ENDIAN)
@@ -317,10 +327,11 @@ private fun pcm16ToFloat32(pcm16: ByteArray): FloatArray {
     return out
 }
 
-private fun edgeErrorDetail(error: Throwable, fallback: String): String {
+internal fun sherpaEdgeErrorDetail(error: Throwable, fallback: String): String {
     val head = error.message ?: error.cause?.message ?: fallback
     val type = error::class.java.name
     return "$type: $head"
 }
 
 private const val TAG = "SherpaSpeechEngine"
+private const val ASR_PREWARM_PCM_BYTES = 16_000 / 5 * 2

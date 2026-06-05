@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.firstaid.copilot.execution.GuidanceActionDispatcherTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-06-05T12:13:35.222Z" hostname="BYMAX" time="0.03">
+  <properties/>
+  <testcase name="dispatch_blocksUnconfirmedShareVideoTool" classname="com.firstaid.copilot.execution.GuidanceActionDispatcherTest" time="0.028"/>
+  <testcase name="dispatch_routesHapticToolsOnlyToHapticSink" classname="com.firstaid.copilot.execution.GuidanceActionDispatcherTest" time="0.0"/>
+  <testcase name="dispatch_throwsWhenStrictCriticalHasNoNaturalChannel" classname="com.firstaid.copilot.execution.GuidanceActionDispatcherTest" time="0.001"/>
+  <testcase name="dispatch_deliversUiTtsAndLoggableChannels" classname="com.firstaid.copilot.execution.GuidanceActionDispatcherTest" time="0.0"/>
+  <testcase name="dispatch_marksUnknownIntentAndFallsBackWhenNoChannelDelivers" classname="com.firstaid.copilot.execution.GuidanceActionDispatcherTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

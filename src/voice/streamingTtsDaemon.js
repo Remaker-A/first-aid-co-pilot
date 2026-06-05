@@ -20,10 +20,22 @@ const DEFAULT_SAMPLE_RATE_HINT = 22050;
 // tests are unchanged unless a caller opts in via options.useDaemon or
 // SPEECH_TTS_STREAM=1.
 export function createLiveTts(options = {}) {
-  if (shouldUseTtsDaemon(options)) {
-    return new StreamingTtsDaemon(options);
+  const resolved = withTtsCacheBundle(options);
+  if (shouldUseTtsDaemon(resolved)) {
+    return new StreamingTtsDaemon(resolved);
   }
-  return new StreamingTts(options);
+  return new StreamingTts(resolved);
+}
+
+// Opt-in: only attach the shipped WA audio bundle when a caller passes a
+// directory or sets VOICE_TTS_CACHE_DIR. Left unset, the streamer keeps a
+// hermetic per-instance LRU (no disk reads), which is what the test-suite uses.
+function withTtsCacheBundle(options = {}) {
+  if (options.cache !== undefined || options.cacheBundleDir !== undefined) {
+    return options;
+  }
+  const dir = firstNonEmpty(options.ttsCacheDir, process.env.VOICE_TTS_CACHE_DIR);
+  return dir ? { ...options, cacheBundleDir: dir } : options;
 }
 
 export function shouldUseTtsDaemon(options = {}) {

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.firstaid.copilot.live.audio.MetronomeControllerTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-06-05T12:13:35.284Z" hostname="BYMAX" time="0.002">
+  <properties/>
+  <testcase name="apply_enabled_startsClickLoopAtBpmAtFullVolume" classname="com.firstaid.copilot.live.audio.MetronomeControllerTest" time="0.001"/>
+  <testcase name="apply_nullBpm_usesDefault" classname="com.firstaid.copilot.live.audio.MetronomeControllerTest" time="0.0"/>
+  <testcase name="apply_disabled_stops" classname="com.firstaid.copilot.live.audio.MetronomeControllerTest" time="0.0"/>
+  <testcase name="duckedState_persistsAcrossTempoChange" classname="com.firstaid.copilot.live.audio.MetronomeControllerTest" time="0.0"/>
+  <testcase name="setDucked_isIdempotent" classname="com.firstaid.copilot.live.audio.MetronomeControllerTest" time="0.0"/>
+  <testcase name="apply_sameBpmTwice_keepsLoopAliveWithoutRestart" classname="com.firstaid.copilot.live.audio.MetronomeControllerTest" time="0.0"/>
+  <testcase name="stop_thenRelease_delegateToAudio" classname="com.firstaid.copilot.live.audio.MetronomeControllerTest" time="0.0"/>
+  <testcase name="setDucked_changesVolumeNotTempo" classname="com.firstaid.copilot.live.audio.MetronomeControllerTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -38,6 +38,8 @@ class OnDeviceGemmaDriver(
     private val mutex = Mutex()
     private var engine: Any? = null
     private var backendName: String? = null
+    @Volatile
+    private var activeConversation: Any? = null
 
     suspend fun prewarm(timeoutMs: Long = 30_000L): EdgeInferenceResult =
         mutex.withLock {
@@ -87,7 +89,9 @@ class OnDeviceGemmaDriver(
                         latencyMs = System.currentTimeMillis() - startedMs,
                     )
                 } catch (timeout: TimeoutException) {
+                    cancelActiveConversation()
                     future.cancel(true)
+                    resetEngine()
                     EdgeInferenceResult(
                         ok = false,
                         latencyMs = System.currentTimeMillis() - startedMs,
@@ -95,6 +99,9 @@ class OnDeviceGemmaDriver(
                     )
                 } catch (error: ExecutionException) {
                     val cause = error.cause ?: error
+                    if (cause.message?.contains("session already exists", ignoreCase = true) == true) {
+                        resetEngine()
+                    }
                     EdgeInferenceResult(
                         ok = false,
                         latencyMs = System.currentTimeMillis() - startedMs,
@@ -113,8 +120,8 @@ class OnDeviceGemmaDriver(
         }
 
     override fun close() {
-        engine.callQuietly("close")
-        engine = null
+        cancelActiveConversation()
+        resetEngine()
     }
 
     private fun ensureEngine(): Any {
@@ -160,13 +167,31 @@ class OnDeviceGemmaDriver(
     private fun generateBlocking(localEngine: Any, prompt: String): String {
         val conversation = localEngine.call("createConversation", newLitert("ConversationConfig"))
             ?: throw IllegalStateException("LiteRT-LM did not create a conversation")
+        activeConversation = conversation
         return try {
             val message = conversation.call("sendMessage", prompt, emptyMap<String, Any>())
                 ?: throw IllegalStateException("LiteRT-LM returned no response")
             message.textContent()
         } finally {
             conversation.callQuietly("close")
+            if (activeConversation === conversation) {
+                activeConversation = null
+            }
         }
+    }
+
+    private fun cancelActiveConversation() {
+        activeConversation?.let { conversation ->
+            conversation.callQuietly("cancelProcess")
+            conversation.callQuietly("close")
+            activeConversation = null
+        }
+    }
+
+    private fun resetEngine() {
+        engine.callQuietly("close")
+        engine = null
+        backendName = null
     }
 }
 

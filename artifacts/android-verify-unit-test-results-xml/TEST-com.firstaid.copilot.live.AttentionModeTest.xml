@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.firstaid.copilot.live.AttentionModeTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-06-05T12:13:35.271Z" hostname="BYMAX" time="0.001">
+  <properties/>
+  <testcase name="s7CompressionFeedbackMapsToEyesOff" classname="com.firstaid.copilot.live.AttentionModeTest" time="0.001"/>
+  <testcase name="earlyStagesStayCoach" classname="com.firstaid.copilot.live.AttentionModeTest" time="0.0"/>
+  <testcase name="legacyCprQualityFeedbackMapsToEyesOffInS7" classname="com.firstaid.copilot.live.AttentionModeTest" time="0.0"/>
+  <testcase name="s8AssistanceMapsToGlanceable" classname="com.firstaid.copilot.live.AttentionModeTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

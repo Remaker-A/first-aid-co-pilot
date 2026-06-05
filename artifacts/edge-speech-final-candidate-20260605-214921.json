@@ -1,0 +1,157 @@
+﻿{
+    "createdAt":  "2026-06-05T21:49:48.9759293+08:00",
+    "device":  "V2318A",
+    "results":  [
+                    {
+                        "label":  "asr_threads2_1500ms",
+                        "json":  {
+                                     "ok":  true,
+                                     "mode":  "asr",
+                                     "runs":  5,
+                                     "threads":  2,
+                                     "modelRoot":  "/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models",
+                                     "summary":  "Gemma=Ready ASR=Ready TTS=Ready sherpa=Ready",
+                                     "gemmaReady":  true,
+                                     "asrReady":  true,
+                                     "ttsReady":  true,
+                                     "phase":  "finished",
+                                     "updatedAtMs":  1780667368171,
+                                     "asrInputBytes":  48000,
+                                     "asr":  {
+                                                 "ok":  true,
+                                                 "sample":  "0.wav",
+                                                 "inputMs":  1500,
+                                                 "inputBytes":  48000,
+                                                 "warmLatencyMs":  2144,
+                                                 "latencyMs":  184,
+                                                 "avgLatencyMs":  176.2,
+                                                 "minLatencyMs":  169,
+                                                 "maxLatencyMs":  184,
+                                                 "text":  "昨天",
+                                                 "runs":  [
+                                                              {
+                                                                  "ok":  true,
+                                                                  "latencyMs":  169,
+                                                                  "text":  "昨天"
+                                                              },
+                                                              {
+                                                                  "ok":  true,
+                                                                  "latencyMs":  175,
+                                                                  "text":  "昨天"
+                                                              },
+                                                              {
+                                                                  "ok":  true,
+                                                                  "latencyMs":  174,
+                                                                  "text":  "昨天"
+                                                              },
+                                                              {
+                                                                  "ok":  true,
+                                                                  "latencyMs":  179,
+                                                                  "text":  "昨天"
+                                                              },
+                                                              {
+                                                                  "ok":  true,
+                                                                  "latencyMs":  184,
+                                                                  "text":  "昨天"
+                                                              }
+                                                          ]
+                                             },
+                                     "asrRuns":  [
+                                                     {
+                                                         "ok":  true,
+                                                         "latencyMs":  169,
+                                                         "text":  "昨天"
+                                                     },
+                                                     {
+                                                         "ok":  true,
+                                                         "latencyMs":  175,
+                                                         "text":  "昨天"
+                                                     },
+                                                     {
+                                                         "ok":  true,
+                                                         "latencyMs":  174,
+                                                         "text":  "昨天"
+                                                     },
+                                                     {
+                                                         "ok":  true,
+                                                         "latencyMs":  179,
+                                                         "text":  "昨天"
+                                                     },
+                                                     {
+                                                         "ok":  true,
+                                                         "latencyMs":  184,
+                                                         "text":  "昨天"
+                                                     }
+                                                 ]
+                                 }
+                    },
+                    {
+                        "label":  "tts_threads6_cached",
+                        "json":  {
+                                     "ok":  true,
+                                     "mode":  "tts",
+                                     "runs":  3,
+                                     "threads":  6,
+                                     "modelRoot":  "/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models",
+                                     "summary":  "Gemma=Ready ASR=Ready TTS=Ready sherpa=Ready",
+                                     "gemmaReady":  true,
+                                     "asrReady":  true,
+                                     "ttsReady":  true,
+                                     "phase":  "finished",
+                                     "updatedAtMs":  1780667389570,
+                                     "tts":  {
+                                                 "ok":  true,
+                                                 "text":  "继续按压",
+                                                 "warmLatencyMs":  8743,
+                                                 "cachedStartLatencyMs":  58,
+                                                 "latencyMs":  3199,
+                                                 "avgLatencyMs":  3187,
+                                                 "minLatencyMs":  3178,
+                                                 "maxLatencyMs":  3199,
+                                                 "sampleRate":  44100,
+                                                 "bytes":  66604,
+                                                 "runs":  [
+                                                              {
+                                                                  "ok":  true,
+                                                                  "latencyMs":  3178,
+                                                                  "sampleRate":  44100,
+                                                                  "bytes":  66604
+                                                              },
+                                                              {
+                                                                  "ok":  true,
+                                                                  "latencyMs":  3184,
+                                                                  "sampleRate":  44100,
+                                                                  "bytes":  66604
+                                                              },
+                                                              {
+                                                                  "ok":  true,
+                                                                  "latencyMs":  3199,
+                                                                  "sampleRate":  44100,
+                                                                  "bytes":  66604
+                                                              }
+                                                          ]
+                                             },
+                                     "ttsRuns":  [
+                                                     {
+                                                         "ok":  true,
+                                                         "latencyMs":  3178,
+                                                         "sampleRate":  44100,
+                                                         "bytes":  66604
+                                                     },
+                                                     {
+                                                         "ok":  true,
+                                                         "latencyMs":  3184,
+                                                         "sampleRate":  44100,
+                                                         "bytes":  66604
+                                                     },
+                                                     {
+                                                         "ok":  true,
+                                                         "latencyMs":  3199,
+                                                         "sampleRate":  44100,
+                                                         "bytes":  66604
+                                                     }
+                                                 ]
+                                 }
+                    }
+                ]
+}

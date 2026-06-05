@@ -1,0 +1,463 @@
+﻿         1780671298.107 17722 17740 I TextToSpeech: Connected to TTS engine
+         1780671298.109 17722 17757 I TextToSpeech: Setting up the connection to TTS engine...
+         1780671298.117 17722 17753 I EdgeTextToSpeech: Bundled TTS cache ready: 0/46 phrases (Asset)
+         1780671298.388 17722 17753 D Linux   : [Posix_connect Debug]Process com.firstaid.copilot.debug :8787 
+         1780671298.388 17722 17779 D Linux   : [Posix_connect Debug]Process com.firstaid.copilot.debug :8787 
+         1780671298.432 17722 17784 I SherpaSpeechEngine: ASR create start modelDir=/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models/speech/stt-stream/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20
+         1780671300.549 17722 17784 I SherpaSpeechEngine: ASR create done
+         1780671300.551 17722 17784 I SherpaSpeechEngine: ASR accept waveform samples=3200
+         1780671300.552 17722 17784 I SherpaSpeechEngine: ASR decode done iterations=0
+         1780671300.602 17722 17753 I SherpaSpeechEngine: ASR create start modelDir=/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models/speech/stt-stream/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20
+         1780671302.261 17795 17795 D RefBase : #00 pc 000000000010cc18  /apex/com.android.runtime/lib64/bionic/libc.so (__cxa_finalize+280)
+         1780671302.509 17722 17753 I SherpaSpeechEngine: ASR create done
+         1780671302.515 17722 17802 I SherpaSpeechEngine: TTS create start model=/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models/speech/tts/model.int8.onnx
+         1780671302.526 17722 17802 W sherpa-onnx: /home/runner/work/sherpa-onnx/sherpa-onnx/sherpa-onnx/jni/offline-tts.cc:operator():481
+         1780671302.526 17722 17802 W sherpa-onnx: OfflineTtsConfig(model=OfflineTtsModelConfig(vits=OfflineTtsVitsModelConfig(model="/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models/speech/tts/model.int8.onnx", lexicon="/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models/speech/tts/lexicon.txt", tokens="/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models/speech/tts/tokens.txt", data_dir="", noise_scale=0.667, noise_scale_w=0.8, length_scale=1), matcha=OfflineTtsMatchaModelConfig(acoustic_model="", vocoder="", lexicon="", tokens="", data_dir="", noise_scale=1, length_scale=1), kokoro=OfflineTtsKokoroModelConfig(model="", voices="", tokens="", lexicon="", data_dir="", length_scale=1, lang=""), zipvoice=OfflineTtsZipvoiceModelConfig(tokens="", encoder="", decoder="", vocoder="", data_dir="", lexicon="", feat_scale=0.1, t_shift=0.5, target_rms=0.1, guidance_scale=1), kitten=OfflineTtsKittenModelConfig(model="", voices="", tokens="", data_dir="", length_scale=1), pocket=OfflineTtsPocketModelConfig(lm_flo
+         1780671304.513 17798 17798 D RefBase : #00 pc 000000000010cc18  /apex/com.android.runtime/lib64/bionic/libc.so (__cxa_finalize+280)
+         1780671308.333 17722 17802 I SherpaSpeechEngine: TTS create done
+         1780671308.333 17722 17802 I SherpaSpeechEngine: TTS generate start chars=4
+         1780671311.790 17722 17802 I SherpaSpeechEngine: TTS generate done
+         1780671311.796 17722 17802 I SherpaSpeechEngine: TTS save done bytes=71724
+         1780671311.797 17722 17722 I EdgeTextToSpeech: Sherpa TTS cached '继续按压' in 9283ms
+         1780671322.132  3989 17844 D Linux   : [Posix_connect Debug]Process com.google.android.gms.persistent :443 
+         1780671346.229 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780671347.761 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671347.765 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671350.447 17722 17754 D Linux   : [Posix_connect Debug]Process com.firstaid.copilot.debug :8787 
+         1780671353.214 17722 17722 I EdgeTextToSpeech: Android TTS fast path for '先确认周围安全，再靠近患者。'
+         1780671353.303 17722 17884 I SherpaSpeechEngine: TTS generate start chars=14
+         1780671353.305 17722 17738 I AndroidTextToSpeech: Android TTS onStart latency=4ms
+         1780671356.591 17894 17894 D RefBase : #00 pc 000000000010cc18  /apex/com.android.runtime/lib64/bionic/libc.so (__cxa_finalize+280)
+         1780671356.803 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671356.841 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671362.851 17722 17884 I SherpaSpeechEngine: TTS generate done
+         1780671362.854 17722 17884 I SherpaSpeechEngine: TTS save done bytes=212012
+         1780671362.858 17722 17722 I EdgeTextToSpeech: Sherpa TTS background cached '先确认周围安全，再靠近患者。' in 9551ms
+         1780671368.006 17898 17898 D RefBase : #00 pc 000000000010cc18  /apex/com.android.runtime/lib64/bionic/libc.so (__cxa_finalize+280)
+         1780671370.533 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780671377.264 17722 17722 D AudioTrack: INSP: type=audio,case=1,set=0xb400007660c820f0,stream_type=-1,sample_rate=44100,format=0x1,channel_mask=0x1,frame_count=8820,flags=0x0,notification_frames=0,session_id=0,transfer_type=3,uid=-1,pid=-1
+         1780671377.264 17722 17722 D AudioTrack: INSP: type=audio,case=1,attributes=1,content_type=1,usage=1,source=-1,flags=0x900
+         1780671377.265 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671377.266 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671377.266 17722 17722 D AudioTrack: set(): Building AudioTrack with attributes: usage=1 content=1 flags=0x900 tags=[]
+         1780671377.266 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671377.267 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671377.267 17722 17722 D AudioTrack: set(): Building AudioTrack with attributes: usage = 1, content = 1, flags = 0x900, tags = []
+         1780671377.267 17722 17722 D AudioTrack: want to change usage for game mode
+         1780671377.268 17722 17722 D AudioTrack: get APPSharePck NULL
+         1780671377.268 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671377.268 17722 17722 D AudioTrack: set(): 0xb400007660c820f0, Create AudioTrackThread, tid = 17921
+         1780671377.283 17722 17722 D AudioTrack: createTrack_l(160): 0xb400007660c820f0, mCblk = 0x7544b02980, mLatency = 284, mAfLatency = 84, frameCount = 8820, mSampleRate = 44100, mFlags = 0, mReqFrameCount = 8820, mNotificationFramesAct = 882
+         1780671377.284 17722 17722 D AudioTrack: setVolumeLR:  track set volome = (-536813568)
+         1780671377.284 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671377.292 17722 17722 D AudioTrack: start(160): 0xb400007660c820f0, prior state:STATE_STOPPED
+         1780671377.292 17722 17722 D AudioTrack: start(portId:160, sessionId:1097): prior state:STATE_STOPPED
+         1780671377.292 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671377.306 17722 17722 I LiveAudioPlayer: Live audio start latency=15ms sampleRate=44100 stream=act_mq11r9yv_013x_adf59591bc92
+         1780671379.853 17722 17722 I LiveAudioPlayer: Live audio ended stream=act_mq11r9yv_013x_adf59591bc92
+         1780671390.697 17722 17722 D AudioTrack: pause(160): 0xb400007660c820f0, prior state:STATE_ACTIVE
+         1780671390.697 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671390.698 17722 17722 D AudioTrackShared: this(0xb400007600eb91f0), mCblk(0x7544b02980), front(115200), mIsOut 1, interrupt() FUTEX_WAKE
+         1780671390.700 17722 17722 D AudioTrack: flush(160): 0xb400007660c820f0, prior state:STATE_PAUSED
+         1780671390.700 17722 17722 D AudioTrack: stop(portId:160, sessionId:1097): prior state:STATE_FLUSHED
+         1780671390.702 17722 17722 D AudioTrack: stop(portId:160, sessionId:1097): prior state:STATE_FLUSHED
+         1780671390.705 17722 17722 D AudioTrack: ~AudioTrack(160): 0xb400007660c820f0
+         1780671390.705 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671390.705 17722 17722 D AudioTrack: stop(portId:160, sessionId:1097): prior state:STATE_FLUSHED
+         1780671390.705 17722 17722 D AudioTrack: requestExitAndWait start
+         1780671390.705 17722 17722 D AudioTrack: requestExitAndWait end
+         1780671390.705 17722 17722 D AudioTrack: stopAndJoinCallbacks(160) done
+         1780671390.707 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780671392.117 17931 17931 D RefBase : #00 pc 000000000010cc18  /apex/com.android.runtime/lib64/bionic/libc.so (__cxa_finalize+280)
+         1780671392.372 17722 17722 D AudioTrack: INSP: type=audio,case=1,set=0xb400007660b59210,stream_type=-1,sample_rate=44100,format=0x1,channel_mask=0x1,frame_count=8820,flags=0x0,notification_frames=0,session_id=0,transfer_type=3,uid=-1,pid=-1
+         1780671392.372 17722 17722 D AudioTrack: INSP: type=audio,case=1,attributes=1,content_type=1,usage=1,source=-1,flags=0x900
+         1780671392.373 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671392.373 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671392.373 17722 17722 D AudioTrack: set(): Building AudioTrack with attributes: usage=1 content=1 flags=0x900 tags=[]
+         1780671392.373 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671392.374 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671392.374 17722 17722 D AudioTrack: set(): Building AudioTrack with attributes: usage = 1, content = 1, flags = 0x900, tags = []
+         1780671392.374 17722 17722 D AudioTrack: want to change usage for game mode
+         1780671392.374 17722 17722 D AudioTrack: get APPSharePck NULL
+         1780671392.374 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671392.374 17722 17722 D AudioTrack: set(): 0xb400007660b59210, Create AudioTrackThread, tid = 17940
+         1780671392.390 17722 17722 D AudioTrack: createTrack_l(161): 0xb400007660b59210, mCblk = 0x753b362980, mLatency = 242, mAfLatency = 42, frameCount = 8820, mSampleRate = 44100, mFlags = 0, mReqFrameCount = 8820, mNotificationFramesAct = 882
+         1780671392.390 17722 17722 D AudioTrack: setVolumeLR:  track set volome = (-536813568)
+         1780671392.390 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671392.395 17722 17722 D AudioTrack: start(161): 0xb400007660b59210, prior state:STATE_STOPPED
+         1780671392.395 17722 17722 D AudioTrack: start(portId:161, sessionId:1105): prior state:STATE_STOPPED
+         1780671392.395 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671392.407 17722 17722 I LiveAudioPlayer: Live audio start latency=14ms sampleRate=44100 stream=act_mq11rpje_0146_cedb8a5e1113
+         1780671393.635 17722 17722 D AudioTrack: pause(161): 0xb400007660b59210, prior state:STATE_ACTIVE
+         1780671393.635 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671393.636 17722 17722 D AudioTrackShared: this(0xb400007600ee3970), mCblk(0x753b362980), front(51508), mIsOut 1, interrupt() FUTEX_WAKE
+         1780671393.649 17722 17722 D AudioTrack: flush(161): 0xb400007660b59210, prior state:STATE_PAUSED
+         1780671393.650 17722 17722 D AudioTrack: stop(portId:161, sessionId:1105): prior state:STATE_FLUSHED
+         1780671393.651 17722 17722 D AudioTrack: pause(161): 0xb400007660b59210, prior state:STATE_FLUSHED
+         1780671393.652 17722 17722 D AudioTrack: flush(161): 0xb400007660b59210, prior state:STATE_FLUSHED
+         1780671393.652 17722 17722 D AudioTrack: stop(portId:161, sessionId:1105): prior state:STATE_FLUSHED
+         1780671393.654 17722 17722 D AudioTrack: stop(portId:161, sessionId:1105): prior state:STATE_FLUSHED
+         1780671393.656 17722 17722 D AudioTrack: ~AudioTrack(161): 0xb400007660b59210
+         1780671393.656 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671393.656 17722 17722 D AudioTrack: stop(portId:161, sessionId:1105): prior state:STATE_FLUSHED
+         1780671393.656 17722 17722 D AudioTrack: requestExitAndWait start
+         1780671393.657 17722 17722 D AudioTrack: requestExitAndWait end
+         1780671393.657 17722 17722 D AudioTrack: stopAndJoinCallbacks(161) done
+         1780671393.658 17722 17722 I LiveAudioPlayer: Live audio cancelled stream=act_mq11rpje_0146_cedb8a5e1113 reason=new_turn
+         1780671395.843 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671395.852 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671395.861  3989 17945 D Linux   : [Posix_connect Debug]Process com.google.android.gms.persistent :443 
+         1780671400.484 17722 17754 D Linux   : [Posix_connect Debug]Process com.firstaid.copilot.debug :8787 
+         1780671400.922 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671400.927 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671403.118 17722 17722 I EdgeTextToSpeech: Sherpa TTS cache hit 212012 bytes for '先确认周围安全，再靠近患者。'
+         1780671412.510 17722 17736 D MediaPlayer: finalize() native_finalize called
+         1780671412.510 17722 17736 D MediaPlayer: finalize() native_finalize finished
+         1780671414.919 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780671415.993 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671416.008 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671421.156 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780671422.584 17722 17722 D AudioTrack: INSP: type=audio,case=1,set=0xb400007660c8e210,stream_type=-1,sample_rate=44100,format=0x1,channel_mask=0x1,frame_count=8820,flags=0x0,notification_frames=0,session_id=0,transfer_type=3,uid=-1,pid=-1
+         1780671422.584 17722 17722 D AudioTrack: INSP: type=audio,case=1,attributes=1,content_type=1,usage=1,source=-1,flags=0x900
+         1780671422.585 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671422.586 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671422.586 17722 17722 D AudioTrack: set(): Building AudioTrack with attributes: usage=1 content=1 flags=0x900 tags=[]
+         1780671422.586 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671422.586 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671422.586 17722 17722 D AudioTrack: set(): Building AudioTrack with attributes: usage = 1, content = 1, flags = 0x900, tags = []
+         1780671422.586 17722 17722 D AudioTrack: want to change usage for game mode
+         1780671422.587 17722 17722 D AudioTrack: get APPSharePck NULL
+         1780671422.587 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671422.587 17722 17722 D AudioTrack: set(): 0xb400007660c8e210, Create AudioTrackThread, tid = 17982
+         1780671422.609 17722 17722 D AudioTrack: createTrack_l(163): 0xb400007660c8e210, mCblk = 0x753b362980, mLatency = 242, mAfLatency = 42, frameCount = 8820, mSampleRate = 44100, mFlags = 0, mReqFrameCount = 8820, mNotificationFramesAct = 882
+         1780671422.609 17722 17722 D AudioTrack: setVolumeLR:  track set volome = (-536813568)
+         1780671422.610 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671422.616 17722 17722 D AudioTrack: start(163): 0xb400007660c8e210, prior state:STATE_STOPPED
+         1780671422.616 17722 17722 D AudioTrack: start(portId:163, sessionId:1121): prior state:STATE_STOPPED
+         1780671422.616 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671422.626 17722 17722 I LiveAudioPlayer: Live audio start latency=11ms sampleRate=44100 stream=act_mq11sd0x_015q_6676968fc2bc
+         1780671425.118 17722 17722 I LiveAudioPlayer: Live audio ended stream=act_mq11sd0x_015q_6676968fc2bc
+         1780671425.140 17722 17722 D AudioTrack: pause(163): 0xb400007660c8e210, prior state:STATE_ACTIVE
+         1780671425.140 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671425.142 17722 17722 D AudioTrackShared: this(0xb400007600eaea50), mCblk(0x753b362980), front(107956), mIsOut 1, interrupt() FUTEX_WAKE
+         1780671425.151 17722 17722 D AudioTrack: flush(163): 0xb400007660c8e210, prior state:STATE_PAUSED
+         1780671425.152 17722 17722 D AudioTrack: stop(portId:163, sessionId:1121): prior state:STATE_FLUSHED
+         1780671425.154 17722 17722 D AudioTrack: stop(portId:163, sessionId:1121): prior state:STATE_FLUSHED
+         1780671425.157 17722 17722 D AudioTrack: ~AudioTrack(163): 0xb400007660c8e210
+         1780671425.157 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671425.157 17722 17722 D AudioTrack: stop(portId:163, sessionId:1121): prior state:STATE_FLUSHED
+         1780671425.157 17722 17722 D AudioTrack: requestExitAndWait start
+         1780671425.157 17722 17722 D AudioTrack: requestExitAndWait end
+         1780671425.157 17722 17722 D AudioTrack: stopAndJoinCallbacks(163) done
+         1780671425.159 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671425.168 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671441.238 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780671442.735 17722 17722 D AudioTrack: INSP: type=audio,case=1,set=0xb400007660c8e210,stream_type=-1,sample_rate=44100,format=0x1,channel_mask=0x1,frame_count=8820,flags=0x0,notification_frames=0,session_id=0,transfer_type=3,uid=-1,pid=-1
+         1780671442.736 17722 17722 D AudioTrack: INSP: type=audio,case=1,attributes=1,content_type=1,usage=1,source=-1,flags=0x900
+         1780671442.736 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671442.737 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671442.737 17722 17722 D AudioTrack: set(): Building AudioTrack with attributes: usage=1 content=1 flags=0x900 tags=[]
+         1780671442.737 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671442.737 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671442.737 17722 17722 D AudioTrack: set(): Building AudioTrack with attributes: usage = 1, content = 1, flags = 0x900, tags = []
+         1780671442.737 17722 17722 D AudioTrack: want to change usage for game mode
+         1780671442.738 17722 17722 D AudioTrack: get APPSharePck NULL
+         1780671442.738 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671442.738 17722 17722 D AudioTrack: set(): 0xb400007660c8e210, Create AudioTrackThread, tid = 17992
+         1780671442.755 17722 17722 D AudioTrack: createTrack_l(164): 0xb400007660c8e210, mCblk = 0x753b362980, mLatency = 242, mAfLatency = 42, frameCount = 8820, mSampleRate = 44100, mFlags = 0, mReqFrameCount = 8820, mNotificationFramesAct = 882
+         1780671442.755 17722 17722 D AudioTrack: setVolumeLR:  track set volome = (-536813568)
+         1780671442.755 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671442.760 17722 17722 D AudioTrack: start(164): 0xb400007660c8e210, prior state:STATE_STOPPED
+         1780671442.760 17722 17722 D AudioTrack: start(portId:164, sessionId:1129): prior state:STATE_STOPPED
+         1780671442.760 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671442.773 17722 17722 I LiveAudioPlayer: Live audio start latency=14ms sampleRate=44100 stream=act_mq11ssiv_0169_554eee6f39c4
+         1780671444.011 17722 17722 D AudioTrack: pause(164): 0xb400007660c8e210, prior state:STATE_ACTIVE
+         1780671444.011 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671444.011 17722 17722 D AudioTrackShared: this(0xb400007600e328b0), mCblk(0x753b362980), front(51508), mIsOut 1, interrupt() FUTEX_WAKE
+         1780671444.017 17722 17722 D AudioTrack: flush(164): 0xb400007660c8e210, prior state:STATE_PAUSED
+         1780671444.017 17722 17722 D AudioTrack: stop(portId:164, sessionId:1129): prior state:STATE_FLUSHED
+         1780671444.018 17722 17722 D AudioTrack: pause(164): 0xb400007660c8e210, prior state:STATE_FLUSHED
+         1780671444.018 17722 17722 D AudioTrack: flush(164): 0xb400007660c8e210, prior state:STATE_FLUSHED
+         1780671444.019 17722 17722 D AudioTrack: stop(portId:164, sessionId:1129): prior state:STATE_FLUSHED
+         1780671444.019 17722 17722 D AudioTrack: stop(portId:164, sessionId:1129): prior state:STATE_FLUSHED
+         1780671444.020 17722 17722 D AudioTrack: ~AudioTrack(164): 0xb400007660c8e210
+         1780671444.020 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671444.020 17722 17722 D AudioTrack: stop(portId:164, sessionId:1129): prior state:STATE_FLUSHED
+         1780671444.020 17722 17722 D AudioTrack: requestExitAndWait start
+         1780671444.020 17722 17722 D AudioTrack: requestExitAndWait end
+         1780671444.020 17722 17722 D AudioTrack: stopAndJoinCallbacks(164) done
+         1780671444.021 17722 17722 I LiveAudioPlayer: Live audio cancelled stream=act_mq11ssiv_0169_554eee6f39c4 reason=new_turn
+         1780671444.201 17722 17722 W LiveAudioPlayer: Dropping 111616 live audio bytes without audio_begin
+         1780671444.770 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671444.775 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671446.396 18003 18003 D RefBase : #00 pc 000000000010cc18  /apex/com.android.runtime/lib64/bionic/libc.so (__cxa_finalize+280)
+         1780671447.156 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780671448.293 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671448.298 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671453.206  3989 18013 D Linux   : [Posix_connect Debug]Process com.google.android.gms.persistent :443 
+         1780671453.880 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780671454.156 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671454.163 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671455.959 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780671456.638 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671456.644 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671460.155 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780671461.277 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671461.283 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671463.715 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780671465.171 17722 17722 D AudioTrack: INSP: type=audio,case=1,set=0xb400007660bb3410,stream_type=-1,sample_rate=44100,format=0x1,channel_mask=0x1,frame_count=8820,flags=0x0,notification_frames=0,session_id=0,transfer_type=3,uid=-1,pid=-1
+         1780671465.171 17722 17722 D AudioTrack: INSP: type=audio,case=1,attributes=1,content_type=1,usage=1,source=-1,flags=0x900
+         1780671465.171 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671465.172 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671465.172 17722 17722 D AudioTrack: set(): Building AudioTrack with attributes: usage=1 content=1 flags=0x900 tags=[]
+         1780671465.173 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671465.173 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671465.173 17722 17722 D AudioTrack: set(): Building AudioTrack with attributes: usage = 1, content = 1, flags = 0x900, tags = []
+         1780671465.173 17722 17722 D AudioTrack: want to change usage for game mode
+         1780671465.174 17722 17722 D AudioTrack: get APPSharePck NULL
+         1780671465.174 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671465.174 17722 17722 D AudioTrack: set(): 0xb400007660bb3410, Create AudioTrackThread, tid = 18018
+         1780671465.189 17722 17722 D AudioTrack: createTrack_l(165): 0xb400007660bb3410, mCblk = 0x753e457980, mLatency = 242, mAfLatency = 42, frameCount = 8820, mSampleRate = 44100, mFlags = 0, mReqFrameCount = 8820, mNotificationFramesAct = 882
+         1780671465.189 17722 17722 D AudioTrack: setVolumeLR:  track set volome = (-536813568)
+         1780671465.189 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671465.194 17722 17722 D AudioTrack: start(165): 0xb400007660bb3410, prior state:STATE_STOPPED
+         1780671465.194 17722 17722 D AudioTrack: start(portId:165, sessionId:1137): prior state:STATE_STOPPED
+         1780671465.194 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671465.204 17722 17722 I LiveAudioPlayer: Live audio start latency=11ms sampleRate=44100 stream=act_mq11t9v8_01al_91030c8f4582
+         1780671467.690 17722 17722 I LiveAudioPlayer: Live audio ended stream=act_mq11t9v8_01al_91030c8f4582
+         1780671467.713 17722 17722 D AudioTrack: pause(165): 0xb400007660bb3410, prior state:STATE_ACTIVE
+         1780671467.713 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671467.714 17722 17722 D AudioTrackShared: this(0xb400007600ee3970), mCblk(0x753e457980), front(107956), mIsOut 1, interrupt() FUTEX_WAKE
+         1780671467.723 17722 17722 D AudioTrack: flush(165): 0xb400007660bb3410, prior state:STATE_PAUSED
+         1780671467.724 17722 17722 D AudioTrack: stop(portId:165, sessionId:1137): prior state:STATE_FLUSHED
+         1780671467.725 17722 17722 D AudioTrack: stop(portId:165, sessionId:1137): prior state:STATE_FLUSHED
+         1780671467.728 17722 17722 D AudioTrack: ~AudioTrack(165): 0xb400007660bb3410
+         1780671467.729 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671467.729 17722 17722 D AudioTrack: stop(portId:165, sessionId:1137): prior state:STATE_FLUSHED
+         1780671467.729 17722 17722 D AudioTrack: requestExitAndWait start
+         1780671467.729 17722 17722 D AudioTrack: requestExitAndWait end
+         1780671467.729 17722 17722 D AudioTrack: stopAndJoinCallbacks(165) done
+         1780671467.730 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671467.732 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780671467.740 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671469.114 17722 17722 D AudioTrack: INSP: type=audio,case=1,set=0xb400007660bb3410,stream_type=-1,sample_rate=44100,format=0x1,channel_mask=0x1,frame_count=8820,flags=0x0,notification_frames=0,session_id=0,transfer_type=3,uid=-1,pid=-1
+         1780671469.114 17722 17722 D AudioTrack: INSP: type=audio,case=1,attributes=1,content_type=1,usage=1,source=-1,flags=0x900
+         1780671469.115 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671469.116 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671469.116 17722 17722 D AudioTrack: set(): Building AudioTrack with attributes: usage=1 content=1 flags=0x900 tags=[]
+         1780671469.116 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671469.117 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671469.117 17722 17722 D AudioTrack: set(): Building AudioTrack with attributes: usage = 1, content = 1, flags = 0x900, tags = []
+         1780671469.117 17722 17722 D AudioTrack: want to change usage for game mode
+         1780671469.117 17722 17722 D AudioTrack: get APPSharePck NULL
+         1780671469.117 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671469.117 17722 17722 D AudioTrack: set(): 0xb400007660bb3410, Create AudioTrackThread, tid = 18019
+         1780671469.131 17722 17722 D AudioTrack: createTrack_l(166): 0xb400007660bb3410, mCblk = 0x753e457980, mLatency = 242, mAfLatency = 42, frameCount = 8820, mSampleRate = 44100, mFlags = 0, mReqFrameCount = 8820, mNotificationFramesAct = 882
+         1780671469.131 17722 17722 D AudioTrack: setVolumeLR:  track set volome = (-536813568)
+         1780671469.132 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671469.140 17722 17722 D AudioTrack: start(166): 0xb400007660bb3410, prior state:STATE_STOPPED
+         1780671469.140 17722 17722 D AudioTrack: start(portId:166, sessionId:1145): prior state:STATE_STOPPED
+         1780671469.140 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671469.150 17722 17722 I LiveAudioPlayer: Live audio start latency=15ms sampleRate=44100 stream=act_mq11tcxo_01bi_a51e28c41f5c
+         1780671470.412 17722 17722 D AudioTrack: pause(166): 0xb400007660bb3410, prior state:STATE_ACTIVE
+         1780671470.412 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671470.412 17722 17722 D AudioTrackShared: this(0xb4000076008b7630), mCblk(0x753e457980), front(52920), mIsOut 1, interrupt() FUTEX_WAKE
+         1780671470.429 17722 17722 D AudioTrack: flush(166): 0xb400007660bb3410, prior state:STATE_PAUSED
+         1780671470.430 17722 17722 D AudioTrack: stop(portId:166, sessionId:1145): prior state:STATE_FLUSHED
+         1780671470.430 17722 17722 D AudioTrack: pause(166): 0xb400007660bb3410, prior state:STATE_FLUSHED
+         1780671470.431 17722 17722 D AudioTrack: flush(166): 0xb400007660bb3410, prior state:STATE_FLUSHED
+         1780671470.431 17722 17722 D AudioTrack: stop(portId:166, sessionId:1145): prior state:STATE_FLUSHED
+         1780671470.432 17722 17722 D AudioTrack: stop(portId:166, sessionId:1145): prior state:STATE_FLUSHED
+         1780671470.433 17722 17722 D AudioTrack: ~AudioTrack(166): 0xb400007660bb3410
+         1780671470.434 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671470.434 17722 17722 D AudioTrack: stop(portId:166, sessionId:1145): prior state:STATE_FLUSHED
+         1780671470.434 17722 17722 D AudioTrack: requestExitAndWait start
+         1780671470.434 17722 17722 D AudioTrack: requestExitAndWait end
+         1780671470.435 17722 17722 D AudioTrack: stopAndJoinCallbacks(166) done
+         1780671470.435 17722 17722 I LiveAudioPlayer: Live audio cancelled stream=act_mq11tcxo_01bi_a51e28c41f5c reason=client_barge_in
+         1780671470.436 17722 17722 W LiveAudioPlayer: Dropping 111616 live audio bytes without audio_begin
+         1780671470.504 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671479.736 18091 18091 D RefBase : #00 pc 000000000010cc18  /apex/com.android.runtime/lib64/bionic/libc.so (__cxa_finalize+280)
+         1780671486.682 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780671488.033 17722 17722 D AudioTrack: INSP: type=audio,case=1,set=0xb400007660c8dba0,stream_type=-1,sample_rate=44100,format=0x1,channel_mask=0x1,frame_count=8820,flags=0x0,notification_frames=0,session_id=0,transfer_type=3,uid=-1,pid=-1
+         1780671488.033 17722 17722 D AudioTrack: INSP: type=audio,case=1,attributes=1,content_type=1,usage=1,source=-1,flags=0x900
+         1780671488.034 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671488.034 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671488.034 17722 17722 D AudioTrack: set(): Building AudioTrack with attributes: usage=1 content=1 flags=0x900 tags=[]
+         1780671488.034 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671488.035 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671488.036 17722 17722 D AudioTrack: set(): Building AudioTrack with attributes: usage = 1, content = 1, flags = 0x900, tags = []
+         1780671488.036 17722 17722 D AudioTrack: want to change usage for game mode
+         1780671488.036 17722 17722 D AudioTrack: get APPSharePck NULL
+         1780671488.036 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671488.036 17722 17722 D AudioTrack: set(): 0xb400007660c8dba0, Create AudioTrackThread, tid = 18103
+         1780671488.053 17722 17722 D AudioTrack: createTrack_l(167): 0xb400007660c8dba0, mCblk = 0x7538c8d980, mLatency = 242, mAfLatency = 42, frameCount = 8820, mSampleRate = 44100, mFlags = 0, mReqFrameCount = 8820, mNotificationFramesAct = 882
+         1780671488.054 17722 17722 D AudioTrack: setVolumeLR:  track set volome = (-536813568)
+         1780671488.054 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671488.059 17722 17722 D AudioTrack: start(167): 0xb400007660c8dba0, prior state:STATE_STOPPED
+         1780671488.059 17722 17722 D AudioTrack: start(portId:167, sessionId:1153): prior state:STATE_STOPPED
+         1780671488.059 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671488.070 17722 17722 I LiveAudioPlayer: Live audio start latency=13ms sampleRate=44100 stream=act_mq11trl6_01ch_f53355cb9b18
+         1780671490.563 17722 17722 I LiveAudioPlayer: Live audio ended stream=act_mq11trl6_01ch_f53355cb9b18
+         1780671501.238 17722 17722 D AudioTrack: pause(167): 0xb400007660c8dba0, prior state:STATE_ACTIVE
+         1780671501.238 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671501.239 17722 17722 D AudioTrackShared: this(0xb400007600e66150), mCblk(0x7538c8d980), front(115200), mIsOut 1, interrupt() FUTEX_WAKE
+         1780671501.239 17722 17722 D AudioTrack: flush(167): 0xb400007660c8dba0, prior state:STATE_PAUSED
+         1780671501.240 17722 17722 D AudioTrack: stop(portId:167, sessionId:1153): prior state:STATE_FLUSHED
+         1780671501.242 17722 17722 D AudioTrack: stop(portId:167, sessionId:1153): prior state:STATE_FLUSHED
+         1780671501.244 17722 17722 D AudioTrack: ~AudioTrack(167): 0xb400007660c8dba0
+         1780671501.244 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671501.245 17722 17722 D AudioTrack: stop(portId:167, sessionId:1153): prior state:STATE_FLUSHED
+         1780671501.245 17722 17722 D AudioTrack: requestExitAndWait start
+         1780671501.245 17722 17722 D AudioTrack: requestExitAndWait end
+         1780671501.245 17722 17722 D AudioTrack: stopAndJoinCallbacks(167) done
+         1780671501.246 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780671502.737 17722 17722 D AudioTrack: INSP: type=audio,case=1,set=0xb400007660b5a560,stream_type=-1,sample_rate=44100,format=0x1,channel_mask=0x1,frame_count=8820,flags=0x0,notification_frames=0,session_id=0,transfer_type=3,uid=-1,pid=-1
+         1780671502.737 17722 17722 D AudioTrack: INSP: type=audio,case=1,attributes=1,content_type=1,usage=1,source=-1,flags=0x900
+         1780671502.737 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671502.738 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671502.738 17722 17722 D AudioTrack: set(): Building AudioTrack with attributes: usage=1 content=1 flags=0x900 tags=[]
+         1780671502.738 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671502.739 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671502.739 17722 17722 D AudioTrack: set(): Building AudioTrack with attributes: usage = 1, content = 1, flags = 0x900, tags = []
+         1780671502.739 17722 17722 D AudioTrack: want to change usage for game mode
+         1780671502.739 17722 17722 D AudioTrack: get APPSharePck NULL
+         1780671502.739 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671502.740 17722 17722 D AudioTrack: set(): 0xb400007660b5a560, Create AudioTrackThread, tid = 18114
+         1780671502.757 17722 17722 D AudioTrack: createTrack_l(168): 0xb400007660b5a560, mCblk = 0x7538c8d980, mLatency = 242, mAfLatency = 42, frameCount = 8820, mSampleRate = 44100, mFlags = 0, mReqFrameCount = 8820, mNotificationFramesAct = 882
+         1780671502.757 17722 17722 D AudioTrack: setVolumeLR:  track set volome = (-536813568)
+         1780671502.758 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671502.762 17722 17722 D AudioTrack: start(168): 0xb400007660b5a560, prior state:STATE_STOPPED
+         1780671502.762 17722 17722 D AudioTrack: start(portId:168, sessionId:1161): prior state:STATE_STOPPED
+         1780671502.762 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671502.772 17722 17722 I LiveAudioPlayer: Live audio start latency=11ms sampleRate=44100 stream=act_mq11u2tp_01di_66852b690647
+         1780671505.255 17722 17722 I LiveAudioPlayer: Live audio ended stream=act_mq11u2tp_01di_66852b690647
+         1780671505.319 17722 17722 D AudioTrack: pause(168): 0xb400007660b5a560, prior state:STATE_ACTIVE
+         1780671505.319 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671505.319 17722 17722 D AudioTrackShared: this(0xb400007600e2ead0), mCblk(0x7538c8d980), front(110073), mIsOut 1, interrupt() FUTEX_WAKE
+         1780671505.338 17722 17722 D AudioTrack: flush(168): 0xb400007660b5a560, prior state:STATE_PAUSED
+         1780671505.339 17722 17722 D AudioTrack: stop(portId:168, sessionId:1161): prior state:STATE_FLUSHED
+         1780671505.341 17722 17722 D AudioTrack: stop(portId:168, sessionId:1161): prior state:STATE_FLUSHED
+         1780671505.343 17722 17722 D AudioTrack: ~AudioTrack(168): 0xb400007660b5a560
+         1780671505.343 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671505.343 17722 17722 D AudioTrack: stop(portId:168, sessionId:1161): prior state:STATE_FLUSHED
+         1780671505.343 17722 17722 D AudioTrack: requestExitAndWait start
+         1780671505.344 17722 17722 D AudioTrack: requestExitAndWait end
+         1780671505.344 17722 17722 D AudioTrack: stopAndJoinCallbacks(168) done
+         1780671505.345 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780671506.076 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671506.083 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671511.613 18119 18119 D RefBase : #00 pc 000000000010cc18  /apex/com.android.runtime/lib64/bionic/libc.so (__cxa_finalize+280)
+         1780671517.733 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780671519.076 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671519.090 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671523.558 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780671524.119 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671524.129 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671526.935  3989 18128 D Linux   : [Posix_connect Debug]Process com.google.android.gms.persistent :443 
+         1780671540.120 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780671540.962 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671540.975 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671560.279 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780671561.555 17722 17722 D AudioTrack: INSP: type=audio,case=1,set=0xb4000076608ee530,stream_type=-1,sample_rate=44100,format=0x1,channel_mask=0x1,frame_count=8820,flags=0x0,notification_frames=0,session_id=0,transfer_type=3,uid=-1,pid=-1
+         1780671561.555 17722 17722 D AudioTrack: INSP: type=audio,case=1,attributes=1,content_type=1,usage=1,source=-1,flags=0x900
+         1780671561.556 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671561.557 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671561.557 17722 17722 D AudioTrack: set(): Building AudioTrack with attributes: usage=1 content=1 flags=0x900 tags=[]
+         1780671561.557 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671561.558 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671561.558 17722 17722 D AudioTrack: set(): Building AudioTrack with attributes: usage = 1, content = 1, flags = 0x900, tags = []
+         1780671561.558 17722 17722 D AudioTrack: want to change usage for game mode
+         1780671561.558 17722 17722 D AudioTrack: get APPSharePck NULL
+         1780671561.558 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671561.559 17722 17722 D AudioTrack: set(): 0xb4000076608ee530, Create AudioTrackThread, tid = 18139
+         1780671561.572 17722 17722 D AudioTrack: createTrack_l(169): 0xb4000076608ee530, mCblk = 0x7538c8d980, mLatency = 242, mAfLatency = 42, frameCount = 8820, mSampleRate = 44100, mFlags = 0, mReqFrameCount = 8820, mNotificationFramesAct = 882
+         1780671561.572 17722 17722 D AudioTrack: setVolumeLR:  track set volome = (-536813568)
+         1780671561.573 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671561.578 17722 17722 D AudioTrack: start(169): 0xb4000076608ee530, prior state:STATE_STOPPED
+         1780671561.578 17722 17722 D AudioTrack: start(portId:169, sessionId:1169): prior state:STATE_STOPPED
+         1780671561.578 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671561.586 17722 17722 I LiveAudioPlayer: Live audio start latency=10ms sampleRate=44100 stream=act_mq11vcdf_01jh_1782f32762ec
+         1780671564.065 17722 17722 I LiveAudioPlayer: Live audio ended stream=act_mq11vcdf_01jh_1782f32762ec
+         1780671564.128 17722 17722 D AudioTrack: pause(169): 0xb4000076608ee530, prior state:STATE_ACTIVE
+         1780671564.128 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671564.129 17722 17722 D AudioTrackShared: this(0xb400007600f5c090), mCblk(0x7538c8d980), front(110073), mIsOut 1, interrupt() FUTEX_WAKE
+         1780671564.146 17722 17722 D AudioTrack: flush(169): 0xb4000076608ee530, prior state:STATE_PAUSED
+         1780671564.147 17722 17722 D AudioTrack: stop(portId:169, sessionId:1169): prior state:STATE_FLUSHED
+         1780671564.148 17722 17722 D AudioTrack: stop(portId:169, sessionId:1169): prior state:STATE_FLUSHED
+         1780671564.150 17722 17722 D AudioTrack: ~AudioTrack(169): 0xb4000076608ee530
+         1780671564.150 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671564.151 17722 17722 D AudioTrack: stop(portId:169, sessionId:1169): prior state:STATE_FLUSHED
+         1780671564.151 17722 17722 D AudioTrack: requestExitAndWait start
+         1780671564.151 17722 17722 D AudioTrack: requestExitAndWait end
+         1780671564.151 17722 17722 D AudioTrack: stopAndJoinCallbacks(169) done
+         1780671564.152 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780671565.640 17722 17722 D AudioTrack: INSP: type=audio,case=1,set=0xb4000076608ee530,stream_type=-1,sample_rate=44100,format=0x1,channel_mask=0x1,frame_count=8820,flags=0x0,notification_frames=0,session_id=0,transfer_type=3,uid=-1,pid=-1
+         1780671565.640 17722 17722 D AudioTrack: INSP: type=audio,case=1,attributes=1,content_type=1,usage=1,source=-1,flags=0x900
+         1780671565.641 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671565.642 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671565.642 17722 17722 D AudioTrack: set(): Building AudioTrack with attributes: usage=1 content=1 flags=0x900 tags=[]
+         1780671565.642 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671565.643 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671565.643 17722 17722 D AudioTrack: set(): Building AudioTrack with attributes: usage = 1, content = 1, flags = 0x900, tags = []
+         1780671565.643 17722 17722 D AudioTrack: want to change usage for game mode
+         1780671565.643 17722 17722 D AudioTrack: get APPSharePck NULL
+         1780671565.643 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671565.644 17722 17722 D AudioTrack: set(): 0xb4000076608ee530, Create AudioTrackThread, tid = 18219
+         1780671565.661 17722 17722 D AudioTrack: createTrack_l(170): 0xb4000076608ee530, mCblk = 0x7538c8d980, mLatency = 242, mAfLatency = 42, frameCount = 8820, mSampleRate = 44100, mFlags = 0, mReqFrameCount = 8820, mNotificationFramesAct = 882
+         1780671565.662 17722 17722 D AudioTrack: setVolumeLR:  track set volome = (-536813568)
+         1780671565.662 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671565.671 17722 17722 D AudioTrack: start(170): 0xb4000076608ee530, prior state:STATE_STOPPED
+         1780671565.671 17722 17722 D AudioTrack: start(portId:170, sessionId:1177): prior state:STATE_STOPPED
+         1780671565.671 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671565.679 17722 17722 I LiveAudioPlayer: Live audio start latency=13ms sampleRate=44100 stream=act_mq11vfd8_01ku_41eadb3fcd0e
+         1780671568.169 17722 17722 I LiveAudioPlayer: Live audio ended stream=act_mq11vfd8_01ku_41eadb3fcd0e
+         1780671584.275  3989 17669 D Linux   : [Posix_connect Debug]Process com.google.android.gms.persistent :443 
+         1780671584.281 17722 17722 D AudioTrack: pause(170): 0xb4000076608ee530, prior state:STATE_ACTIVE
+         1780671584.281 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671584.282 17722 17722 D AudioTrackShared: this(0xb400007600e35130), mCblk(0x7538c8d980), front(115200), mIsOut 1, interrupt() FUTEX_WAKE
+         1780671584.283 17722 17722 D AudioTrack: flush(170): 0xb4000076608ee530, prior state:STATE_PAUSED
+         1780671584.283 17722 17722 D AudioTrack: stop(portId:170, sessionId:1177): prior state:STATE_FLUSHED
+         1780671584.285 17722 17722 D AudioTrack: stop(portId:170, sessionId:1177): prior state:STATE_FLUSHED
+         1780671584.286 17722 17722 D AudioTrack: ~AudioTrack(170): 0xb4000076608ee530
+         1780671584.286 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671584.286 17722 17722 D AudioTrack: stop(portId:170, sessionId:1177): prior state:STATE_FLUSHED
+         1780671584.287 17722 17722 D AudioTrack: requestExitAndWait start
+         1780671584.287 17722 17722 D AudioTrack: requestExitAndWait end
+         1780671584.287 17722 17722 D AudioTrack: stopAndJoinCallbacks(170) done
+         1780671584.288 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780671585.705 17722 17722 D AudioTrack: INSP: type=audio,case=1,set=0xb4000076608ee530,stream_type=-1,sample_rate=44100,format=0x1,channel_mask=0x1,frame_count=8820,flags=0x0,notification_frames=0,session_id=0,transfer_type=3,uid=-1,pid=-1
+         1780671585.706 17722 17722 D AudioTrack: INSP: type=audio,case=1,attributes=1,content_type=1,usage=1,source=-1,flags=0x900
+         1780671585.706 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671585.707 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671585.707 17722 17722 D AudioTrack: set(): Building AudioTrack with attributes: usage=1 content=1 flags=0x900 tags=[]
+         1780671585.707 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671585.708 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671585.708 17722 17722 D AudioTrack: set(): Building AudioTrack with attributes: usage = 1, content = 1, flags = 0x900, tags = []
+         1780671585.708 17722 17722 D AudioTrack: want to change usage for game mode
+         1780671585.708 17722 17722 D AudioTrack: get APPSharePck NULL
+         1780671585.708 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671585.709 17722 17722 D AudioTrack: set(): 0xb4000076608ee530, Create AudioTrackThread, tid = 18225
+         1780671585.720 17722 17722 D AudioTrack: createTrack_l(171): 0xb4000076608ee530, mCblk = 0x7538c8d980, mLatency = 242, mAfLatency = 42, frameCount = 8820, mSampleRate = 44100, mFlags = 0, mReqFrameCount = 8820, mNotificationFramesAct = 882
+         1780671585.720 17722 17722 D AudioTrack: setVolumeLR:  track set volome = (-536813568)
+         1780671585.720 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671585.724 17722 17722 D AudioTrack: start(171): 0xb4000076608ee530, prior state:STATE_STOPPED
+         1780671585.724 17722 17722 D AudioTrack: start(portId:171, sessionId:1185): prior state:STATE_STOPPED
+         1780671585.724 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671585.732 17722 17722 I LiveAudioPlayer: Live audio start latency=9ms sampleRate=44100 stream=act_mq11vuwe_01m9_c435e2d08043
+         1780671588.219 17722 17722 I LiveAudioPlayer: Live audio ended stream=act_mq11vuwe_01m9_c435e2d08043
+         1780671594.528 17722 17722 D AudioTrack: pause(171): 0xb4000076608ee530, prior state:STATE_ACTIVE
+         1780671594.528 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671594.529 17722 17722 D AudioTrackShared: this(0xb400007600c346d0), mCblk(0x7538c8d980), front(115200), mIsOut 1, interrupt() FUTEX_WAKE
+         1780671594.531 17722 17722 D AudioTrack: flush(171): 0xb4000076608ee530, prior state:STATE_PAUSED
+         1780671594.532 17722 17722 D AudioTrack: stop(portId:171, sessionId:1185): prior state:STATE_FLUSHED
+         1780671594.532 17722 17722 D AudioTrack: stop(portId:171, sessionId:1185): prior state:STATE_FLUSHED
+         1780671594.534 17722 17722 D AudioTrack: ~AudioTrack(171): 0xb4000076608ee530
+         1780671594.534 17722 17722 D AudioTrack: getpackName client name com.firstaid.copilot.debug(17722)
+         1780671594.534 17722 17722 D AudioTrack: stop(portId:171, sessionId:1185): prior state:STATE_FLUSHED
+         1780671594.534 17722 17722 D AudioTrack: requestExitAndWait start
+         1780671594.534 17722 17722 D AudioTrack: requestExitAndWait end
+         1780671594.534 17722 17722 D AudioTrack: stopAndJoinCallbacks(171) done
+         1780671594.535 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780671595.035 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in
+         1780671595.041 17722 17722 I LiveAudioPlayer: Live audio cancel with no active stream reason=client_barge_in

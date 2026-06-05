@@ -1,9 +1,15 @@
 import { runAgentPipeline } from "../agent/runPipeline.js";
-import { createDecisionFrame } from "../gemma/decisionFrame.js";
+import { createDecisionFrame, SPECIAL_GEMMA_INTENTS } from "../gemma/decisionFrame.js";
 import { GemmaRuntime } from "../gemma/runtime.js";
+import { OPEN_QUESTION_GEMMA_SYSTEM_PROMPT_FILE } from "../gemma/promptBuilder.js";
 import { createNluGovernor } from "../gemma/nluCache.js";
 import { createId } from "../domain/types.js";
 import { validateAction } from "../engine/actionValidator.js";
+import {
+  guidanceSourceRank,
+  recordGuidanceArbitration,
+  resolveGemmaAuthority
+} from "../engine/guidanceArbitration.js";
 import { AgentStage } from "../domain/stages.js";
 import { getNluSlotsConfig } from "../knowledge/knowledgeBase.js";
 import { transcribeInput } from "./stt.js";
@@ -11,9 +17,14 @@ import { synthesizeSpeech } from "./tts.js";
 import { resolveUserIntent } from "./intentResolver.js";
 import {
   LiveResponseType,
+  OPEN_QUESTION_CPR_FALLBACK_PHRASE,
   createLiveAgentInput,
   createLiveDriverProposal,
+  createOpenQuestionAckProposal,
+  detectOpenQuestion,
+  isOpenQuestionStage,
   liveProposalToGuidanceAction,
+  openQuestionAnswerIntents,
 } from "./liveDriver.js";
 
 const DEFAULT_VOICE_EVENT_TTL_MS = 30 * 60 * 1000;
@@ -72,6 +83,12 @@ export function createVoiceDemoService(options = {}) {
       const guidanceAction = guidance.guidanceAction;
       const spokenText = guidanceAction?.tts?.text || guidance.stateAction?.tts?.text || "";
       const tts = await timed(timings, "tts_ms", () => synthesizeSpeech(spokenText, options.tts || {}));
+      // The open-question answer is generated asynchronously; HTTP is single-shot so
+      // we resolve it here (bounded by the Gemma timeout) and attach it as data. The
+      // primary spoken audio stays the immediate ack/flow line.
+      const openQuestionAnswer = guidance.openQuestionAnswer
+        ? await guidance.openQuestionAnswer.promise.catch(() => null)
+        : null;
       timings.total_ms = Date.now() - totalStart;
       const response = {
         ok: true,
@@ -92,8 +109,11 @@ export function createVoiceDemoService(options = {}) {
         response_type: guidance.guidanceDecision.responseType,
         live_driver_source: guidance.guidanceDecision.liveDriverSource,
         tts_arbitration_reason: guidance.guidanceDecision.reason,
+        decision_scope: guidance.guidanceDecision.decision_scope ?? null,
         gemma: guidance.gemma,
         gemma_live: createGemmaLiveDebug(guidance.gemma, guidance.gemmaPlan),
+        open_question: guidance.openQuestion === true,
+        open_question_answer: summarizeOpenQuestionAnswer(openQuestionAnswer),
         tts,
         timings,
         report: guidance.pipeline.report,
@@ -211,9 +231,32 @@ export async function runVoiceGuidanceCore({
     liveProposal,
     options,
   });
-  const gemma = gemmaPlan.run
-    ? await timed(timings, "gemma_ms", () => generateGemmaPatch(runtime, frame, gemmaPlan))
-    : createSkippedGemma(gemmaPlan.reason);
+
+  // WB open question: the synchronous turn plays an immediate stabilizing ack
+  // (WA-cache eligible, CPR-live only) while the controlled Q&A Gemma answer is
+  // generated asynchronously and streamed afterwards. We never block the ack on
+  // the model, and the deterministic flow / critical corrections (handled earlier
+  // in planGemmaSupplement) always win, so the metronome and corrections are never
+  // interrupted.
+  let openQuestionAnswer = null;
+  let openQuestionAck = null;
+  let gemma;
+  if (gemmaPlan.openQuestion) {
+    const stage = pipeline.state.current_stage;
+    openQuestionAck = buildOpenQuestionAck(stage, pipeline.state, sessionId);
+    openQuestionAnswer = startOpenQuestionAnswer({
+      runtime,
+      frame,
+      plan: gemmaPlan,
+      state: pipeline.state,
+      sessionId,
+    });
+    gemma = createSkippedGemma("open_question_async");
+  } else {
+    gemma = gemmaPlan.run
+      ? await timed(timings, "gemma_ms", () => generateGemmaPatch(runtime, frame, gemmaPlan))
+      : createSkippedGemma(gemmaPlan.reason);
+  }
   const patch = gemma.patch || null;
   const gemmaValidation = patch
     ? validateAction(toGuidanceCandidate(patch, pipeline.state, sessionId), pipeline.state)
@@ -224,9 +267,11 @@ export async function runVoiceGuidanceCore({
     liveProposal,
     state: pipeline.state,
     sessionId,
-    allowIntentChange: false,
+    // allowIntentChange 不再写死：由 gemma_decision_scope 在 arbitrateGuidanceAction
+    // 内按 restricted/autonomy 裁决（关键/工具流早已在 planGemmaSupplement 阶段拦截）。
     userIntent: event.user_input?.intent ?? null,
     event,
+    openQuestionAck,
   });
 
   return {
@@ -245,6 +290,8 @@ export async function runVoiceGuidanceCore({
     gemmaValidation,
     guidanceDecision,
     guidanceAction: guidanceDecision.action,
+    openQuestion: gemmaPlan.openQuestion === true,
+    openQuestionAnswer,
   };
 }
 
@@ -271,9 +318,15 @@ export function resolveGuidanceAction(stateAction, gemmaValidation, options = {}
   }
 
   if (gemmaValidation?.action) {
+    if (!gemmaValidation.ok) {
+      return { action: gemmaValidation.action, source: "gemma_fallback" };
+    }
+    // 同 intent -> 润色 (gemma_agent)；不同 intent 且授权放开 -> Gemma autonomy 自选。
+    const changedIntent =
+      Boolean(stateAction) && gemmaValidation.action.intent !== stateAction.intent;
     return {
       action: gemmaValidation.action,
-      source: gemmaValidation.ok ? "gemma_agent" : "gemma_fallback",
+      source: changedIntent ? "gemma_autonomy" : "gemma_agent",
     };
   }
 
@@ -286,9 +339,12 @@ export function arbitrateGuidanceAction({
   liveProposal,
   state = {},
   sessionId = null,
-  allowIntentChange = false,
+  // 默认 undefined：交由 gemma_decision_scope 裁决换义授权。显式传 false 时退化为
+  // 强制"仅润色"的硬上限（不再写死，但保留可由调用方收紧的能力）。
+  allowIntentChange = undefined,
   userIntent = null,
   event = null,
+  openQuestionAck = null,
 } = {}) {
   if (isCriticalRuleCorrection(stateAction)) {
     return {
@@ -307,6 +363,20 @@ export function arbitrateGuidanceAction({
       responseType: LiveResponseType.FLOW_INSTRUCTION,
       liveDriverSource: "rule_flow_fast_path",
       reason: "s6_readiness_continue_cpr",
+    };
+  }
+
+  // WB open-question ack: an immediate stabilizing line that supersedes the
+  // (non-critical) deterministic CPR-loop guidance for this turn while the async
+  // answer is prepared. Placed after the critical-correction / readiness gates so
+  // those always win (corrections are never interrupted).
+  if (openQuestionAck) {
+    return {
+      action: openQuestionAck,
+      source: "open_question_ack",
+      responseType: LiveResponseType.OPEN_QUESTION_ACK,
+      liveDriverSource: "open_question_ack",
+      reason: "open_question_ack",
     };
   }
 
@@ -329,12 +399,49 @@ export function arbitrateGuidanceAction({
     };
   }
 
-  const gemmaDecision = resolveGuidanceAction(stateAction, gemmaValidation, { allowIntentChange });
+  // Tier-2 授权信封：按 gemma_decision_scope 决定 Gemma 能否在该轮换义。
+  //  - 状态机 intent 是 restricted -> 仅润色（换义丢弃）。
+  //  - 状态机 intent 是 autonomy 且 Gemma 选的也是 autonomy 子集 -> 允许自选。
+  // 显式 allowIntentChange===false 作为硬上限可强制只润色。
+  const gemmaAction = gemmaValidation?.action || null;
+  const authority = resolveGemmaAuthority({
+    stage: state.current_stage,
+    stateIntent: stateAction?.intent ?? null,
+    gemmaIntent: gemmaAction?.intent ?? null,
+  });
+  const effectiveAllowIntentChange =
+    allowIntentChange === false ? false : authority.allowIntentChange;
+  const gemmaDecision = resolveGuidanceAction(stateAction, gemmaValidation, {
+    allowIntentChange: effectiveAllowIntentChange,
+  });
+  const decisionScope = {
+    state_intent: stateAction?.intent ?? null,
+    gemma_intent: gemmaAction?.intent ?? null,
+    state_scope: authority.stateScope,
+    gemma_scope: authority.gemmaScope,
+    allow_intent_change: effectiveAllowIntentChange,
+    priority_rank: guidanceSourceRank(gemmaDecision.source),
+  };
+  // 可审计：每次仲裁（自选/被拦截/润色）都留结构化记录（intent + scope + source）。
+  recordGuidanceArbitration({
+    session_id: sessionId,
+    stage: state.current_stage ?? null,
+    state_intent: decisionScope.state_intent,
+    gemma_intent: decisionScope.gemma_intent,
+    state_scope: authority.stateScope,
+    gemma_scope: authority.gemmaScope,
+    allow_intent_change: effectiveAllowIntentChange,
+    chosen_source: gemmaDecision.source,
+  });
   return {
     ...gemmaDecision,
     responseType: responseTypeForAction(gemmaDecision.action, stateAction),
-    liveDriverSource: gemmaDecision.source === "gemma_agent" ? "gemma_live_driver" : null,
+    liveDriverSource:
+      gemmaDecision.source === "gemma_agent" || gemmaDecision.source === "gemma_autonomy"
+        ? "gemma_live_driver"
+        : null,
     reason: gemmaDecision.source,
+    decision_scope: decisionScope,
   };
 }
 
@@ -394,6 +501,22 @@ function planGemmaSupplement(stateAction, stt, context = {}) {
     return { run: false, reason: "no_user_input" };
   }
 
+  // WB 开放问答例外：闭集外的提问（detectOpenQuestion）路由给受控问答 Gemma —
+  // 即便在非 CPR-live 轮（否则会被下面的 diagnostic_fast_path 跳过）。答案异步生成，
+  // 不阻塞当轮（CPR-live 先即时 ack），并被收紧到该 stage 的 autonomy 答句 intent。
+  if (isOpenQuestionRoutable(stateAction, stt, context)) {
+    return {
+      run: true,
+      reason: null,
+      live: cprLive,
+      openQuestion: true,
+      timeoutMs: cprLive
+        ? resolveGemmaLiveTimeoutMs(context.options)
+        : resolveGemmaTurnTimeoutMs(context.options),
+      timeoutReason: "gemma_open_question_timeout",
+    };
+  }
+
   // 方案①（诊断轮即时）：非 CPR-live 的流程引导轮（S1/S2 等标准话术）不为
   // Gemma 润色阻塞，直接用确定性状态机话术即时响应，降低判断阶段延迟。
   // 这些话术是固定的标准流程句，Gemma 润色收益低；Gemma 仍服务于 CPR-live
@@ -408,6 +531,18 @@ function planGemmaSupplement(stateAction, stt, context = {}) {
     live: true,
     timeoutMs: resolveGemmaLiveTimeoutMs(context.options),
   };
+}
+
+// True when the current user turn is an open question this stage can safely answer.
+function isOpenQuestionRoutable(stateAction, stt, context = {}) {
+  const stage = context.state?.current_stage;
+  if (!isOpenQuestionStage(stage)) {
+    return false;
+  }
+  return detectOpenQuestion({
+    transcript: stt.transcript,
+    intent: context.event?.user_input?.intent ?? null,
+  });
 }
 
 function createSkippedGemma(reason) {
@@ -430,6 +565,20 @@ function createGemmaLiveDebug(gemma, plan = {}) {
   };
 }
 
+function summarizeOpenQuestionAnswer(answer) {
+  if (!answer) {
+    return null;
+  }
+  return {
+    ok: answer.ok === true,
+    fallback: answer.fallback === true,
+    source: answer.source || null,
+    response_type: answer.responseType || null,
+    reason: answer.reason || null,
+    action: answer.action || null,
+  };
+}
+
 function createGuidanceResponseSnapshot(guidance = {}) {
   return {
     ok: true,
@@ -448,15 +597,135 @@ function createGuidanceResponseSnapshot(guidance = {}) {
 }
 
 async function generateGemmaPatch(runtime, frame, plan = {}) {
+  const invoke = () =>
+    plan.promptOptions
+      ? runtime.generatePatch(frame, { promptOptions: plan.promptOptions })
+      : runtime.generatePatch(frame);
+
   if (!plan.timeoutMs) {
-    return runtime.generatePatch(frame);
+    return invoke();
   }
 
-  return withTimeout(
-    runtime.generatePatch(frame),
-    plan.timeoutMs,
-    plan.live ? "gemma_live_timeout" : "gemma_turn_timeout"
-  );
+  const timeoutReason = plan.timeoutReason || (plan.live ? "gemma_live_timeout" : "gemma_turn_timeout");
+  return withTimeout(invoke(), plan.timeoutMs, timeoutReason);
+}
+
+// WB: build the immediate stabilizing ack (CPR-live only). Routed through the live
+// proposal path so it keeps the running metronome (haptic) and a
+// do_not_interrupt_critical policy, then validated like any other live answer.
+function buildOpenQuestionAck(stage, state, sessionId) {
+  const ackProposal = createOpenQuestionAckProposal(stage);
+  if (!ackProposal) {
+    return null;
+  }
+  const candidate = liveProposalToGuidanceAction(ackProposal, state, sessionId);
+  const validation = validateAction(candidate, state);
+  return validation.ok ? validation.action : null;
+}
+
+// WB: kick off (but do NOT await) the controlled Q&A answer. Returns a channel
+// whose `promise` always resolves to a safe { action, source, responseType } —
+// timeouts and illegal/forbidden answers resolve to a deterministic safety
+// fallback, never a rejection, so the streaming layer can speak it after the ack.
+function startOpenQuestionAnswer({ runtime, frame, plan, state, sessionId }) {
+  const stage = state.current_stage;
+  const answerIntents = openQuestionAnswerIntents(stage);
+  const promise = resolveOpenQuestionAnswer({
+    runtime,
+    frame: buildOpenQuestionFrame(frame, answerIntents),
+    plan: {
+      timeoutMs: plan.timeoutMs,
+      live: plan.live,
+      timeoutReason: plan.timeoutReason || "gemma_open_question_timeout",
+      promptOptions: { systemPromptFile: OPEN_QUESTION_GEMMA_SYSTEM_PROMPT_FILE },
+    },
+    state,
+    sessionId,
+    stage,
+    answerIntents,
+  }).catch((error) => openQuestionFallback(stage, state, sessionId, "open_question_error", { error }));
+
+  return { promise, intents: answerIntents };
+}
+
+async function resolveOpenQuestionAnswer({ runtime, frame, plan, state, sessionId, stage, answerIntents }) {
+  const validatorIntents = [...answerIntents, ...SPECIAL_GEMMA_INTENTS];
+  const gemma = await generateGemmaPatch(runtime, frame, plan);
+  const patch = gemma?.patch || null;
+
+  if (!patch) {
+    return openQuestionFallback(stage, state, sessionId, gemma?.skipReason || gemma?.reason || "open_question_no_answer");
+  }
+
+  const candidate = toGuidanceCandidate(patch, state, sessionId);
+  const validation = validateAction(candidate, state, { allowedIntents: validatorIntents });
+  if (!validation.ok || !validation.action?.tts?.text) {
+    // Illegal / forbidden / empty answer -> deterministic safety fallback.
+    return openQuestionFallback(stage, state, sessionId, "open_question_blocked", { validation });
+  }
+
+  // In the CPR loop the answer must never preempt a critical correction or pause
+  // the metronome, so force a non-interrupting policy regardless of the patch.
+  if (stage === AgentStage.S7_CPR_LOOP || stage === AgentStage.S8_ASSISTANCE) {
+    validation.action.tts.interrupt_policy = "do_not_interrupt_critical";
+  }
+
+  return {
+    ok: true,
+    action: validation.action,
+    source: "gemma_open_question",
+    responseType: LiveResponseType.OPEN_QUESTION_ANSWER,
+    reason: "open_question_answered",
+  };
+}
+
+// Restrict the answer frame to the stage's controlled-answer intents so both the
+// prompt and the validator agree on what Gemma may say.
+function buildOpenQuestionFrame(frame, answerIntents) {
+  return {
+    ...frame,
+    allowed_intents: [...answerIntents, ...SPECIAL_GEMMA_INTENTS],
+  };
+}
+
+// Deterministic safety fallback for a timed-out / illegal open-question answer. In
+// CPR-live a short "keep pressing" reassurance is spoken after the ack; elsewhere
+// the ack/flow line already covered the turn so no extra answer is spoken.
+function openQuestionFallback(stage, state, sessionId, reason, extra = {}) {
+  const action = buildOpenQuestionFallbackAction(stage, state, sessionId, reason);
+  return {
+    ok: false,
+    fallback: true,
+    action,
+    source: "open_question_fallback",
+    responseType: LiveResponseType.REASSURANCE,
+    reason,
+    violations: extra.validation?.violations || [],
+  };
+}
+
+function buildOpenQuestionFallbackAction(stage, state, sessionId, reason) {
+  if (stage !== AgentStage.S7_CPR_LOOP && stage !== AgentStage.S8_ASSISTANCE) {
+    return null;
+  }
+  const candidate = {
+    intent: "encourage_rescuer",
+    session_id: sessionId,
+    stage,
+    source: "open_question_fallback",
+    priority: "normal",
+    reason_codes: ["open_question_fallback", reason],
+    tts: {
+      text: OPEN_QUESTION_CPR_FALLBACK_PHRASE,
+      tone: "calm_firm",
+      speed: "normal",
+      interrupt_policy: "do_not_interrupt_critical",
+    },
+    ui: { main_text: "继续按压", secondary_text: "跟着节拍，不要停" },
+    log_event: { type: "open_question_fallback", detail: reason },
+  };
+  const validation = validateAction(candidate, state);
+  return validation.ok ? validation.action : null;
 }
 
 async function withTimeout(promise, timeoutMs, reason) {

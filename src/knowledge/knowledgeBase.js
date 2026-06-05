@@ -50,6 +50,7 @@ function load() {
     ...(allowed.forbidden_intents || []),
     ...(nluSlots.forbidden_intents || [])
   ]);
+  const gemmaDecisionScopeByStage = buildGemmaDecisionScope(allowed.gemma_decision_scope);
 
   cache = {
     knowledgeVersion: allowed.knowledge_version || phrases.knowledge_version || "unknown",
@@ -57,6 +58,7 @@ function load() {
     globalIntents,
     allowedIntentsByStage,
     forbiddenIntents,
+    gemmaDecisionScopeByStage,
     safetyPhrasesByStage,
     forbiddenPhrases,
     validatorRules: phrases.validator_rules || {},
@@ -67,6 +69,30 @@ function load() {
   };
 
   return cache;
+}
+
+// Tier-2 授权信封的单一事实源。每阶段把意图二分为 autonomy / restricted（见
+// allowed_intents.json 的 gemma_decision_scope）。仲裁层据此决定是否放开 Gemma 换义。
+const AUTONOMY_INTENT_PATTERN =
+  /^(reassure_rescuer|encourage_rescuer|calm_rescuer|answer_[a-z0-9_]+_question|explain_[a-z0-9_]+)$/;
+
+function buildGemmaDecisionScope(rawScope) {
+  if (!rawScope || typeof rawScope !== "object" || Array.isArray(rawScope)) {
+    return {};
+  }
+
+  const result = {};
+  for (const [stage, scope] of Object.entries(rawScope)) {
+    if (!scope || typeof scope !== "object" || Array.isArray(scope)) {
+      continue;
+    }
+    result[stage] = {
+      autonomy: uniqueStrings(scope.autonomy),
+      restricted: uniqueStrings(scope.restricted)
+    };
+  }
+
+  return result;
 }
 
 function buildSafetyPhrasesByStage(allowedPhrases) {
@@ -128,6 +154,43 @@ export function getSafetyPhrases(stage) {
 
 export function getForbiddenIntents() {
   return [...load().forbiddenIntents];
+}
+
+export function getGemmaDecisionScopeByStage() {
+  const { gemmaDecisionScopeByStage } = load();
+  return Object.fromEntries(
+    Object.entries(gemmaDecisionScopeByStage).map(([stage, scope]) => [
+      stage,
+      { autonomy: [...scope.autonomy], restricted: [...scope.restricted] }
+    ])
+  );
+}
+
+export function getGemmaDecisionScope(stage) {
+  const scope = load().gemmaDecisionScopeByStage[stage];
+  return scope
+    ? { autonomy: [...scope.autonomy], restricted: [...scope.restricted] }
+    : { autonomy: [], restricted: [] };
+}
+
+// "autonomy" -> Gemma 可自选 intent + 自由措辞；"restricted" -> 仅可润色同 intent。
+// 未显式分类的意图：表达性意图按启发式归 autonomy，其余一律从严按 restricted。
+export function getGemmaIntentScope(stage, intent) {
+  if (typeof intent !== "string" || intent.length === 0) {
+    return "restricted";
+  }
+
+  const scope = load().gemmaDecisionScopeByStage[stage];
+  if (scope) {
+    if (scope.autonomy.includes(intent)) {
+      return "autonomy";
+    }
+    if (scope.restricted.includes(intent)) {
+      return "restricted";
+    }
+  }
+
+  return AUTONOMY_INTENT_PATTERN.test(intent) ? "autonomy" : "restricted";
 }
 
 export function getForbiddenPhrases() {

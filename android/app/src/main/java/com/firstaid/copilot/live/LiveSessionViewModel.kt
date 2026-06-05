@@ -4,17 +4,22 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.firstaid.copilot.execution.GuidanceAction
 import com.firstaid.copilot.execution.HAPTIC_TOOL_TYPES
+import com.firstaid.copilot.live.audio.LiveAudioMetadata
+import com.firstaid.copilot.live.audio.LiveAudioPlayer
 import com.firstaid.copilot.live.perception.EmaQualityScore
 import com.firstaid.copilot.live.perception.HandPositionHysteresis
 import com.firstaid.copilot.live.perception.PerceptionSignal
 import com.firstaid.copilot.live.perception.smoothInterruptionSeconds
 import com.firstaid.copilot.live.vision.cpr.evaluateVisionReadiness
 import java.util.UUID
+import java.util.concurrent.Executors
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Owns the Live CPR Coach session and exposes a single [StateFlow] of
@@ -32,6 +37,7 @@ import kotlinx.coroutines.launch
 class LiveSessionViewModel(
     private val transport: AgentTransport = HttpAgentTransport(),
     private val liveChannel: LiveAgentChannel = WebSocketAgentChannel(),
+    private val liveAudioPlayer: LiveAudioPlayer = LiveAudioPlayer(),
     private val sessionId: String = defaultSessionId(),
 ) : ViewModel() {
 
@@ -41,12 +47,24 @@ class LiveSessionViewModel(
     val uiState: StateFlow<LiveUiState> = _uiState.asStateFlow()
     private val visionHandPosition = HandPositionHysteresis()
     private val visionQualityScore = EmaQualityScore()
+    private val liveAudioDispatcher = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "live-audio-player").apply { isDaemon = true }
+    }.asCoroutineDispatcher()
+    private var ignoredServerAudioActionId: String? = null
     private var lastVisionMetricsEmitMs = 0L
     private var lastVisionInterruptionSeconds: Double? = null
 
     init {
         viewModelScope.launch {
             liveChannel.events.collect { event ->
+                if (shouldDropServerAudioEvent(event)) {
+                    return@collect
+                }
+                if (event.isLiveAudioPlaybackEvent()) {
+                    withContext(liveAudioDispatcher) {
+                        liveAudioPlayer.consume(event)
+                    }
+                }
                 _uiState.update { current -> reduceLiveEvent(current, event) }
             }
         }
@@ -58,8 +76,12 @@ class LiveSessionViewModel(
             _uiState.update { it.copy(connectionState = ConnectionState.Connecting) }
             liveChannel.connect(sessionId)
             val online = transport.health()
-            _uiState.update {
-                it.copy(connectionState = if (online) ConnectionState.Online else ConnectionState.Offline)
+            _uiState.update { current ->
+                if (online) {
+                    current
+                } else {
+                    current.copy(connectionState = ConnectionState.Offline)
+                }
             }
         }
     }
@@ -71,12 +93,28 @@ class LiveSessionViewModel(
      * the entry source only enriches metadata priors, never the medical flow.
      */
     fun startFirstAid(source: EntrySource = EntrySource.OneKeyButton) {
-        runTurn(
-            firstAidSessionStartedRequest(sessionId, source),
-            presetId = null,
-            sourceBadge = SourceBadge.RecordingOnly,
-            clearDemoPreset = true,
-        )
+        val request = firstAidSessionStartedRequest(sessionId, source)
+        if (_uiState.value.connectionState == ConnectionState.Online) {
+            cancelLiveAudio("new_turn")
+            liveChannel.sendTurn(request)
+            _uiState.update {
+                it.copy(
+                    isInFlight = true,
+                    currentDemoPresetId = null,
+                    sourceBadge = SourceBadge.RecordingOnly,
+                    isLiveAudioPlaying = false,
+                    activeAudioActionId = null,
+                    lastErrorMessage = null,
+                )
+            }
+        } else {
+            runTurn(
+                request,
+                presetId = null,
+                sourceBadge = SourceBadge.RecordingOnly,
+                clearDemoPreset = true,
+            )
+        }
     }
 
     /**
@@ -286,6 +324,27 @@ class LiveSessionViewModel(
         _uiState.update { it.copy(micState = micState) }
     }
 
+    fun acceptLocalAsrPartial(text: String) {
+        val clean = text.trim()
+        _uiState.update {
+            it.copy(
+                partialTranscript = clean.takeIf(String::isNotBlank),
+                micState = MicState.Capturing,
+                sourceBadge = SourceBadge.RecordingOnly,
+                lastErrorMessage = null,
+            )
+        }
+    }
+
+    fun reportLocalAsrError(message: String) {
+        _uiState.update {
+            it.copy(
+                micState = if (it.micState == MicState.Capturing) MicState.Listening else it.micState,
+                lastErrorMessage = message,
+            )
+        }
+    }
+
     fun startLiveAudio() {
         liveChannel.updateContext(TurnRequest(sessionId = sessionId))
         _uiState.update {
@@ -302,23 +361,62 @@ class LiveSessionViewModel(
         liveChannel.sendPcm(pcm16)
     }
 
+    fun submitLiveText(text: String, intent: String? = null) {
+        val clean = text.trim()
+        if (clean.isBlank()) return
+        val resolvedIntent = intent ?: inferLiveFastIntent(clean)?.intent
+        if (_uiState.value.connectionState != ConnectionState.Online) {
+            submitTurn(text = clean)
+            return
+        }
+        cancelLiveAudio("new_turn")
+        liveChannel.updateContext(TurnRequest(sessionId = sessionId))
+        liveChannel.commitText(clean, resolvedIntent)
+        _uiState.update {
+            it.copy(
+                partialTranscript = null,
+                lastUserTranscript = clean,
+                isInFlight = true,
+                micState = MicState.Listening,
+                sourceBadge = SourceBadge.RecordingOnly,
+                isLiveAudioPlaying = false,
+                activeAudioActionId = null,
+                lastErrorMessage = null,
+            )
+        }
+    }
+
     fun sendLiveBargeIn() {
+        cancelLiveAudio("client_barge_in")
         liveChannel.sendBargeIn()
         _uiState.update {
             it.copy(
                 micState = MicState.Capturing,
                 partialTranscript = null,
+                isLiveAudioPlaying = false,
+                activeAudioActionId = null,
+                suppressLocalTts = true,
             )
         }
     }
 
     fun stopLiveAudio() {
-        _uiState.update { it.copy(micState = MicState.Off, partialTranscript = null) }
+        cancelLiveAudio("client_stop")
+        _uiState.update {
+            it.copy(
+                micState = MicState.Off,
+                partialTranscript = null,
+                isLiveAudioPlaying = false,
+                activeAudioActionId = null,
+                suppressLocalTts = false,
+            )
+        }
     }
 
     /** Reset the server session and clear local UI state back to a fresh session. */
     fun reset() {
         viewModelScope.launch {
+            cancelLiveAudio("reset")
             liveChannel.reset()
             transport.reset(sessionId)
             _uiState.value = LiveUiState(sessionId = sessionId, connectionState = ConnectionState.Connecting)
@@ -327,7 +425,41 @@ class LiveSessionViewModel(
 
     override fun onCleared() {
         liveChannel.close()
+        liveAudioPlayer.release()
+        liveAudioDispatcher.close()
         super.onCleared()
+    }
+
+    private fun cancelLiveAudio(reason: String) {
+        liveAudioPlayer.onAudioCancel(reason)
+    }
+
+    private fun shouldDropServerAudioEvent(event: LiveAgentEvent): Boolean {
+        when (event) {
+            is LiveAgentEvent.AudioBegin -> {
+                val current = _uiState.value
+                val shouldUseLocal = !current.suppressLocalTts &&
+                    event.actionId != null &&
+                    event.actionId == current.lastActionId
+                ignoredServerAudioActionId = if (shouldUseLocal) event.actionId else null
+                return shouldUseLocal
+            }
+            is LiveAgentEvent.AudioChunk -> return ignoredServerAudioActionId != null
+            is LiveAgentEvent.AudioEnd -> {
+                val ignored = ignoredServerAudioActionId ?: return false
+                val matchesIgnored = event.actionId == null || event.actionId == ignored
+                if (matchesIgnored) {
+                    ignoredServerAudioActionId = null
+                }
+                return matchesIgnored
+            }
+            is LiveAgentEvent.AudioCancel -> {
+                val wasIgnoring = ignoredServerAudioActionId != null
+                ignoredServerAudioActionId = null
+                return wasIgnoring
+            }
+            else -> return false
+        }
     }
 
     private fun runTurn(
@@ -526,6 +658,12 @@ internal fun reduceLiveEvent(current: LiveUiState, event: LiveAgentEvent): LiveU
             connectionState = if (event.connected) ConnectionState.Online else ConnectionState.Offline,
             lastErrorMessage = event.message,
         )
+        is LiveAgentEvent.Thinking -> current.copy(
+            isInFlight = true,
+            lastLiveTurnSeq = event.turnSeq ?: current.lastLiveTurnSeq,
+            connectionState = ConnectionState.Online,
+            lastErrorMessage = null,
+        )
         is LiveAgentEvent.PartialTranscript -> current.copy(
             partialTranscript = event.text.takeIf { it.isNotBlank() },
             micState = MicState.Capturing,
@@ -540,15 +678,18 @@ internal fun reduceLiveEvent(current: LiveUiState, event: LiveAgentEvent): LiveU
         )
         is LiveAgentEvent.Guidance -> {
             val response = event.response
+            val useLocalTts = event.action.shouldUseLocalLiveTts()
             val base = current.copy(
                 connectionState = ConnectionState.Online,
                 currentStage = response?.currentStage ?: current.currentStage,
-                responseType = response?.responseType ?: current.responseType,
-                guidanceSource = response?.guidanceSource ?: current.guidanceSource,
+                responseType = response?.responseType ?: event.responseType ?: current.responseType,
+                guidanceSource = response?.guidanceSource ?: event.guidanceSource ?: current.guidanceSource,
                 eventSource = response?.eventSource ?: current.eventSource,
                 eventMode = response?.eventMode ?: current.eventMode,
                 ttsText = event.action.tts.text,
                 lastAssistantText = event.action.tts.text.ifBlank { null } ?: current.lastAssistantText,
+                lastLiveTurnSeq = event.turnSeq ?: current.lastLiveTurnSeq,
+                suppressLocalTts = !useLocalTts,
                 lastErrorMessage = null,
                 isInFlight = false,
                 micState = if (current.micState == MicState.Capturing) MicState.Listening else current.micState,
@@ -556,13 +697,107 @@ internal fun reduceLiveEvent(current: LiveUiState, event: LiveAgentEvent): LiveU
             base.applyGuidance(event.action)
         }
         is LiveAgentEvent.State -> current.copy(currentStage = event.currentStage ?: current.currentStage)
-        is LiveAgentEvent.AudioChunk -> current
+        is LiveAgentEvent.AudioBegin -> current.copy(
+            isLiveAudioPlaying = true,
+            activeAudioActionId = event.actionId,
+            lastLiveTurnSeq = event.turnSeq ?: current.lastLiveTurnSeq,
+            suppressLocalTts = true,
+            micState = MicState.Speaking,
+            lastErrorMessage = null,
+        )
+        is LiveAgentEvent.AudioChunk -> current.copy(isLiveAudioPlaying = true)
+        is LiveAgentEvent.AudioEnd -> current.copy(
+            isLiveAudioPlaying = false,
+            activeAudioActionId = null,
+            lastLiveTurnSeq = event.turnSeq ?: current.lastLiveTurnSeq,
+            micState = if (current.micState == MicState.Speaking) MicState.Listening else current.micState,
+        )
+        is LiveAgentEvent.AudioCancel -> current.copy(
+            isLiveAudioPlaying = false,
+            activeAudioActionId = null,
+            micState = if (current.micState == MicState.Speaking) MicState.Listening else current.micState,
+            lastErrorMessage = event.reason
+                ?.takeIf { it.isNotBlank() && !it.isExpectedAudioCancelReason() }
+                ?.let { "Audio cancelled: $it" },
+        )
+        is LiveAgentEvent.AudioUnavailable -> {
+            val alreadyUsingLocalTts = !current.suppressLocalTts &&
+                event.actionId != null &&
+                event.actionId == current.lastActionId
+            current.copy(
+                isLiveAudioPlaying = false,
+                activeAudioActionId = null,
+                suppressLocalTts = false,
+                lastErrorMessage = if (alreadyUsingLocalTts) {
+                    current.lastErrorMessage
+                } else {
+                    event.reason?.takeIf { it.isNotBlank() } ?: current.lastErrorMessage
+                },
+            )
+        }
         is LiveAgentEvent.Error -> current.copy(
             connectionState = ConnectionState.Error,
             lastErrorMessage = event.message,
             isInFlight = false,
         )
     }
+
+private fun LiveAudioPlayer.consume(event: LiveAgentEvent) {
+    when (event) {
+        is LiveAgentEvent.AudioBegin -> onAudioBegin(
+            LiveAudioMetadata(
+                streamId = event.streamId,
+                sessionId = event.sessionId,
+                actionId = event.actionId,
+                turnSeq = event.turnSeq?.toLong(),
+                format = event.format,
+                sampleRateHz = event.sampleRate,
+                channels = event.channels,
+                bitsPerSample = event.bitsPerSample,
+                flushQueue = event.flushQueue,
+            ),
+        )
+        is LiveAgentEvent.AudioChunk -> onPcmChunk(event.bytes)
+        is LiveAgentEvent.AudioEnd -> onAudioEnd(event.actionId)
+        is LiveAgentEvent.AudioCancel -> onAudioCancel(event.reason)
+        is LiveAgentEvent.AudioUnavailable -> flushQueue()
+        else -> Unit
+    }
+}
+
+private fun LiveAgentEvent.isLiveAudioPlaybackEvent(): Boolean =
+    this is LiveAgentEvent.AudioBegin ||
+        this is LiveAgentEvent.AudioChunk ||
+        this is LiveAgentEvent.AudioEnd ||
+        this is LiveAgentEvent.AudioCancel ||
+        this is LiveAgentEvent.AudioUnavailable
+
+private fun String.isExpectedAudioCancelReason(): Boolean =
+    this == "client_barge_in" ||
+        this == "new_turn" ||
+        this == "reset" ||
+        this == "client_stop" ||
+        this == "closed"
+
+private fun GuidanceAction.shouldUseLocalLiveTts(): Boolean {
+    val text = tts.text.trim()
+    if (text.isBlank()) return false
+    return text.length <= LOCAL_LIVE_TTS_MAX_CHARS ||
+        priority == "critical" ||
+        priority == "high" ||
+        tts.tone == "urgent" ||
+        text in LOCAL_LIVE_TTS_TEXTS
+}
+
+private const val LOCAL_LIVE_TTS_MAX_CHARS = 24
+
+private val LOCAL_LIVE_TTS_TEXTS = setOf(
+    "\u7ee7\u7eed\u6309\u538b",
+    "\u4e0d\u8981\u505c",
+    "\u7528\u529b\u6309\u538b",
+    "\u6253\u5f00 AED",
+    "\u547c\u53eb 120",
+)
 
 private fun reduceSuccess(current: LiveUiState, response: TurnResponse): LiveUiState {
     if (!response.ok) {
@@ -592,6 +827,7 @@ private fun reduceSuccess(current: LiveUiState, response: TurnResponse): LiveUiS
         partialTranscript = null,
         lastUserTranscript = response.transcript.ifBlank { null } ?: current.lastUserTranscript,
         lastAssistantText = response.ttsText.ifBlank { null } ?: current.lastAssistantText,
+        suppressLocalTts = false,
         lastErrorMessage = null,
         isInFlight = false,
         micState = if (current.micState == MicState.Uploading) MicState.Idle else current.micState,

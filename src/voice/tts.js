@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { canUseSpeechDaemon, requestTtsDaemon } from "./speechDaemon.js";
-import { normalizeForTts } from "./ttsText.js";
+import { buildTtsCacheKey, normalizeForTts } from "./ttsText.js";
 
 const VOICE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(VOICE_DIR, "..", "..");
@@ -20,9 +20,34 @@ export async function synthesizeSpeech(text, options = {}) {
   );
   const plan = resolveTtsPlan(options);
 
+  // Opt-in WA pre-synth cache: when a caller passes a TtsAudioCache, replay
+  // pre-rendered / previously synthesized audio (~0ms) before touching sherpa.
+  const cache = options.cache && typeof options.cache.getWav === "function" ? options.cache : null;
+  let cacheKey = null;
+  if (cache) {
+    cacheKey = buildTtsCacheKey(normalizedText, { tone: options.tone, speed: options.speed });
+    if (cache.bundleDir && !cache.bundleLoaded) {
+      await cache.loadBundle();
+    }
+    const cachedWav = await cache.getWav(cacheKey);
+    if (cachedWav && cachedWav.length) {
+      return {
+        provider: "tts_cache",
+        ok: true,
+        cached: true,
+        text: normalizedText,
+        audio: wavBytesToAudio(cachedWav),
+      };
+    }
+  }
+
   if (shouldAttemptRealTts(provider, plan)) {
     try {
-      return await synthesizeWithSherpa(normalizedText, plan);
+      const result = await synthesizeWithSherpa(normalizedText, plan);
+      if (cache && cacheKey && result?.ok && result.audio?.path) {
+        await storeWavInCache(cache, cacheKey, result.audio.path);
+      }
+      return result;
     } catch (error) {
       return {
         provider: "mock",
@@ -40,6 +65,25 @@ export async function synthesizeSpeech(text, options = {}) {
     text: normalizedText,
     audio: createMockAudio(normalizedText),
   };
+}
+
+function wavBytesToAudio(wav) {
+  return {
+    kind: "cache",
+    mime_type: "audio/wav",
+    data_url: `data:audio/wav;base64,${Buffer.from(wav).toString("base64")}`,
+  };
+}
+
+async function storeWavInCache(cache, key, filePath) {
+  try {
+    const bytes = await fs.readFile(filePath);
+    if (bytes.length) {
+      cache.set(key, bytes);
+    }
+  } catch {
+    // Best-effort: a failed cache write must never break synthesis.
+  }
 }
 
 export function createMockAudio(text = "") {

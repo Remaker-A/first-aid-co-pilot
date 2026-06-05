@@ -1,0 +1,63 @@
+﻿{
+    "artifact_dir":  "D:\\文档\\Codex\\first aid\\artifacts\\phone-smoke-20260605-225356",
+    "generated_at":  "2026-06-05T23:03:50.4312283+08:00",
+    "device_online":  true,
+    "device_lines":  "List of devices attached\n10KDCF04SH00000        device product:PD2318M model:V2318A device:PD2318 transport_id:6\n",
+    "adb_reverse_8787":  true,
+    "reverse_lines":  "UsbFfs tcp:8787 tcp:8787\n",
+    "server_reachable":  true,
+    "server_status":  200,
+    "server_has_ws_live_path":  true,
+    "package":  "com.firstaid.copilot.debug",
+    "apk":  "android/app/build/outputs/apk/debug/app-debug.apk",
+    "actions":  [
+                    "tap_start_at=2026-06-05T22:55:44.8045420+08:00 x=225 y=1480",
+                    "tap_input_at=2026-06-05T22:57:22.3247154+08:00 x=584 y=1480",
+                    "manual_input_text_at=2026-06-05T22:57:48.5981617+08:00 text=safe",
+                    "tap_send_at=2026-06-05T22:57:50.0105654+08:00 x=405 y=1480",
+                    "tap_send_corrected_at=2026-06-05T22:58:19.8247419+08:00 x=405 y=930"
+                ],
+    "verified":  {
+                     "ws_or_tcp_connect_from_app":  true,
+                     "one_key_start_screen":  true,
+                     "live_audio_playback_dispatch":  true,
+                     "audio_end_seen":  true,
+                     "active_audio_cancel_seen":  true,
+                     "stale_audio_dropped_after_cancel":  true,
+                     "bad_control_type_seen":  false,
+                     "asr_runtime_loaded":  true,
+                     "tts_runtime_loaded":  true
+                 },
+    "metrics":  {
+                    "live_audio_start_latency_count":  11,
+                    "live_audio_start_latency_values_ms":  "15,14,11,14,11,15,13,11,10,13,9",
+                    "live_audio_start_latency_avg_ms":  12.36,
+                    "live_audio_start_latency_p50_ms":  13,
+                    "live_audio_start_latency_p95_ms":  15,
+                    "android_tts_on_start_values_ms":  "4",
+                    "android_tts_on_start_avg_ms":  4,
+                    "sherpa_tts_background_values_ms":  "9283,9551",
+                    "sherpa_tts_background_avg_ms":  9417,
+                    "live_audio_ended_count":  8,
+                    "live_audio_active_cancelled_count":  3,
+                    "live_audio_cancel_no_active_count":  57,
+                    "stale_audio_drop_count":  2,
+                    "app_connect_8787_count":  4,
+                    "asr_create_done_count":  2,
+                    "tts_create_done_count":  1
+                },
+    "not_covered":  [
+                        "No human speech was provided, so mic frame -\u003e partial and speech end -\u003e final latency were not measured.",
+                        "Mic resumed after cancel is inferred from continued turns/cancel events, not proven by a human utterance transcript.",
+                        "uiautomator dump after start failed on vivo with /sys/board_info/user_cpu_freq EACCES; screenshots were used instead.",
+                        "No real emergency call action was triggered."
+                    ],
+    "files":  {
+                  "full_log":  "logcat-full.txt",
+                  "filtered_log":  "logcat-live-filtered.txt",
+                  "summary":  "smoke-summary.json",
+                  "after_start_screen":  "screen-after-start-device.png",
+                  "input_screen":  "screen-input-dialog.png",
+                  "after_safe_send_screen":  "screen-after-safe-send.png"
+              }
+}

@@ -1,6 +1,7 @@
 package com.firstaid.copilot.live.ui
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Handler
@@ -18,9 +19,11 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,12 +42,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -76,12 +77,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.firstaid.copilot.live.AttentionMode
 import com.firstaid.copilot.live.ConnectionState
-import com.firstaid.copilot.live.DEMO_WAKE_PHRASE
 import com.firstaid.copilot.live.DemoTurn
 import com.firstaid.copilot.live.LiveSessionViewModel
 import com.firstaid.copilot.live.LiveUiState
 import com.firstaid.copilot.live.MicState
-import com.firstaid.copilot.live.SourceBadge
 import com.firstaid.copilot.live.audio.LiveAudioCapture
 import com.firstaid.copilot.live.audio.MetronomeController
 import com.firstaid.copilot.live.demoCprSetupSequence
@@ -91,7 +90,10 @@ import com.firstaid.copilot.live.edge.EdgeModelKind
 import com.firstaid.copilot.live.edge.EdgeModelReport
 import com.firstaid.copilot.live.edge.EdgeTextToSpeechEdge
 import com.firstaid.copilot.live.edge.OnDeviceGemmaDriver
+import com.firstaid.copilot.live.edge.StreamingAsrEvent
+import com.firstaid.copilot.live.edge.StreamingAsrSession
 import com.firstaid.copilot.live.edge.buildSherpaSpeechEngine
+import com.firstaid.copilot.live.edge.buildSherpaStreamingAsrSession
 import com.firstaid.copilot.live.edge.inspectEdgeModels
 import com.firstaid.copilot.live.normalizeOverlayMode
 import com.firstaid.copilot.live.toAttentionMode
@@ -101,7 +103,10 @@ import com.firstaid.copilot.live.vision.cpr.VisionCameraMount
 import java.io.File
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun LiveCprCoachScreen(
@@ -109,6 +114,9 @@ fun LiveCprCoachScreen(
     onOpenFixtureDebug: () -> Unit = {},
 ) {
     val context = LocalContext.current
+    val skipGemmaWarmup = remember {
+        (context as? Activity)?.intent?.getBooleanExtra("skipGemmaWarmup", false) == true
+    }
     val coroutineScope = rememberCoroutineScope()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val attentionMode = state.attentionModeInputs.toAttentionMode()
@@ -127,6 +135,7 @@ fun LiveCprCoachScreen(
     var edgeReport by remember { mutableStateOf<EdgeModelReport?>(null) }
     var edgeSummary by remember { mutableStateOf("Edge models: checking") }
     var gemmaDriver by remember { mutableStateOf<OnDeviceGemmaDriver?>(null) }
+    var streamingAsrSession by remember { mutableStateOf<StreamingAsrSession?>(null) }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
@@ -135,9 +144,10 @@ fun LiveCprCoachScreen(
 
     val metronome = remember { MetronomeController(context) }
     val audioCapture = remember { LiveAudioCapture() }
-    val edgeSpeechEngine = remember { buildSherpaSpeechEngine(context) }
+    val asrSpeechEngine = remember { buildSherpaSpeechEngine(context, numThreads = 2) }
+    val ttsSpeechEngine = remember { buildSherpaSpeechEngine(context, numThreads = 6) }
     val ttsEdge = remember {
-        EdgeTextToSpeechEdge(context, edgeSpeechEngine) { speaking ->
+        EdgeTextToSpeechEdge(context, ttsSpeechEngine) { speaking ->
             audioCapture.setTtsSpeaking(speaking)
             // Single voice: duck the metronome under TTS, restore to full when done.
             // The beat itself never pauses for TTS — only its volume changes.
@@ -151,10 +161,41 @@ fun LiveCprCoachScreen(
             )
         }
     }
+    fun handleStreamingAsrEvents(events: List<StreamingAsrEvent>) {
+        events.forEach { event ->
+            when (event) {
+                is StreamingAsrEvent.Partial -> mainHandler.post {
+                    viewModel.acceptLocalAsrPartial(event.text)
+                }
+                is StreamingAsrEvent.Final -> mainHandler.post {
+                    if (event.text.isNotBlank()) {
+                        viewModel.submitLiveText(text = event.text, intent = event.intent)
+                    }
+                }
+                StreamingAsrEvent.Endpoint -> mainHandler.post {
+                    if (liveAudioEnabled) {
+                        viewModel.setMicState(MicState.Listening)
+                    }
+                }
+                is StreamingAsrEvent.Error -> mainHandler.post {
+                    viewModel.reportLocalAsrError(event.message)
+                }
+            }
+        }
+    }
+
     fun startAudioCapture() {
-        val useLocalAsr = edgeReport?.asrReady == true
+        val localStreamingAsr = if (edgeReport?.asrReady == true) {
+            streamingAsrSession?.takeIf { it.available }
+        } else {
+            null
+        }
+        val useWholeUtteranceAsr = edgeReport?.asrReady == true && localStreamingAsr == null
         liveAudioEnabled = true
         viewModel.startLiveAudio()
+        if (localStreamingAsr != null) {
+            handleStreamingAsrEvents(localStreamingAsr.start())
+        }
         audioCapture.start(
             onLevel = { level ->
                 mainHandler.post {
@@ -162,19 +203,29 @@ fun LiveCprCoachScreen(
                 }
             },
             onPcmChunk = { pcm16 ->
-                if (!useLocalAsr) {
+                if (localStreamingAsr == null && !useWholeUtteranceAsr) {
                     viewModel.sendLivePcm(pcm16)
                 }
             },
+            onListeningPcmChunk = { pcm16 ->
+                if (localStreamingAsr != null) {
+                    handleStreamingAsrEvents(localStreamingAsr.feedPcm(pcm16))
+                }
+            },
             onUtterancePcm = { pcm16 ->
-                if (useLocalAsr) {
-                    coroutineScope.launch {
-                        viewModel.setMicState(MicState.Uploading)
-                        val result = edgeSpeechEngine.transcribePcm16(pcm16)
-                        if (result.ok && result.text.isNotBlank()) {
-                            viewModel.submitTurn(text = result.text)
-                        } else {
-                            viewModel.setMicState(MicState.Listening)
+                when {
+                    localStreamingAsr != null -> {
+                        handleStreamingAsrEvents(localStreamingAsr.end())
+                    }
+                    useWholeUtteranceAsr -> {
+                        coroutineScope.launch {
+                            viewModel.setMicState(MicState.Uploading)
+                            val result = asrSpeechEngine.transcribePcm16(pcm16)
+                            if (result.ok && result.text.isNotBlank()) {
+                                viewModel.submitLiveText(text = result.text)
+                            } else {
+                                viewModel.setMicState(MicState.Listening)
+                            }
                         }
                     }
                 }
@@ -206,22 +257,42 @@ fun LiveCprCoachScreen(
 
     LaunchedEffect(Unit) {
         viewModel.connect()
-        val report = inspectEdgeModels(context, edgeSpeechEngine.runtimeAvailable())
+        val report = inspectEdgeModels(context, asrSpeechEngine.runtimeAvailable())
         edgeReport = report
         edgeSummary = report.summaryLine()
         launch {
+            var asrWarmSummary = ""
             var ttsWarmSummary = ""
             var gemmaWarmSummary = ""
             fun publishWarmSummary() {
-                edgeSummary = listOf(report.summaryLine(), ttsWarmSummary, gemmaWarmSummary)
+                edgeSummary = listOf(report.summaryLine(), asrWarmSummary, ttsWarmSummary, gemmaWarmSummary)
                     .filter(String::isNotBlank)
                     .joinToString(" ")
             }
 
+            if (report.asrReady) {
+                val asrWarmup = asrSpeechEngine.prewarmAsr()
+                asrWarmSummary = if (asrWarmup.ok) {
+                    "ASRWarm=${asrWarmup.latencyMs}ms"
+                } else {
+                    "ASRWarm=error"
+                }
+                publishWarmSummary()
+                val session = withContext(Dispatchers.Default) {
+                    buildSherpaStreamingAsrSession(context.applicationContext, numThreads = 2)
+                }
+                streamingAsrSession = session
+                asrWarmSummary += if (session.available) {
+                    " ASRStream=ready"
+                } else {
+                    " ASRStream=error"
+                }
+                publishWarmSummary()
+            }
+
             if (report.ttsReady) {
-                val ttsWarmup = edgeSpeechEngine.synthesizeToWav(
+                val ttsWarmup = ttsEdge.prewarmPhrase(
                     text = "继续按压",
-                    outputFile = File(context.cacheDir, "edge-tts/prewarm.wav"),
                 )
                 ttsWarmSummary = if (ttsWarmup.ok) {
                     "TTSWarm=${ttsWarmup.latencyMs}ms"
@@ -231,7 +302,8 @@ fun LiveCprCoachScreen(
                 publishWarmSummary()
             }
 
-            report.status(EdgeModelKind.Gemma).path?.let { gemmaPath ->
+            val gemmaPath = report.status(EdgeModelKind.Gemma).path
+            if (gemmaPath != null && !skipGemmaWarmup) {
                 val driver = OnDeviceGemmaDriver(context.applicationContext, File(gemmaPath))
                 gemmaDriver = driver
                 val warmup = driver.prewarm()
@@ -241,6 +313,9 @@ fun LiveCprCoachScreen(
                     "GemmaWarm=error"
                 }
                 publishWarmSummary()
+            } else if (skipGemmaWarmup) {
+                gemmaWarmSummary = "GemmaWarm=skipped"
+                publishWarmSummary()
             }
         }
     }
@@ -249,15 +324,30 @@ fun LiveCprCoachScreen(
         metronome.apply(state.haptic)
     }
 
-    LaunchedEffect(state.lastActionId, state.ttsText) {
-        ttsEdge.speak(
-            text = state.ttsText,
-            utteranceKey = state.lastActionId,
-            priority = state.ttsPriority,
-            interruptPolicy = state.ttsInterruptPolicy,
-            tone = state.ttsTone,
-            speed = state.ttsSpeed,
-        )
+    LaunchedEffect(state.isLiveAudioPlaying) {
+        if (state.isLiveAudioPlaying) {
+            audioCapture.setTtsSpeaking(true)
+            metronome.setDucked(true)
+        } else {
+            delay(180)
+            audioCapture.setTtsSpeaking(false)
+            metronome.setDucked(false)
+        }
+    }
+
+    LaunchedEffect(state.lastActionId, state.ttsText, state.suppressLocalTts) {
+        if (state.suppressLocalTts) {
+            ttsEdge.stop()
+        } else {
+            ttsEdge.speak(
+                text = state.ttsText,
+                utteranceKey = state.lastActionId,
+                priority = state.ttsPriority,
+                interruptPolicy = state.ttsInterruptPolicy,
+                tone = state.ttsTone,
+                speed = state.ttsSpeed,
+            )
+        }
     }
 
     DisposableEffect(Unit) {
@@ -265,16 +355,18 @@ fun LiveCprCoachScreen(
             metronome.release()
             audioCapture.release()
             ttsEdge.shutdown()
-            edgeSpeechEngine.close()
+            asrSpeechEngine.close()
+            streamingAsrSession?.close()
+            ttsSpeechEngine.close()
             gemmaDriver?.close()
         }
     }
 
-    val displayBadge = when {
-        state.currentDemoPresetId != null -> SourceBadge.DemoData
-        state.sourceBadge == SourceBadge.LiveRecognition -> SourceBadge.LiveRecognition
-        useCameraSource || state.micState in recordingMicStates -> SourceBadge.RecordingOnly
-        else -> state.sourceBadge
+    fun setCameraSource(enabled: Boolean) {
+        if (enabled && !hasCameraPermission) {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+        useCameraSource = enabled
     }
 
     Box(
@@ -305,25 +397,9 @@ fun LiveCprCoachScreen(
             AttentionMode.Glanceable -> GlanceableLayout(state)
         }
 
-        TopStatusStrip(
+        MinimalTopStatus(
             state = state,
-            sourceBadge = displayBadge,
-            useCameraSource = useCameraSource,
-            cameraNotice = state.lastErrorMessage?.takeIf {
-                useCameraSource && (
-                    it.contains("相机") ||
-                        it.contains("姿态") ||
-                        it.contains("实时识别") ||
-                        it.contains("pose_landmarker")
-                    )
-            },
-            onCameraToggle = {
-                if (!hasCameraPermission && !useCameraSource) {
-                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                }
-                useCameraSource = it
-            },
-            onOpenDemo = { showDemoDrawer = true },
+            onOpenDebug = { showDemoDrawer = true },
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(16.dp),
@@ -338,10 +414,9 @@ fun LiveCprCoachScreen(
                 audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             },
             onStartFirstAid = { viewModel.startFirstAid() },
-            onWakeEntry = { viewModel.triggerWakePhrase(DEMO_WAKE_PHRASE) },
             onSubmitText = {
                 ttsEdge.stop()
-                viewModel.submitTurn(text = it)
+                viewModel.submitLiveText(text = it)
             },
             onStartAudio = { startAudioCapture() },
             onStopAudio = {
@@ -349,12 +424,6 @@ fun LiveCprCoachScreen(
                 audioCapture.stop()
                 viewModel.stopLiveAudio()
             },
-            onReset = {
-                ttsEdge.stop()
-                viewModel.reset()
-            },
-            onOpenFixtureDebug = onOpenFixtureDebug,
-            edgeSummary = edgeSummary,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(16.dp),
@@ -366,6 +435,14 @@ fun LiveCprCoachScreen(
                 onClose = { showDemoDrawer = false },
                 onRunPreset = { preset -> viewModel.injectDemoPreset(preset) },
                 onRunSetup = { viewModel.runDemoTurns(demoCprSetupSequence()) },
+                onOpenFixtureDebug = onOpenFixtureDebug,
+                onReset = {
+                    ttsEdge.stop()
+                    viewModel.reset()
+                },
+                useCameraSource = useCameraSource,
+                onCameraToggle = ::setCameraSource,
+                edgeSummary = edgeSummary,
                 onQuickQuestion = { presetId, text ->
                     val turn = DemoTurn(demoPresetById(presetId), text)
                     val turns = if (state.currentStage?.startsWith("S7") == true) {
@@ -381,67 +458,38 @@ fun LiveCprCoachScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun TopStatusStrip(
+private fun MinimalTopStatus(
     state: LiveUiState,
-    sourceBadge: SourceBadge,
-    useCameraSource: Boolean,
-    cameraNotice: String?,
-    onCameraToggle: (Boolean) -> Unit,
-    onOpenDemo: () -> Unit,
+    onOpenDebug: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        color = Color(0xDD0F172A),
-        shape = RoundedCornerShape(24.dp),
-        modifier = modifier.fillMaxWidth(),
+        color = Color(0x990F172A),
+        shape = RoundedCornerShape(22.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = {},
+                onLongClick = onOpenDebug,
+            ),
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                StatusChip(state.connectionState.label, state.connectionState.color)
-                SourceBadgeView(sourceBadge)
-                Text(
-                    text = state.currentStage ?: "等待状态",
-                    color = Color.White,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.End,
-            ) {
-                Text("Camera", color = Color.White, fontSize = 12.sp)
-                Spacer(Modifier.width(8.dp))
-                Switch(checked = useCameraSource, onCheckedChange = onCameraToggle)
-                Spacer(Modifier.width(8.dp))
-                OutlinedButton(
-                    onClick = onOpenDemo,
-                    modifier = Modifier.height(36.dp),
-                ) {
-                    Text("Demo", fontSize = 12.sp)
-                }
-            }
-            cameraNotice?.let {
-                Text(
-                    text = it,
-                    color = Color(0xFFFCA5A5),
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            StatusChip(state.connectionState.label, state.connectionState.color)
+            Text(
+                text = stageStatusLabel(state.currentStage),
+                color = Color.White,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.End,
+            )
         }
     }
 }
@@ -456,7 +504,6 @@ private fun CoachLayout(state: LiveUiState) {
     ) {
         FlowProgressRail(state.currentStage)
         GuidanceCard(state, large = false)
-        LiveSubtitleLayer(state)
     }
 }
 
@@ -470,21 +517,31 @@ private fun EyesOffLayout(state: LiveUiState) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = state.mainText.ifBlank { "继续按压" },
+            text = primaryGuidanceText(state.mainText, state.currentStage),
             color = Color.White,
             fontSize = 46.sp,
             fontWeight = FontWeight.Black,
             textAlign = TextAlign.Center,
             lineHeight = 52.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.height(16.dp))
-        Text(
-            text = state.secondaryText.ifBlank { "跟着节拍，胸口中央，持续按压" },
-            color = Color(0xFFE2E8F0),
-            fontSize = 22.sp,
-            textAlign = TextAlign.Center,
+        compactSecondaryText(state.secondaryText, state.statusTags)?.let {
+            Spacer(Modifier.height(16.dp))
+            Text(
+                text = it,
+                color = Color(0xFFE2E8F0),
+                fontSize = 22.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        QualityScoreDial(
+            score = state.qualityScore,
+            currentStage = state.currentStage,
+            modifier = Modifier.padding(top = 22.dp),
         )
-        QualityScore(state.qualityScore, Modifier.padding(top = 22.dp))
     }
 }
 
@@ -498,7 +555,6 @@ private fun GlanceableLayout(state: LiveUiState) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         GuidanceCard(state, large = true)
-        LiveSubtitleLayer(state)
     }
 }
 
@@ -517,26 +573,23 @@ private fun GuidanceCard(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = state.mainText.ifBlank { "等待急救引导" },
+                text = primaryGuidanceText(state.mainText, state.currentStage),
                 color = Color.White,
                 fontSize = if (large) 36.sp else 28.sp,
                 fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
-            state.secondaryText.takeIf { it.isNotBlank() }?.let {
-                Text(text = it, color = Color(0xFFCBD5E1), fontSize = if (large) 20.sp else 17.sp)
+            compactSecondaryText(state.secondaryText, state.statusTags)?.let {
+                Text(
+                    text = it,
+                    color = Color(0xFFCBD5E1),
+                    fontSize = if (large) 20.sp else 17.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                state.statusTags.take(4).forEach { tag ->
-                    StatusChip(tag, Color(0xFF2563EB))
-                }
-            }
-            QualityScore(state.qualityScore)
-            state.lastErrorMessage?.let {
-                Text(text = it, color = Color(0xFFFBBF24), fontSize = 13.sp)
-            }
-            if (state.perceptionSignals.isEmpty()) {
-                Text(text = "感知信号：占位接入，当前不做真实识别", color = Color(0xFF94A3B8), fontSize = 12.sp)
-            }
+            QualityScoreDial(score = state.qualityScore, currentStage = state.currentStage)
         }
     }
 }
@@ -686,7 +739,8 @@ private fun CameraPreviewSurface(
             )
         } else {
             MockCameraFallback(
-                message = if (useCameraSource) "需要相机权限，仅显示模拟背景" else "模拟背景源，不代表实时识别",
+                message = if (useCameraSource) "需要相机权限" else null,
+                showPermissionButton = useCameraSource,
                 onRequestCameraPermission = onRequestCameraPermission,
             )
         }
@@ -765,7 +819,8 @@ private fun CameraPreviewSurface(
 
 @Composable
 private fun MockCameraFallback(
-    message: String,
+    message: String?,
+    showPermissionButton: Boolean,
     onRequestCameraPermission: () -> Unit,
 ) {
     Column(
@@ -782,10 +837,14 @@ private fun MockCameraFallback(
                 .border(2.dp, Color(0xFF334155), RoundedCornerShape(120.dp))
                 .background(Color(0xFF111827)),
         )
-        Spacer(Modifier.height(18.dp))
-        Text(text = message, color = Color(0xFFCBD5E1), textAlign = TextAlign.Center)
-        OutlinedButton(onClick = onRequestCameraPermission, modifier = Modifier.padding(top = 8.dp)) {
-            Text("请求相机权限")
+        message?.let {
+            Spacer(Modifier.height(18.dp))
+            Text(text = it, color = Color(0xFFCBD5E1), textAlign = TextAlign.Center)
+        }
+        if (showPermissionButton) {
+            OutlinedButton(onClick = onRequestCameraPermission, modifier = Modifier.padding(top = 8.dp)) {
+                Text("请求相机权限")
+            }
         }
     }
 }
@@ -816,69 +875,39 @@ private fun FlowProgressRail(currentStage: String?) {
 }
 
 @Composable
-private fun LiveSubtitleLayer(state: LiveUiState) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-        state.partialTranscript?.let {
-            SubtitleLine(prefix = "你（实时）", text = it)
-        }
-        state.lastUserTranscript?.let {
-            SubtitleLine(prefix = "你", text = it)
-        }
-        state.lastAssistantText?.let {
-            SubtitleLine(prefix = "助手", text = it)
-        }
-    }
-}
-
-@Composable
-private fun SubtitleLine(prefix: String, text: String) {
-    Surface(color = Color(0x99000000), shape = RoundedCornerShape(16.dp)) {
-        Text(
-            text = "$prefix：$text",
-            color = Color.White,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-            fontSize = 15.sp,
-        )
-    }
-}
-
-@Composable
 private fun LiveVoiceControls(
     state: LiveUiState,
     rmsLevel: Float,
     hasAudioPermission: Boolean,
     onRequestAudioPermission: () -> Unit,
     onStartFirstAid: () -> Unit,
-    onWakeEntry: () -> Boolean,
     onSubmitText: (String) -> Unit,
     onStartAudio: () -> Unit,
     onStopAudio: () -> Unit,
-    onReset: () -> Unit,
-    onOpenFixtureDebug: () -> Unit,
-    edgeSummary: String,
     modifier: Modifier = Modifier,
 ) {
     var text by remember { mutableStateOf("") }
-    val listening = state.micState == MicState.Listening || state.micState == MicState.Capturing
-    val flowStarted = state.currentStage != null && state.currentStage != "S0_INIT"
-    val primaryLabel = when {
-        !flowStarted -> "一键急救"
-        listening -> "停止录音"
-        else -> "继续录音"
-    }
+    var inputExpanded by remember { mutableStateOf(false) }
+    val voice = voiceControlPresentation(state.micState, state.currentStage)
     val primaryColor = when {
-        !flowStarted -> Color(0xFF16A34A)
-        listening -> Color(0xFFDC2626)
+        !voice.flowStarted -> Color(0xFF16A34A)
+        voice.active -> Color(0xFFDC2626)
         else -> Color(0xFF2563EB)
     }
-    Surface(color = Color(0xF20F172A), shape = RoundedCornerShape(26.dp), modifier = modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Surface(color = Color(0xE60F172A), shape = RoundedCornerShape(26.dp), modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (inputExpanded) {
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
-                    placeholder = { Text("说不清时可直接输入") },
-                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("输入") },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(72.dp),
                     singleLine = true,
                 )
                 Button(
@@ -886,32 +915,27 @@ private fun LiveVoiceControls(
                     onClick = {
                         onSubmitText(text)
                         text = ""
+                        inputExpanded = false
                     },
+                    modifier = Modifier.height(72.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        disabledContainerColor = Color(0xFF1E293B),
+                        disabledContentColor = Color(0xFF94A3B8),
+                    ),
                 ) {
                     Text("发送")
                 }
-            }
-            if (!flowStarted) {
-                // Wake-word entry (Demo): routes through the same EntryAdapter as the
-                // always-available "一键急救" fallback below. A real offline wake engine
-                // would call viewModel.triggerWakePhrase(recognizedText) on this seam.
                 OutlinedButton(
-                    onClick = {
-                        if (onWakeEntry()) {
-                            if (!hasAudioPermission) onRequestAudioPermission() else onStartAudio()
-                        }
-                    },
-                    enabled = !state.isInFlight,
-                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { inputExpanded = false },
+                    modifier = Modifier.height(72.dp),
                 ) {
-                    Text("语音唤起（Demo：有人没有呼吸了）")
+                    Text("收起")
                 }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            } else {
                 Button(
-                    enabled = !state.isInFlight || listening,
+                    enabled = !state.isInFlight || voice.active,
                     onClick = {
-                        if (!flowStarted) {
+                        if (!voice.flowStarted) {
                             onStartFirstAid()
                             if (!hasAudioPermission) {
                                 onRequestAudioPermission()
@@ -920,37 +944,58 @@ private fun LiveVoiceControls(
                             }
                         } else if (!hasAudioPermission) {
                             onRequestAudioPermission()
-                        } else if (listening) {
+                        } else if (voice.active) {
                             onStopAudio()
                         } else {
                             onStartAudio()
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
-                ) {
-                    Text(primaryLabel)
-                }
-                LinearProgressIndicator(
-                    progress = { rmsLevel },
                     modifier = Modifier
                         .weight(1f)
-                        .height(8.dp)
-                        .clip(CircleShape),
+                        .height(72.dp),
+                ) {
+                    Text(voice.label, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                }
+                VoiceLevelDot(
+                    micState = state.micState,
+                    rmsLevel = rmsLevel,
                 )
-                OutlinedButton(onClick = onReset) { Text("重置") }
-                OutlinedButton(onClick = onOpenFixtureDebug) { Text("旧 Fixture") }
+                OutlinedButton(
+                    onClick = { inputExpanded = !inputExpanded },
+                    modifier = Modifier.height(72.dp),
+                ) {
+                    Text("输入")
+                }
             }
-            Text(
-                text = "麦克风：${state.micState.label}。TTS 播放时保持采集，仅持续高阈值说话会打断播报。",
-                color = Color(0xFFCBD5E1),
-                fontSize = 12.sp,
-            )
-            Text(
-                text = edgeSummary,
-                color = Color(0xFF93C5FD),
-                fontSize = 12.sp,
-            )
         }
+    }
+}
+
+@Composable
+private fun VoiceLevelDot(
+    micState: MicState,
+    rmsLevel: Float,
+    modifier: Modifier = Modifier,
+) {
+    val active = micState in recordingMicStates || micState == MicState.Speaking
+    val color = when (micState) {
+        MicState.Speaking -> Color(0xFFA78BFA)
+        MicState.Off -> Color(0xFF64748B)
+        else -> if (active) Color(0xFF22C55E) else Color(0xFF334155)
+    }
+    val size = 14.dp + (10.dp * rmsLevel.coerceIn(0f, 1f))
+
+    Box(
+        modifier = modifier.size(34.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(color),
+        )
     }
 }
 
@@ -960,6 +1005,11 @@ private fun DemoInjectionDrawer(
     onClose: () -> Unit,
     onRunPreset: (com.firstaid.copilot.live.DemoPreset) -> Unit,
     onRunSetup: () -> Unit,
+    onOpenFixtureDebug: () -> Unit,
+    onReset: () -> Unit,
+    useCameraSource: Boolean,
+    onCameraToggle: (Boolean) -> Unit,
+    edgeSummary: String,
     onQuickQuestion: (String, String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -991,6 +1041,30 @@ private fun DemoInjectionDrawer(
                 color = Color(0xFFCBD5E1),
                 fontSize = 13.sp,
             )
+            Text(
+                text = "Transcript: ${state.partialTranscript ?: "-"} / ${state.lastUserTranscript ?: "-"} / ${state.lastAssistantText ?: "-"}",
+                color = Color(0xFF94A3B8),
+                fontSize = 12.sp,
+            )
+            Text(
+                text = "Runtime: $edgeSummary",
+                color = Color(0xFF93C5FD),
+                fontSize = 12.sp,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = onReset, modifier = Modifier.weight(1f)) {
+                    Text("重置")
+                }
+                OutlinedButton(onClick = onOpenFixtureDebug, modifier = Modifier.weight(1f)) {
+                    Text("旧 Fixture")
+                }
+            }
+            OutlinedButton(
+                onClick = { onCameraToggle(!useCameraSource) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (useCameraSource) "关闭 Camera" else "打开 Camera")
+            }
             Button(onClick = onRunSetup, modifier = Modifier.fillMaxWidth()) {
                 Text("运行 6 步 CPR setup")
             }
@@ -1029,23 +1103,59 @@ private fun DemoInjectionDrawer(
 }
 
 @Composable
-private fun QualityScore(score: Int?, modifier: Modifier = Modifier) {
-    score ?: return
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("质量分", color = Color(0xFFCBD5E1), fontSize = 13.sp)
-            Spacer(Modifier.width(10.dp))
-            Text("$score", color = Color.White, fontWeight = FontWeight.Bold)
+private fun QualityScoreDial(
+    score: Int?,
+    currentStage: String?,
+    modifier: Modifier = Modifier,
+) {
+    val presentation = qualityScorePresentation(score, currentStage) ?: return
+    val color = presentation.tone.toColor()
+
+    Surface(
+        color = color.copy(alpha = 0.2f),
+        shape = RoundedCornerShape(28.dp),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = "质量",
+                color = Color(0xFFCBD5E1),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = presentation.valueText,
+                    color = Color.White,
+                    fontSize = if (presentation.tone == QualityScoreTone.Pending) 24.sp else 44.sp,
+                    fontWeight = FontWeight.Black,
+                    maxLines = 1,
+                )
+                if (presentation.labelText.isNotBlank()) {
+                    Text(
+                        text = presentation.labelText,
+                        color = color,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Black,
+                        modifier = Modifier.padding(bottom = 6.dp),
+                    )
+                }
+            }
         }
-        LinearProgressIndicator(
-            progress = { score.coerceIn(0, 100) / 100f },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(8.dp)
-                .clip(CircleShape),
-        )
     }
 }
+
+private fun QualityScoreTone.toColor(): Color =
+    when (this) {
+        QualityScoreTone.Good -> Color(0xFF22C55E)
+        QualityScoreTone.Steady -> Color(0xFFF59E0B)
+        QualityScoreTone.Adjust -> Color(0xFFEF4444)
+        QualityScoreTone.Pending -> Color(0xFF38BDF8)
+    }
 
 @Composable
 private fun StatusChip(text: String, color: Color) {
@@ -1058,16 +1168,6 @@ private fun StatusChip(text: String, color: Color) {
             fontWeight = FontWeight.SemiBold,
         )
     }
-}
-
-@Composable
-private fun SourceBadgeView(sourceBadge: SourceBadge) {
-    val (label, color) = when (sourceBadge) {
-        SourceBadge.DemoData -> "演示数据" to Color(0xFFF59E0B)
-        SourceBadge.RecordingOnly -> "仅录制/采集" to Color(0xFF38BDF8)
-        SourceBadge.LiveRecognition -> "实时识别" to Color(0xFF22C55E)
-    }
-    StatusChip(label, color)
 }
 
 private fun Context.hasPermission(permission: String): Boolean =
@@ -1090,16 +1190,6 @@ private val ConnectionState.color: Color
         ConnectionState.Online -> Color(0xFF16A34A)
         ConnectionState.Offline -> Color(0xFFF59E0B)
         ConnectionState.Error -> Color(0xFFDC2626)
-    }
-
-private val MicState.label: String
-    get() = when (this) {
-        MicState.Idle -> "空闲"
-        MicState.Listening -> "监听中"
-        MicState.Capturing -> "采集中"
-        MicState.Uploading -> "上传中"
-        MicState.Speaking -> "TTS 播放"
-        MicState.Off -> "关闭"
     }
 
 private val recordingMicStates = setOf(MicState.Listening, MicState.Capturing, MicState.Uploading)

@@ -1,6 +1,0 @@
-SELFCHECK_SUMMARY total=5 pass=5 fail=0 overall=ALL_PASS
-[PASS] C1 S7 interruption(stopped) -> correct_compression_interruption/critical :: selectRuleFeedback.intent=correct_compression_interruption priority=critical tts="不要停，继续按压。" | action.intent=correct_compression_interruption action.priority=critical action.tts="不要停，继续按压。"
-[PASS] C2 S7 slow-rate -> correct_compression_rate, has 跟着节拍, no 震动 :: intent=correct_compression_rate type=rate_low tts="再快一点，跟着节拍按。" has_节拍=true has_震动=false
-[PASS] C3a 他动了 -> signs_of_life :: intent=signs_of_life
-[PASS] C3b 又有呼吸了 -> signs_of_life :: intent=signs_of_life
-[PASS] C3c 准备好了 != step_done :: intent=null

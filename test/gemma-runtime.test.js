@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import {
   GemmaRuntime,
   GEMMA_SYSTEM_PROMPT,
+  OPEN_QUESTION_GEMMA_SYSTEM_PROMPT_FILE,
   buildGemmaServeArgs,
   buildGemmaPrompt,
   buildLiteRtLmArgs,
@@ -267,6 +268,34 @@ test("GemmaRuntime parses a valid mock runner JSON patch", async () => {
     assert.equal(result.fallback ?? false, false);
     assert.equal(result.patch.intent, "parse_response_answer");
     assert.equal(result.patch.tts.text, "Check if they respond.");
+  });
+});
+
+test("GemmaRuntime generatePatch honors a per-call controlled-prompt override", async () => {
+  await withMockModelFile(async (modelFile) => {
+    let seenSystemPrompt = null;
+    const runtime = new GemmaRuntime({
+      config: {
+        ...resolveGemmaConfig({ env: {}, cwd: "D:\\test-workspace" }),
+        modelFile
+      },
+      runner: async ({ messages }) => {
+        seenSystemPrompt = messages[0].content;
+        return { stdout: JSON.stringify(VALID_PATCH), stderr: "", exitCode: 0 };
+      }
+    });
+
+    // Default call keeps the standard driver system prompt.
+    await runtime.generatePatch(DECISION_FRAME);
+    const defaultPrompt = seenSystemPrompt;
+    assert.match(defaultPrompt, /话术驱动层|Gemma Model Driver/);
+
+    // The WB open-question call swaps in the controlled Q&A system prompt.
+    await runtime.generatePatch(DECISION_FRAME, {
+      promptOptions: { systemPromptFile: OPEN_QUESTION_GEMMA_SYSTEM_PROMPT_FILE }
+    });
+    assert.notEqual(seenSystemPrompt, defaultPrompt);
+    assert.match(seenSystemPrompt, /受控问答/);
   });
 });
 

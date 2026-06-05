@@ -176,6 +176,84 @@ test("live session emits final, guidance, state, and streaming audio", async () 
   assert.deepEqual([...audioEvents[0]], [7, 8]);
 });
 
+test("live session accepts Android turn control frames", async () => {
+  let capturedInput = null;
+  const session = createLiveSession({
+    sessionId: "sess_android_turn",
+    service: {
+      async createGuidance(input) {
+        capturedInput = input;
+        return {
+          stt: { transcript: input.text, intent: "scene_safe" },
+          pipeline: { state: { current_stage: "S2_CHECK_RESPONSE" } },
+          guidanceDecision: { source: "state_machine", responseType: "flow_instruction" },
+          guidanceAction: {
+            action_id: "act_android_turn",
+            tts: { text: "请检查反应。" },
+          },
+        };
+      },
+      reset() {},
+    },
+    tts: {
+      cancel() {},
+      async *speak() {},
+    },
+  });
+  const jsonEvents = [];
+  session.on("json", (event) => jsonEvents.push(event));
+
+  await session.handleControl({
+    type: "turn",
+    payload: {
+      text: "现场安全了",
+      eventSource: "demo_script",
+      eventType: "session_started",
+    },
+  });
+
+  assert.equal(capturedInput.sessionId, "sess_android_turn");
+  assert.equal(capturedInput.text, "现场安全了");
+  assert.equal(capturedInput.eventSource, "demo_script");
+  assert.equal(jsonEvents.find((event) => event.type === "guidance")?.action.action_id, "act_android_turn");
+  assert.equal(jsonEvents.some((event) => event.error?.code === "bad_control_type"), false);
+
+  session.close();
+});
+
+test("live session emits audio_unavailable when TTS produces no chunks", async () => {
+  const session = createLiveSession({
+    sessionId: "sess_empty_tts",
+    service: {
+      async createGuidance() {
+        return {
+          stt: { transcript: "continue", intent: "continue_cpr" },
+          guidanceAction: {
+            action_id: "act_empty_tts",
+            tts: { text: "continue compressions" },
+          },
+        };
+      },
+      reset() {},
+    },
+    tts: {
+      cancel() {},
+      async *speak() {},
+    },
+  });
+  const jsonEvents = [];
+  session.on("json", (event) => jsonEvents.push(event));
+
+  await session.handleControl({ type: "commit_text", text: "continue" });
+
+  const unavailable = jsonEvents.find((event) => event.type === "audio_unavailable");
+  assert.equal(unavailable?.action_id, "act_empty_tts");
+  assert.equal(unavailable?.reason, "tts_stream_empty");
+  assert.equal(jsonEvents.some((event) => event.type === "audio_begin"), false);
+
+  session.close();
+});
+
 test("live session feeds PCM to streaming STT and commits partial/final turns", async () => {
   const fakeStt = createFakeStt();
   let captured = null;
@@ -227,6 +305,77 @@ test("live session feeds PCM to streaming STT and commits partial/final turns", 
   assert.equal(captured.text, "现场安全了");
   assert.equal(jsonEvents.find((event) => event.type === "guidance").source, "rule_fast_path");
   assert.equal(jsonEvents.find((event) => event.type === "audio_begin").sample_rate, 22050);
+
+  session.close();
+});
+
+test("live session orders partial, final, guidance, and audio frames", async () => {
+  const fakeStt = createFakeStt();
+  const sequence = [];
+  const session = createLiveSession({
+    sessionId: "sess_live_order",
+    createStreamingStt: () => fakeStt,
+    service: {
+      async createGuidance(input) {
+        assert.equal(input.sessionId, "sess_live_order");
+        assert.equal(input.text, "scene is safe");
+        return {
+          stt: { transcript: input.text, intent: "scene_safe" },
+          guidanceDecision: { source: "rule_fast_path", responseType: "flow_instruction" },
+          guidanceAction: {
+            action_id: "act_live_order",
+            tts: { text: "check response" },
+          },
+        };
+      },
+      reset() {},
+    },
+    tts: {
+      cancel() {},
+      async *speak(text) {
+        assert.equal(text, "check response");
+        yield {
+          chunk: Buffer.from([3, 4]),
+          sampleRate: 16000,
+          channels: 1,
+          bitsPerSample: 16,
+        };
+      },
+    },
+  });
+
+  const done = new Promise((resolve) => {
+    session.on("json", (event) => {
+      if (["partial", "final", "guidance", "audio_begin", "audio_end"].includes(event.type)) {
+        sequence.push(event.type);
+      }
+      if (event.type === "audio_end") {
+        resolve();
+      }
+    });
+    session.on("audio", (chunk, metadata) => {
+      sequence.push("audio_chunk");
+      assert.deepEqual([...chunk], [3, 4]);
+      assert.equal(metadata.action_id, "act_live_order");
+      assert.equal(metadata.sample_rate, 16000);
+    });
+  });
+
+  session.handlePcm(Buffer.from([0, 0, 0, 0]));
+  await tick();
+  fakeStt.emit("partial", { text: "scene" });
+  fakeStt.emit("final", { text: "scene is safe", intent: "scene_safe" });
+
+  await done;
+
+  assert.deepEqual(sequence, [
+    "partial",
+    "final",
+    "guidance",
+    "audio_begin",
+    "audio_chunk",
+    "audio_end",
+  ]);
 
   session.close();
 });

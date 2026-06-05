@@ -11,6 +11,10 @@ import { GUIDANCE_ACTION_PATCH_SCHEMA } from "./decisionFrame.js";
 const PROMPTS_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "prompts");
 export const DEFAULT_GEMMA_SYSTEM_PROMPT_FILE = "gemma_system_prompt_v1.1.txt";
 export const DEFAULT_GEMMA_USER_PROMPT_FILE = "gemma_user_prompt_template_v1.1.txt";
+// WB 受控问答（open question）专用 system prompt：在标准 GuidanceActionPatch 契约上
+// 收紧为"只在 allowed_intents 内、短答、贴 safety_phrases"，供 service.js 通过
+// promptOptions.systemPromptFile 在开放问答轮注入。
+export const OPEN_QUESTION_GEMMA_SYSTEM_PROMPT_FILE = "gemma_open_question_system_prompt_v1.txt";
 
 const DECISION_FRAME_TOKEN = "<<DECISION_FRAME_JSON>>";
 

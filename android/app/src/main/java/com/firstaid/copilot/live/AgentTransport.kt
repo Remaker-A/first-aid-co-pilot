@@ -40,7 +40,11 @@ interface LiveAgentChannel {
 
     fun updateContext(request: TurnRequest)
 
+    fun sendTurn(request: TurnRequest)
+
     fun sendPcm(pcm16: ByteArray)
+
+    fun commitText(text: String, intent: String? = null)
 
     fun sendBargeIn()
 
@@ -52,15 +56,41 @@ interface LiveAgentChannel {
 sealed interface LiveAgentEvent {
     data class ConnectionChanged(val connected: Boolean, val message: String? = null) : LiveAgentEvent
 
+    data class Thinking(val turnSeq: Int?) : LiveAgentEvent
+
     data class PartialTranscript(val text: String) : LiveAgentEvent
 
     data class FinalTranscript(val text: String, val intent: String?) : LiveAgentEvent
 
-    data class Guidance(val action: GuidanceAction, val response: TurnResponse?) : LiveAgentEvent
+    data class Guidance(
+        val action: GuidanceAction,
+        val response: TurnResponse?,
+        val turnSeq: Int? = null,
+        val guidanceSource: String? = null,
+        val responseType: String? = null,
+    ) : LiveAgentEvent
 
     data class State(val currentStage: String?) : LiveAgentEvent
 
+    data class AudioBegin(
+        val actionId: String?,
+        val turnSeq: Int?,
+        val sampleRate: Int,
+        val channels: Int,
+        val bitsPerSample: Int,
+        val format: String,
+        val streamId: String? = null,
+        val sessionId: String? = null,
+        val flushQueue: Boolean = false,
+    ) : LiveAgentEvent
+
     data class AudioChunk(val bytes: ByteArray) : LiveAgentEvent
+
+    data class AudioEnd(val actionId: String?, val turnSeq: Int?) : LiveAgentEvent
+
+    data class AudioCancel(val reason: String?) : LiveAgentEvent
+
+    data class AudioUnavailable(val reason: String?, val actionId: String? = null) : LiveAgentEvent
 
     data class Error(val message: String) : LiveAgentEvent
 }

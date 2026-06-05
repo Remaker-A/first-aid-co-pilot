@@ -7,6 +7,8 @@ export const LiveResponseType = Object.freeze({
   PROACTIVE_COACHING: "proactive_coaching",
   FLOW_INSTRUCTION: "flow_instruction",
   REASSURANCE: "reassurance",
+  OPEN_QUESTION_ACK: "open_question_ack",
+  OPEN_QUESTION_ANSWER: "open_question_answer",
 });
 
 const QUESTION_INTENTS = new Set([
@@ -16,6 +18,78 @@ const QUESTION_INTENTS = new Set([
   "ask_next_step",
   "ask_emergency_call",
 ]);
+
+// WB 开放问答（闭集外提问 → 受控 Gemma 作答）。闭集问题（QUESTION_INTENTS）仍走
+// liveDriver 固定答句（快稳）；其余"读起来像提问、且不是流程推进/事实上报"的话被标
+// 记为 open_question，交给受控问答 Gemma：先即时 ack 稳场、再异步答。这里只做"粗筛"，
+// 真正的安全护栏由受限 allowed_intents + ActionValidator 强制（service.js）。
+const OPEN_QUESTION_FLOW_OR_FACT_INTENTS = new Set([
+  "continue_cpr",
+  "continue_cpr_loop",
+  "compressions_reported",
+  "step_done",
+  "no_normal_breathing",
+  "normal_breathing",
+  "agonal_breathing",
+  "clarify_breathing",
+  "patient_unresponsive",
+  "patient_responsive",
+  "patient_recovered",
+  "signs_of_life",
+  "scene_safe",
+  "scene_unsafe",
+  "emergency_called",
+  "paramedics_arrived",
+]);
+
+// Conservative interrogative cue: a trailing question mark / 吗呢 particle, or an
+// explicit question word. Kept narrow so plain reports never become open questions.
+const OPEN_QUESTION_TEXT_PATTERN =
+  /[?？]|(?:吗|呢)[?？。!！\s]*$|怎么|为什么|为啥|为何|多久|多长|多大|多少|几分钟|什么|啥|哪(?:里|儿|个|边)?|如何|怎样|能不能|能否|可不可以|可以吗|要不要|用不用|是不是|有没有|该不该|会不会|需不需要|how\b|why\b|what\b|when\b|where\b|which\b|should\b|can\s+i|do\s+i|need\s+to/i;
+
+// Per-stage controlled-answer intents Gemma may use for an open question. Every
+// entry is a subset of that stage's allowed_intents (allowed_intents.json), so the
+// answer also passes ActionValidator. Stages without a safe "answer/reassure"
+// intent (e.g. the tightly-gated S3/S4 breathing/arrest checks) are intentionally
+// omitted, leaving their deterministic flow untouched.
+export const OPEN_QUESTION_ANSWER_INTENTS_BY_STAGE = Object.freeze({
+  S0_INIT: ["reassure_rescuer"],
+  S1_SCENE_SAFE: ["reassure_rescuer"],
+  S2_CHECK_RESPONSE: ["reassure_rescuer"],
+  S5_CALL_EMERGENCY: ["calm_rescuer"],
+  S6_CPR_READY: ["encourage_rescuer", "answer_position_question"],
+  S7_CPR_LOOP: ["answer_current_cpr_question", "encourage_rescuer", "calm_rescuer"],
+  S8_ASSISTANCE: ["calm_rescuer", "explain_aed_support"],
+});
+
+// The immediate stabilizing ack text (shared by the CPR-live stages). Authored as
+// a fixed standard line so it is WA-cache eligible — see OPEN_QUESTION_FIXED_PHRASES.
+const OPEN_QUESTION_ACK_TEXT = "我在，按住别停，听我说。";
+
+// The CPR-live safety fallback spoken when the async answer times out or is
+// blocked (see service.js buildOpenQuestionFallbackAction). Kept here as the
+// single source of truth so the spoken text and the pre-rendered cache key never
+// drift apart.
+export const OPEN_QUESTION_CPR_FALLBACK_PHRASE = "继续按压，不要停，我在。";
+
+// WA-cache source of truth for the WB open-question fixed phrases. The ack lives
+// as a `text:` field and the fallback as an inline service.js string, which the
+// prerender sweep's ttsText/return regexes both miss, so the WA bundle imports
+// this list to pre-synthesize them (scripts/speech/prerenderTtsCache.mjs). That
+// keeps the immediate ack ~0ms instead of paying a ~3.5s live synthesis.
+export const OPEN_QUESTION_FIXED_PHRASES = Object.freeze([
+  OPEN_QUESTION_ACK_TEXT,
+  OPEN_QUESTION_CPR_FALLBACK_PHRASE,
+]);
+
+// Immediate stabilizing ack played BEFORE the async answer, only in the CPR-live
+// stages where latency + the running metronome matter most. The phrase is a fixed
+// standard line (WA-cache eligible): it never stops the metronome and never
+// interrupts a critical action.
+const OPEN_QUESTION_ACK_BY_STAGE = Object.freeze({
+  S7_CPR_LOOP: { intent: "answer_current_cpr_question", text: OPEN_QUESTION_ACK_TEXT },
+  S8_ASSISTANCE: { intent: "calm_rescuer", text: OPEN_QUESTION_ACK_TEXT },
+});
 
 const RATE_LOW = 100;
 const RATE_HIGH = 120;
@@ -150,6 +224,63 @@ export function liveProposalToGuidanceAction(proposalInput, state = {}, sessionI
 
 export function isLiveQuestionIntent(intent) {
   return QUESTION_INTENTS.has(intent);
+}
+
+// Coarse "reads like a question" gate (see OPEN_QUESTION_TEXT_PATTERN).
+export function looksLikeOpenQuestion(transcript = "") {
+  const text = typeof transcript === "string" ? transcript.trim() : "";
+  if (text.length < 2) {
+    return false;
+  }
+  return OPEN_QUESTION_TEXT_PATTERN.test(text);
+}
+
+// True when an utterance is an open question: it reads like a question, is NOT a
+// closed-set question (those keep their deterministic fixed answer) and is NOT a
+// flow-progress / fact report (those drive the state machine, not Q&A).
+export function detectOpenQuestion({ transcript = "", intent = null } = {}) {
+  if (isLiveQuestionIntent(intent)) {
+    return false;
+  }
+  if (intent && OPEN_QUESTION_FLOW_OR_FACT_INTENTS.has(intent)) {
+    return false;
+  }
+  return looksLikeOpenQuestion(transcript);
+}
+
+export function openQuestionAnswerIntents(stage) {
+  const intents = OPEN_QUESTION_ANSWER_INTENTS_BY_STAGE[stage];
+  return intents ? [...intents] : [];
+}
+
+// A stage supports open-question Q&A only if it has a safe controlled-answer
+// intent set; otherwise the open-question exception is not opened for it.
+export function isOpenQuestionStage(stage) {
+  return openQuestionAnswerIntents(stage).length > 0;
+}
+
+// The immediate stabilizing ack proposal (CPR-live only). Returns null for stages
+// without a CPR-live ack, in which case the caller keeps the deterministic guidance
+// as the synchronous turn and still streams the async answer afterwards.
+export function createOpenQuestionAckProposal(stage) {
+  const ack = OPEN_QUESTION_ACK_BY_STAGE[stage];
+  if (!ack) {
+    return null;
+  }
+
+  return proposal({
+    responseType: LiveResponseType.OPEN_QUESTION_ACK,
+    intent: ack.intent,
+    ttsText: ack.text,
+    priority: "normal",
+    source: "open_question_ack",
+    interruptPolicy: "do_not_interrupt_critical",
+    reasonCodes: ["open_question_ack", "wa_cache_eligible"],
+    uiMainText: "我在",
+    uiSecondaryText: "继续按压，听我说",
+    statusTags: ["继续按压", "我在"],
+    throttleKey: "live.open_question_ack",
+  });
 }
 
 function answerCprQuality(input) {

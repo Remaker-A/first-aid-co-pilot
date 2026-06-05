@@ -10,6 +10,7 @@ import { AgentStage } from "../domain/stages.js";
 import { Mode, createInitialSessionState } from "../domain/types.js";
 import { GemmaRuntime } from "../gemma/runtime.js";
 import { generateHandoverReport } from "../report/handoverReportGenerator.js";
+import { generateHandoverNarrative } from "../report/handoverNarrative.js";
 import { createSessionLog } from "../report/sessionLog.js";
 import { createLlmSceneBrain, createSceneSimulator } from "../sim/sceneSimulator.js";
 
@@ -165,8 +166,16 @@ async function runLiveScenario() {
   }
 
   const report = generateHandoverReport(log.toJSON(), state);
+  // WD 第五点：交接终态用 Gemma 把结构化报告"叙述化"，数字只能来自报告，过 ActionValidator，
+  // 失败回退确定性模板。这里展示叙述与其来源，作为 Agent 能力的可见亮点。
+  const handover = await generateHandoverNarrative({ report, state, runtime, sessionId });
+  if (handover.fallback && handover.fallbackReason) {
+    fallbackNotes.push(`handover_narrative:${handover.fallbackReason}`);
+  }
   printReportAndSummary({
     report,
+    narrative: handover.narrative,
+    narrativeSource: handover.source,
     finalStage: state.current_stage,
     actionCount: actions.length,
     dispatchResults,
@@ -212,6 +221,18 @@ function createScenarioRuntime() {
         disabledReason = reason;
       }
       return result;
+    },
+    async generateNarrative(frame) {
+      if (disabledReason) {
+        return {
+          ok: false,
+          fallback: true,
+          fallbackReason: `scenario_runtime_disabled:${disabledReason}`,
+          narrative: "",
+        };
+      }
+
+      return inner.generateNarrative(frame);
     },
   };
 }
@@ -406,10 +427,22 @@ function toolLabel(type) {
   return labels[type] ?? type ?? "未知工具";
 }
 
-function printReportAndSummary({ report, finalStage, actionCount, dispatchResults, extraLines = [] }) {
+function printReportAndSummary({
+  report,
+  narrative,
+  narrativeSource,
+  finalStage,
+  actionCount,
+  dispatchResults,
+  extraLines = [],
+}) {
   const summary = summarizeDispatch(dispatchResults);
   console.log("\n交接报告");
   console.log(report.text);
+  if (narrative && narrative !== report.text) {
+    console.log(`\n交接叙述（Gemma NLG，来源=${narrativeSource ?? "unknown"}）`);
+    console.log(narrative);
+  }
   console.log("\n验收摘要");
   console.log(`最终 stage：${finalStage}`);
   console.log(`动作数：${actionCount}`);

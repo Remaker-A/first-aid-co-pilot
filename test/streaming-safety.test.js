@@ -191,12 +191,15 @@ test("explicit barge_in during playback cancels speech and flushes audio", async
       async *speak() {
         yield { chunk: Buffer.from([1, 0]), sampleRate: 16000, channels: 1, bitsPerSample: 16 };
         await hold; // keep playback "open" until we decide to release it
+        yield { chunk: Buffer.from([9, 9]), sampleRate: 16000, channels: 1, bitsPerSample: 16 };
       },
     },
   });
 
   const jsonEvents = [];
+  const audioEvents = [];
   session.on("json", (event) => jsonEvents.push(event));
+  session.on("audio", (chunk) => audioEvents.push(chunk));
 
   const turnPromise = session.processTurn({ text: "现在怎么办" });
   await tick();
@@ -211,6 +214,95 @@ test("explicit barge_in during playback cancels speech and flushes audio", async
 
   releaseHold();
   await turnPromise;
+  assert.equal(audioEvents.length, 1, "stale audio chunks after barge_in must be suppressed");
+  assert.equal(
+    jsonEvents.some((event) => event.type === "audio_end"),
+    false,
+    "cancelled speech must not emit audio_end"
+  );
+  session.close();
+});
+
+test("new user turn cancels in-flight speech and suppresses stale audio", async () => {
+  const cancelReasons = [];
+  let releaseFirst;
+  const holdFirst = new Promise((resolve) => {
+    releaseFirst = resolve;
+  });
+
+  const session = createLiveSession({
+    sessionId: "sess_new_turn_cancel",
+    disableStreamingStt: true,
+    service: {
+      async createGuidance(input) {
+        const isSecond = input.text === "second";
+        return {
+          stt: { transcript: input.text, intent: null },
+          guidanceAction: {
+            action_id: isSecond ? "act_second" : "act_first",
+            tts: { text: isSecond ? "second prompt" : "first prompt" },
+          },
+        };
+      },
+      reset() {},
+    },
+    tts: {
+      cancel(reason) {
+        cancelReasons.push(reason);
+      },
+      async *speak(text) {
+        if (text === "first prompt") {
+          yield { chunk: Buffer.from([1, 0]), sampleRate: 16000, channels: 1, bitsPerSample: 16 };
+          await holdFirst;
+          yield { chunk: Buffer.from([9, 9]), sampleRate: 16000, channels: 1, bitsPerSample: 16 };
+          return;
+        }
+        yield { chunk: Buffer.from([2, 0]), sampleRate: 16000, channels: 1, bitsPerSample: 16 };
+      },
+    },
+  });
+
+  const sequence = [];
+  const secondFinished = new Promise((resolve) => {
+    session.on("json", (event) => {
+      if (["guidance", "audio_begin", "audio_end"].includes(event.type)) {
+        const actionId = event.action_id || event.action?.action_id;
+        sequence.push(`${event.type}:${actionId}`);
+      }
+      if (event.type === "audio_end" && event.action_id === "act_second") {
+        resolve();
+      }
+    });
+    session.on("audio", (chunk, metadata) => {
+      sequence.push(`audio_chunk:${metadata.action_id}:${[...chunk].join(",")}`);
+    });
+  });
+
+  const firstTurn = session.processTurn({ text: "first" });
+  await tick();
+  assert.equal(session.speaking, true, "first prompt should be mid-playback");
+
+  const secondTurn = session.processTurn({ text: "second" });
+  await secondFinished;
+
+  assert.ok(cancelReasons.includes("new_turn"));
+
+  releaseFirst();
+  await firstTurn;
+  await secondTurn;
+
+  assert.ok(sequence.includes("audio_end:act_second"));
+  assert.equal(
+    sequence.some((event) => event.startsWith("audio_end:act_first")),
+    false,
+    "superseded first turn must not emit audio_end"
+  );
+  assert.equal(
+    sequence.some((event) => event === "audio_chunk:act_first:9,9"),
+    false,
+    "late first-turn audio must not be flushed after the new turn"
+  );
+
   session.close();
 });
 

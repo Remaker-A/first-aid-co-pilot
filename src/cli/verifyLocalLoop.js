@@ -4,6 +4,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { loadEnv } from "../config/loadEnv.js";
 import {
+  AgentStage,
   createVoiceDemoService,
   evaluateGemmaModelCheck,
   findGemmaModelFile,
@@ -242,6 +243,7 @@ async function checkVoiceSmoke() {
   });
 
   let sceneSafeResult;
+  let gemmaSmokeResult;
   let result;
   try {
     sceneSafeResult = await service.handleTurn({
@@ -250,6 +252,7 @@ async function checkVoiceSmoke() {
       patientState: { scene_safe: true },
     });
     result = await service.handleTurn(await createVoiceSmokeInput());
+    gemmaSmokeResult = await runGemmaLiveSmoke(gemmaConfig);
   } catch (error) {
     addCheck("voice.smoke", "fail", error.message || "voice smoke failed");
     return;
@@ -267,14 +270,16 @@ async function checkVoiceSmoke() {
     sceneSafeResult.state?.current_stage || "<none>"
   );
   addCheck("voice.stage", result.state?.current_stage === "S3_CHECK_BREATHING" ? "pass" : "fail", result.state?.current_stage || "<none>");
-  const gemmaPatchOk = Boolean(sceneSafeResult.gemma?.patch) &&
-    !sceneSafeResult.gemma?.fallback &&
-    !sceneSafeResult.gemma?.skipped &&
-    !sceneSafeResult.gemma?.stale;
+  addCheck(
+    "voice.gemma_stage",
+    gemmaSmokeResult.state?.current_stage === AgentStage.S8_ASSISTANCE ? "pass" : "fail",
+    gemmaSmokeResult.state?.current_stage || "<none>"
+  );
+  const gemmaPatchOk = isAcceptedGemmaPatch(gemmaSmokeResult);
   addCheck(
     "voice.gemma",
     gemmaPatchOk ? "pass" : requireRealGemma ? "fail" : "warn",
-    describeGemmaSmokeResult(sceneSafeResult.gemma),
+    describeGemmaLiveSmokeResult(gemmaSmokeResult),
     "Real Gemma verification requires a local model file, callable litert-lm, and a non-stale GuidanceActionPatch."
   );
   addCheck(
@@ -287,6 +292,83 @@ async function checkVoiceSmoke() {
     result.tts?.audio?.data_url || result.tts?.audio?.url ? "pass" : "fail",
     `provider: ${result.tts?.provider || "unknown"}`
   );
+}
+
+async function runGemmaLiveSmoke(gemmaConfig) {
+  const service = createVoiceDemoService({
+    stt: { provider: "mock" },
+    tts: { provider: "mock" },
+    gemmaTurnTimeoutMs: requireRealGemma ? gemmaConfig.timeoutMs : undefined,
+    gemmaLiveTimeoutMs: requireRealGemma ? gemmaConfig.timeoutMs : undefined,
+    now: () => new Date().toISOString(),
+  });
+  const sessionId = "verify_local_loop_gemma";
+  await advanceVoiceSessionToCpr(service, sessionId);
+  return service.handleTurn({
+    sessionId,
+    text: "我有点紧张",
+    rescuerState: { fatigue_level: "high" },
+  });
+}
+
+async function advanceVoiceSessionToCpr(service, sessionId) {
+  await service.handleTurn({
+    sessionId,
+    text: "现场安全了",
+    patientState: { scene_safe: true, adult_likely: true },
+  });
+  await service.handleTurn({ sessionId, text: "他没有反应" });
+  await service.handleTurn({ sessionId, text: "没有正常呼吸" });
+  await service.handleTurn({ sessionId, text: "120 已经拨打" });
+  await service.handleTurn({
+    sessionId,
+    text: "准备好了",
+    patientState: {
+      adult_likely: true,
+      lying_down: true,
+      responsive: false,
+      normal_breathing: false,
+      agonal_breathing: true,
+    },
+  });
+  const cprStart = await service.handleTurn({
+    sessionId,
+    text: "开始按压",
+    eventSource: "vision_cpr",
+    eventType: "cpr_quality_update",
+    cprQuality: {
+      compressions_started: true,
+      current_rate: 110,
+      average_rate: 110,
+      quality_score: 72,
+      hand_position: "center",
+      arm_posture: "straight",
+      interruption_seconds: 0,
+      total_compressions: 12,
+    },
+  });
+  if (cprStart.state?.current_stage !== AgentStage.S7_CPR_LOOP) {
+    throw new Error(`Gemma smoke setup failed to reach S7_CPR_LOOP; got ${cprStart.state?.current_stage || "<none>"}.`);
+  }
+}
+
+function isAcceptedGemmaPatch(result = {}) {
+  return Boolean(result.gemma?.patch) &&
+    !result.gemma?.fallback &&
+    !result.gemma?.skipped &&
+    !result.gemma?.stale &&
+    result.gemma_validation?.ok === true &&
+    ["gemma_agent", "gemma_autonomy"].includes(result.guidance_source);
+}
+
+function describeGemmaLiveSmokeResult(result = {}) {
+  const parts = [
+    describeGemmaSmokeResult(result.gemma),
+    `stage: ${result.state?.current_stage || "<none>"}`,
+    `source: ${result.guidance_source || "<none>"}`,
+    `validation: ${result.gemma_validation?.ok === true ? "ok" : "not_ok"}`,
+  ];
+  return parts.join("; ");
 }
 
 function describeGemmaSmokeResult(gemma = {}) {

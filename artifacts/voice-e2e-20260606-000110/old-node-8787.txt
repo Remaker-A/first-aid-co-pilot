@@ -1,0 +1,7 @@
+﻿
+
+ProcessId   : 85996
+CommandLine : "D:\App\cursor\resources\app\resources\helpers\node.exe" src/voice/server.js 
+
+
+

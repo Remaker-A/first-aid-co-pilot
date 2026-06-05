@@ -2,6 +2,7 @@ package com.firstaid.copilot.live.edge
 
 import android.content.Context
 import java.io.File
+import org.json.JSONObject
 
 private const val GEMMA_MIN_BYTES = 2_000_000_000L
 private const val ASR_MIN_BYTES = 100_000_000L
@@ -224,6 +225,90 @@ private fun asrStatus(files: StreamingAsrFiles?): EdgeModelStatus =
             detail = "missing streaming sherpa-onnx ASR model",
         )
     }
+
+// ---- WA pre-synth TTS cache (assets/tts_cache) --------------------------------
+//
+// The shippable bundle of pre-rendered standard phrases. The manifest is shared
+// with the desktop server (src/voice/ttsCache.js); on device it is loaded from
+// the APK assets first, then from a tts_cache dir pushed alongside the models.
+
+private const val TTS_CACHE_DIR_NAME = "tts_cache"
+private const val TTS_CACHE_MANIFEST_NAME = "manifest.json"
+
+enum class TtsCacheSource { Asset, File }
+
+data class TtsCacheEntry(
+    val kind: String,
+    val text: String,
+    val tone: String,
+    val speed: String,
+    val key: String,
+    val file: String,
+)
+
+data class TtsCacheBundle(
+    val source: TtsCacheSource,
+    val baseDir: File?,
+    val assetRoot: String?,
+    val entries: List<TtsCacheEntry>,
+) {
+    val phraseEntries: List<TtsCacheEntry>
+        get() = entries.filter { it.kind == "phrase" }
+}
+
+fun loadTtsCacheBundle(
+    context: Context,
+    roots: List<File> = defaultEdgeModelRoots(context),
+): TtsCacheBundle? {
+    runCatching {
+        context.applicationContext.assets
+            .open("$TTS_CACHE_DIR_NAME/$TTS_CACHE_MANIFEST_NAME")
+            .use { stream ->
+                val entries = parseTtsCacheEntries(stream.readBytes().toString(Charsets.UTF_8))
+                if (entries.isNotEmpty()) {
+                    return TtsCacheBundle(TtsCacheSource.Asset, null, TTS_CACHE_DIR_NAME, entries)
+                }
+            }
+    }
+
+    for (root in roots.distinctBy { it.absolutePath }) {
+        val candidates = listOfNotNull(root.resolve(TTS_CACHE_DIR_NAME), root.parentFile?.resolve(TTS_CACHE_DIR_NAME))
+        for (dir in candidates) {
+            val manifest = dir.resolve(TTS_CACHE_MANIFEST_NAME)
+            if (manifest.isFile) {
+                val entries = runCatching { parseTtsCacheEntries(manifest.readText()) }.getOrDefault(emptyList())
+                if (entries.isNotEmpty()) {
+                    return TtsCacheBundle(TtsCacheSource.File, dir, null, entries)
+                }
+            }
+        }
+    }
+    return null
+}
+
+private fun parseTtsCacheEntries(json: String): List<TtsCacheEntry> {
+    val array = JSONObject(json).optJSONArray("entries") ?: return emptyList()
+    val out = ArrayList<TtsCacheEntry>(array.length())
+    for (index in 0 until array.length()) {
+        val obj = array.optJSONObject(index) ?: continue
+        val file = obj.optString("file")
+        val text = obj.optString("text")
+        if (file.isBlank() || text.isBlank()) {
+            continue
+        }
+        out.add(
+            TtsCacheEntry(
+                kind = obj.optString("kind", "phrase"),
+                text = text,
+                tone = obj.optString("tone", ""),
+                speed = obj.optString("speed", ""),
+                key = obj.optString("key", ""),
+                file = file,
+            ),
+        )
+    }
+    return out
+}
 
 private fun ttsStatus(files: TtsFiles?): EdgeModelStatus =
     if (files != null && files.model.length() >= TTS_MIN_BYTES) {

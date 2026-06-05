@@ -1,0 +1,176 @@
+{
+  "ok": true,
+  "mode": "all",
+  "runs": 3,
+  "threads": 2,
+  "modelRoot": "\/storage\/emulated\/0\/Android\/media\/com.firstaid.copilot.debug\/models",
+  "summary": "Gemma=Ready ASR=Ready TTS=Ready sherpa=Ready",
+  "gemmaReady": true,
+  "asrReady": true,
+  "ttsReady": true,
+  "phase": "finished",
+  "updatedAtMs": 1780674106168,
+  "gemma": {
+    "ok": true,
+    "latencyMs": 41410,
+    "backend": "CPU",
+    "prompt": "你是急救语音助手。用一句不超过15个字的中文回答：成人心肺复苏的按压频率是多少？",
+    "generateOk": true,
+    "generateLatencyMs": 2175,
+    "generateText": "每分钟100次按压。",
+    "warmGenerateOk": true,
+    "warmGenerateLatencyMs": 11616,
+    "runs": [
+      {
+        "ok": true,
+        "latencyMs": 2163,
+        "text": "每分钟100次按压。"
+      },
+      {
+        "ok": true,
+        "latencyMs": 2165,
+        "text": "每分钟100次按压。"
+      },
+      {
+        "ok": true,
+        "latencyMs": 2175,
+        "text": "每分钟100次按压。"
+      }
+    ],
+    "latency": {
+      "count": 3,
+      "avgMs": 2167.6666666666665,
+      "minMs": 2163,
+      "maxMs": 2175,
+      "p50Ms": 2165,
+      "p95Ms": 2175
+    },
+    "gate": {
+      "gateMs": 1200,
+      "budgetMs": 1500,
+      "totalRuns": 3,
+      "okRuns": 3,
+      "withinBudgetRuns": 0,
+      "p50Ms": 2165,
+      "p95Ms": 2175,
+      "nearRealtimeCapable": false,
+      "recommendation": "ack_then_async"
+    }
+  },
+  "gemmaRuns": [
+    {
+      "ok": true,
+      "latencyMs": 2163,
+      "text": "每分钟100次按压。"
+    },
+    {
+      "ok": true,
+      "latencyMs": 2165,
+      "text": "每分钟100次按压。"
+    },
+    {
+      "ok": true,
+      "latencyMs": 2175,
+      "text": "每分钟100次按压。"
+    }
+  ],
+  "tts": {
+    "ok": true,
+    "text": "继续按压",
+    "warmLatencyMs": 7863,
+    "cachedStartLatencyMs": 68,
+    "latencyMs": 3403,
+    "avgLatencyMs": 2845.6666666666665,
+    "minLatencyMs": 2519,
+    "maxLatencyMs": 3403,
+    "sampleRate": 44100,
+    "bytes": 66604,
+    "runs": [
+      {
+        "ok": true,
+        "latencyMs": 2615,
+        "sampleRate": 44100,
+        "bytes": 66604
+      },
+      {
+        "ok": true,
+        "latencyMs": 2519,
+        "sampleRate": 44100,
+        "bytes": 66604
+      },
+      {
+        "ok": true,
+        "latencyMs": 3403,
+        "sampleRate": 44100,
+        "bytes": 66604
+      }
+    ]
+  },
+  "ttsRuns": [
+    {
+      "ok": true,
+      "latencyMs": 2615,
+      "sampleRate": 44100,
+      "bytes": 66604
+    },
+    {
+      "ok": true,
+      "latencyMs": 2519,
+      "sampleRate": 44100,
+      "bytes": 66604
+    },
+    {
+      "ok": true,
+      "latencyMs": 3403,
+      "sampleRate": 44100,
+      "bytes": 66604
+    }
+  ],
+  "asrInputBytes": 321700,
+  "asr": {
+    "ok": true,
+    "sample": "0.wav",
+    "inputMs": 10053,
+    "inputBytes": 321700,
+    "warmLatencyMs": 3267,
+    "latencyMs": 1323,
+    "avgLatencyMs": 1325,
+    "minLatencyMs": 1323,
+    "maxLatencyMs": 1327,
+    "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三",
+    "runs": [
+      {
+        "ok": true,
+        "latencyMs": 1325,
+        "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三"
+      },
+      {
+        "ok": true,
+        "latencyMs": 1327,
+        "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三"
+      },
+      {
+        "ok": true,
+        "latencyMs": 1323,
+        "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三"
+      }
+    ]
+  },
+  "asrRuns": [
+    {
+      "ok": true,
+      "latencyMs": 1325,
+      "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三"
+    },
+    {
+      "ok": true,
+      "latencyMs": 1327,
+      "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三"
+    },
+    {
+      "ok": true,
+      "latencyMs": 1323,
+      "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三"
+    }
+  ]
+}

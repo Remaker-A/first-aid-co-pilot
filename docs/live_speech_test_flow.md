@@ -29,6 +29,7 @@
 - GPS 注入：`device_state.location` / `metadata.location` 会写入 `state.location` 并置 `gps_attached=true`（reducer）。因此用 `{type:"context", payload:{deviceState:{location}}}` 即可为后续 `S5` 的“向 120 播报”准备坐标。
 - 医疗主线由**状态机**确定性驱动；`S3/S4/S5/S6/S7(起步)` 为 `critical`/带工具动作，guidance 源为 `state_machine_critical`，不会被 Gemma 改写。非关键步（如 `S2`）可能由 `state_machine` 或 `gemma_agent` 给出。
 - Live 下混合 NLU 现为**默认开启、异步纠正、不阻塞回合**：`.env` 已置 `INTENT_NLU=on` 且 `GEMMA_NLU_ASYNC=1`，每轮先用正则/关键词即时兜底推进，Gemma 在后台异步推理并写入 NLU 缓存，供**下一轮**命中纠正。因此本回合不会因等待本地 2.4GB CPU 模型而卡顿；偶发模糊语料可能要到下一轮才被 Gemma 纠正。同时修复了 Live 下意图解析 stage 恒被当成 `S1` 的 bug（现跨轮可拿到真实 `current_stage`），按 stage 区分的 NLU 升级在 Live 下才真正生效。
+- 真实 `/ws/live` 会话默认开启 `LiveSession` 自主 tick：S2/S3 沉默观察窗约 12 秒后只做保护推进并最终停在 S6；若入口带 `metadata.wake_phrase` / `entry_source:"wake_phrase"`，观察窗压短到约 5 秒，但**不跳过 S3、不预设 normal_breathing**。S7 保持沉默默认；仅在质量良好且距离上次纠错足够久时，才低频播报“你做得很好，跟着节拍继续。”。
 
 前置条件：
 
@@ -105,7 +106,15 @@ flowchart TD
 
 > 容差：自动续跳由 `LiveSession` 在服务端完成，合成轮**可能**再次出现 `〔T〕〔F〕`（无用户文本）；断言时以“`S4→S5→S6` 三段 `guidance`/`audio` 依序出现、最终停在 `S6`”为准，不强求合成轮是否带 `thinking/final`。HTTP `/api/turn` 单步语义不受影响（一轮一段）。
 
-### 3.4 关键话术来源与容差
+### 3.4 自主 tick 的事件形态
+
+真实 `/ws/live` 构造点默认传入 `autonomousTick:true`。它只在服务端静默一段时间后合成 `processTurn` 事件：
+
+- S2/S3：到达观察窗时分别注入 `patient_state_update(responsive:false)` / `breathing_update(normal_breathing:false)`，一次只推进一格；S3 后仍沿既有 S4→S5→S6 自动连跳，**停在 S6**，绝不自动进入 S7。
+- 唤醒词入口：`metadata.wake_phrase` 或 `metadata.entry_source` 会写入 `state.scope`；LiveSession 只用它把 S2/S3 窗口从约 12 秒压到约 5 秒，不跳过任何判断步骤。
+- S7：默认沉默。若 `tick.encourage` 开启，且超过鼓励节流间隔、近期没有纠错，才注入 `encourage_tick`；规则反馈会在所有真实纠错之后才选择 `encourage_rescuer`。
+
+### 3.5 关键话术来源与容差
 
 - 既有状态机话术（S1–S7 起步、被动问答）以 `src/engine/stateMachine.js`、`src/voice/liveDriver.js` 为准。
 - “向 120 播报”脚本由 `generateCallBrief`（`src/report/callBrief.js`）生成，挂在 `guidance.action.call_brief.script`（并写入 `emergency_call.briefing.script`）；S5 朗读句仍以“我将为你拨打 120…”开头，播报词为可见脚本/可选第二段语音。
@@ -168,7 +177,7 @@ flowchart TD
 | --- | --- | --- | --- | --- | --- |
 | 7 | `{type:"final", text:"我准备好了"}`（S6 就绪快路径 → `continue_cpr`） | `S7_CPR_LOOP` | 起步句：`开始按压`、`跟着节拍`、`用力快压`（现在开始按压，跟着节拍，用力快压。） | 〔T〕〔F〕〔G〕〔S〕〔A〕 | **stage 翻转到 `S7_CPR_LOOP`**；`final.intent`=`continue_cpr`；`guidance.source`=`rule_flow_fast_path`；`state.cpr_state.started=true`；命中子串 |
 | 7' | 等价确认：点 S6 主按钮「开始按压」（`mark_cpr_ready`），或说「开始 / 可以了 / 这就开始 / 没有呼吸」 | `S7_CPR_LOOP` | 同上（起步句一致） | 〔T〕〔F〕〔G〕〔S〕〔A〕 | 同上：任一确认通道都**一步**进 S7、起播节拍器 |
-| 8 | （进入 S7 后保持沉默观察）视觉 `cpr_quality` 正常 → 不打断 | `S7_CPR_LOOP` | 无异常时可不出声；偶发低频鼓励 `你做得很好，继续跟着节奏。` | 〔T〕〔F〕〔S〕（可无〔A〕） | 沉默默认成立；stage 不变；**无**逐句口令推进 |
+| 8 | （进入 S7 后保持沉默观察）视觉 `cpr_quality` 正常 → 不打断 | `S7_CPR_LOOP` | 无异常时可不出声；偶发低频鼓励 `你做得很好，跟着节拍继续。` | 〔T〕〔F〕〔S〕（可无〔A〕） | 沉默默认成立；stage 不变；**无**逐句口令推进；若刚发生纠错则不鼓励 |
 
 > 容差：S6 就绪话术变体均应**一步**翻进 `S7_CPR_LOOP`（核心判据：`finalStage=S7_CPR_LOOP` / `source=rule_flow_fast_path` / `intent=continue_cpr` / `cpr_state.started=true`）。S7 起步句命中“开始按压 / 跟着节拍 / 用力快压”（**不再含“震动”**）。S7 内的质量纠错由视觉 `cpr_quality` 驱动（见 4.2 / 附录 A），不依赖口头汇报。话术权威见附录 A。
 
@@ -235,7 +244,7 @@ npm run voice:serve
 npm run probe:live
 ```
 
-  行为：进程内构造 `LiveSession`（注入 mock 流式 TTS + stub Gemma runtime），用本文件的控制消息逐步驱动（`{type:"final", text}` 模拟说完一句，`{type:"context", payload:{deviceState:{location}}}` 注入 mock GPS），收集每轮 `json` + `audio` 事件，断言 **stage / intent / guidance source / TTS 子串 / 事件顺序（含自动连跳的多段 guidance/audio）**，输出 `artifacts/live-speech-flow-*.json` 并打印 `PASS/FAIL`。当前覆盖：S1→S2→S3（agonal 直白）→ 自动连跳 S4/S5/S6 停在确认闸 → **CORE：S6 就绪快路径一步进 S7（`rule_flow_fast_path`/`continue_cpr`/`started=true`，起步句"开始按压/跟着节拍/用力快压"）** → S7 被动问答（质量/能不能停/AED 只引导）。
+  行为：进程内构造 `LiveSession`（注入 mock 流式 TTS + stub Gemma runtime），用本文件的控制消息逐步驱动（`{type:"final", text}` 模拟说完一句，`{type:"context", payload:{deviceState:{location}}}` 注入 mock GPS），收集每轮 `json` + `audio` 事件，断言 **stage / intent / guidance source / TTS 子串 / 事件顺序（含自动连跳的多段 guidance/audio）**，输出 `artifacts/live-speech-flow-*.json` 并打印 `PASS/FAIL`。当前覆盖：S1→S2→S3（agonal 直白）→ 自动连跳 S4/S5/S6 停在确认闸 → **CORE：S6 就绪快路径一步进 S7（`rule_flow_fast_path`/`continue_cpr`/`started=true`，起步句"开始按压/跟着节拍/用力快压"）** → S7 被动问答（质量/能不能停/AED 只引导）。自主 tick 的短窗/鼓励细节由 `test/autonomous-loop.test.js` 覆盖。
 
 - 单元/集成用例（`test/live-speech-flow.test.js`）：
 
@@ -246,6 +255,14 @@ npm test
 ```
 
   行为：用 `node:test` 跑同一主线，断言完整事件序列与新口径话术（自动拨号播报、S6 单次确认闸一步进 S7、就绪话术变体、被动问答即时命中 `rule_fast_path`）。
+
+- 自主循环细节（`test/autonomous-loop.test.js`）：
+
+```bash
+node --test test/autonomous-loop.test.js
+```
+
+  行为：断言 S2/S3 沉默保护推进并停在 S6、唤醒词先验压短观察窗但不跳过 S3、S7 `encourage_tick` 的节流/近期纠错抑制，以及规则反馈中真实纠错优先于鼓励。
 
 ---
 
@@ -267,6 +284,7 @@ npm test
 | S7 纠错·频率偏慢（rate_low） | 再快一点，跟着节拍按。 | 再快一点 / 跟着节拍 |
 | S7 纠错·频率偏快（rate_high） | 稍微慢一点，跟着节拍按。 | 稍微慢一点 / 跟着节拍 |
 | S7 纠错·中断（interruption） | 不要停，继续按压。 | 不要停 / 继续按压 |
+| S7 低频鼓励（encourage_tick） | 你做得很好，跟着节拍继续。 | 你做得很好 / 跟着节拍 |
 | safety·节奏（metronome） | 跟着节拍按，快速有力。 | 跟着节拍 / 快速有力 |
 | 被动·我按得对吗 | 按压可以，继续保持 100 到 120 次每分钟。 | 按压可以 / 100 到 120 |
 | 被动·能不能停 | 不要停，继续按压；等 AED 或急救人员接手、或他恢复正常呼吸再停。 | 不要停 / 继续按压 / 急救人员接手 |

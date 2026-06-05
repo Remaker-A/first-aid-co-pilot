@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.firstaid.copilot.live.vision.cpr.VisionPlacementTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-06-05T12:13:35.338Z" hostname="BYMAX" time="0.002">
+  <properties/>
+  <testcase name="readinessRequiresConfidenceCoverageAndStableFrames" classname="com.firstaid.copilot.live.vision.cpr.VisionPlacementTest" time="0.001"/>
+  <testcase name="rescuerHandheldAndFlatGroundStayRecordingOnly" classname="com.firstaid.copilot.live.vision.cpr.VisionPlacementTest" time="0.001"/>
+  <testcase name="phonePlacementsMapToRecordingAndRecognitionMounts" classname="com.firstaid.copilot.live.vision.cpr.VisionPlacementTest" time="0.0"/>
+  <testcase name="sideFixedAndStableBystanderViewsCanBecomeLiveRecognition" classname="com.firstaid.copilot.live.vision.cpr.VisionPlacementTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

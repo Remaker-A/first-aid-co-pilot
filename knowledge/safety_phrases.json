@@ -175,7 +175,7 @@
       "scenario": "鼓励",
       "stages": ["S7_CPR_LOOP", "S8_ASSISTANCE"],
       "intents": ["encourage_rescuer"],
-      "text": "你做得很好，继续跟着节奏。",
+      "text": "你做得很好，跟着节拍继续。",
       "tone": "calm_soft",
       "tags": ["encouragement"]
     },

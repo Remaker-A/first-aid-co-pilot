@@ -15,6 +15,7 @@ export const RuleFeedbackType = Object.freeze({
   ARM_BENT: "arm_bent",
   FATIGUE: "fatigue",
   AED: "aed",
+  ENCOURAGEMENT: "encouragement",
 });
 
 export function createRuleFeedbackAction(state = {}, event = null) {
@@ -23,7 +24,7 @@ export function createRuleFeedbackAction(state = {}, event = null) {
   }
 
   const feedback = selectRuleFeedback(state, event);
-    return feedback ? buildFeedbackAction(state, feedback, event) : null;
+  return feedback ? buildFeedbackAction(state, feedback, event) : null;
 }
 
 export function selectRuleFeedback(state = {}, event = null) {
@@ -168,6 +169,27 @@ export function selectRuleFeedback(state = {}, event = null) {
     };
   }
 
+  if (event?.metadata?.encourage_tick === true) {
+    return {
+      type: RuleFeedbackType.ENCOURAGEMENT,
+      intent: "encourage_rescuer",
+      priority: "normal",
+      reasonCodes: ["encourage_tick"],
+      throttleKey: "encourage.s7",
+      minIntervalMs: 20000,
+      tts: { text: "你做得很好，跟着节拍继续。", tone: "calm_soft" },
+      ui: {
+        mainText: "保持节拍",
+        secondaryText: "你做得很好",
+        statusTags: ["鼓励", "跟着节拍"],
+      },
+      visualOverlay: { mode: "rescuer_assistance" },
+      haptic: { enabled: false },
+      logEventType: "encouragement",
+      logDetail: "encourage_tick",
+    };
+  }
+
   return null;
 }
 
@@ -197,10 +219,10 @@ function buildFeedbackAction(state, feedback, event) {
       statusTags: feedback.ui.statusTags,
       qualityScore: state.cpr_state?.quality_score ?? null,
     },
-    haptic: { enabled: true, pattern: "metronome", bpm: TARGET_BPM },
+    haptic: feedback.haptic ?? { enabled: true, pattern: "metronome", bpm: TARGET_BPM },
     visualOverlay: feedback.visualOverlay,
     toolActions: [],
-    logEvent: { type: "correction", detail: feedback.logDetail },
+    logEvent: { type: feedback.logEventType ?? "correction", detail: feedback.logDetail },
   });
 }
 

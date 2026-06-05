@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.firstaid.copilot.live.vision.cpr.CprMetricsDeriverTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-06-05T12:13:35.320Z" hostname="BYMAX" time="0.016">
+  <properties/>
+  <testcase name="update_classifiesHandPositionOffsets" classname="com.firstaid.copilot.live.vision.cpr.CprMetricsDeriverTest" time="0.005"/>
+  <testcase name="update_estimatesCompressionRateFromRhythmicWristMotion" classname="com.firstaid.copilot.live.vision.cpr.CprMetricsDeriverTest" time="0.006"/>
+  <testcase name="update_accumulatesInterruptionAfterMotionStops" classname="com.firstaid.copilot.live.vision.cpr.CprMetricsDeriverTest" time="0.004"/>
+  <testcase name="update_classifiesBentArms" classname="com.firstaid.copilot.live.vision.cpr.CprMetricsDeriverTest" time="0.0"/>
+  <testcase name="update_keepsVisionNotReadyWhenFrameIsUnstable" classname="com.firstaid.copilot.live.vision.cpr.CprMetricsDeriverTest" time="0.0"/>
+  <testcase name="update_mirrorsFrontCameraXCoordinatesBeforeClassifyingOffsets" classname="com.firstaid.copilot.live.vision.cpr.CprMetricsDeriverTest" time="0.0"/>
+  <testcase name="update_marksVisionReadyOnlyAfterStableCoveredFrames" classname="com.firstaid.copilot.live.vision.cpr.CprMetricsDeriverTest" time="0.0"/>
+  <testcase name="update_nullsGuessedFieldsWhenConfidenceIsLow" classname="com.firstaid.copilot.live.vision.cpr.CprMetricsDeriverTest" time="0.0"/>
+  <testcase name="update_keepsVisionNotReadyWhenKeypointsAreMissing" classname="com.firstaid.copilot.live.vision.cpr.CprMetricsDeriverTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

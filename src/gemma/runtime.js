@@ -5,6 +5,10 @@ import { buildGemmaMessages, buildGemmaPrompt } from "./promptBuilder.js";
 import { buildGemmaNluMessages } from "./nluPrompt.js";
 import { parseGemmaNluResponse } from "./nluResponseParser.js";
 import { parseGemmaResponse } from "./responseParser.js";
+import {
+  buildHandoverNarrativeMessages,
+  parseHandoverNarrativeResponse
+} from "./handoverNarrativePrompt.js";
 import { createGemmaFallbackPatch } from "./fallbackPolicy.js";
 import { requestGemma } from "./gemmaServer.js";
 import {
@@ -17,6 +21,7 @@ import {
 
 export const DEFAULT_GEMMA_NLU_TIMEOUT_MS = 600;
 export const DEFAULT_GEMMA_WARMUP_TIMEOUT_MS = 30000;
+export const DEFAULT_GEMMA_NARRATIVE_TIMEOUT_MS = 8000;
 
 const GEMMA_WARMUP_MESSAGES = Object.freeze([
   { role: "system", content: "warmup" },
@@ -30,8 +35,8 @@ export class GemmaRuntime {
     this.serverRunner = options.serverRunner || requestGemma;
   }
 
-  async generatePatch(frame) {
-    return this.run(frame);
+  async generatePatch(frame, callOptions = {}) {
+    return this.run(frame, callOptions);
   }
 
   async parseUserIntent(frame) {
@@ -165,7 +170,7 @@ export class GemmaRuntime {
     }
   }
 
-  async run(frame) {
+  async run(frame, callOptions = {}) {
     const config = resolveGemmaConfig(this.options);
     const modelFile = await resolveModelFile(config);
 
@@ -175,10 +180,13 @@ export class GemmaRuntime {
       });
     }
 
-    const messages = buildGemmaMessages(frame, this.options.promptOptions || {});
+    // Per-call prompt overrides (e.g. the WB controlled open-question system prompt)
+    // layer over the runtime-level promptOptions without changing the default path.
+    const promptOptions = { ...(this.options.promptOptions || {}), ...(callOptions.promptOptions || {}) };
+    const messages = buildGemmaMessages(frame, promptOptions);
     const prompt = config.supportsMessages
       ? null
-      : buildCombinedPrompt(frame, messages, this.options.promptOptions || {});
+      : buildCombinedPrompt(frame, messages, promptOptions);
     const args = buildLiteRtLmArgs({
       ...config,
       modelFile,
@@ -243,6 +251,96 @@ export class GemmaRuntime {
 
     return parsed;
   }
+
+  // generateNarrative is the S9 handover-NLG path. It is deliberately separate
+  // from run()/generatePatch() (which own the realtime guidance contract): it
+  // uses the handover narrative prompt and returns the raw narrative string
+  // (no GuidanceActionPatch). The number guard + ActionValidator enforcement
+  // lives in report/handoverNarrative.js, so this method only needs to surface
+  // a clean fallback signal whenever the model is missing/slow/invalid.
+  async generateNarrative(frame) {
+    const config = resolveGemmaConfig(this.options);
+    const modelFile = await resolveModelFile(config);
+
+    if (!modelFile) {
+      return createNarrativeFallbackResult("model_missing", {
+        message: `No Gemma model file found in ${config.modelDir}.`
+      });
+    }
+
+    const promptOptions = this.options.narrativePromptOptions || this.options.promptOptions || {};
+    const messages = buildHandoverNarrativeMessages(frame, promptOptions);
+    const prompt = config.supportsMessages ? null : buildCombinedPromptFromMessages(messages);
+    const timeoutMs = resolveGemmaNarrativeTimeoutMs(this.options, config);
+    const args = buildLiteRtLmArgs({
+      ...config,
+      modelFile,
+      messages,
+      prompt
+    });
+
+    let result = null;
+    if (config.daemon) {
+      try {
+        result = await this.serverRunner({
+          config: { ...config, serveRequestTimeoutMs: timeoutMs },
+          messages,
+          prompt,
+          modelFile,
+          timeoutMs
+        });
+      } catch {
+        result = null;
+      }
+    }
+
+    if (!result) {
+      try {
+        result = await this.runner({
+          command: config.command,
+          args,
+          timeoutMs,
+          cwd: config.cwd,
+          env: config.env,
+          messages,
+          prompt,
+          modelFile,
+          backend: config.backend
+        });
+      } catch (error) {
+        return createNarrativeFallbackResult(classifyRunnerError(error), error);
+      }
+    }
+
+    if (result?.timedOut) {
+      return createNarrativeFallbackResult("timeout", {
+        message: `Gemma narrative exceeded ${timeoutMs}ms.`
+      });
+    }
+
+    if (result?.exitCode !== 0) {
+      return createNarrativeFallbackResult("cli_exit_nonzero", {
+        message: result?.stderr || `Gemma CLI exited with code ${result?.exitCode}.`,
+        exitCode: result?.exitCode,
+        stderr: result?.stderr
+      });
+    }
+
+    const parsed = parseHandoverNarrativeResponse(result?.stdout || "");
+    if (!parsed.ok) {
+      return createNarrativeFallbackResult(parsed.error || "narrative_not_found", {
+        message: parsed.error || "Gemma narrative output was not valid."
+      });
+    }
+
+    return {
+      ok: true,
+      narrative: parsed.narrative,
+      reason: parsed.reason,
+      confidence: parsed.confidence,
+      fallback: false
+    };
+  }
 }
 
 function positiveWarmupTimeout(...values) {
@@ -267,6 +365,25 @@ export function resolveGemmaNluTimeoutMs(options = {}) {
   return Number.isFinite(value) && value > 0
     ? Math.floor(value)
     : DEFAULT_GEMMA_NLU_TIMEOUT_MS;
+}
+
+export function resolveGemmaNarrativeTimeoutMs(options = {}, config = {}) {
+  const env = options.env || process.env;
+  const value = Number(
+    options.narrativeTimeoutMs ??
+    options.gemmaNarrativeTimeoutMs ??
+    env.GEMMA_NARRATIVE_TIMEOUT_MS
+  );
+
+  if (Number.isFinite(value) && value > 0) {
+    return Math.floor(value);
+  }
+
+  // The narrative is an S9, non-realtime task; give it a generous budget but
+  // honor a larger configured one-shot timeout when present.
+  return Number.isFinite(config.timeoutMs) && config.timeoutMs > 0
+    ? Math.max(Math.floor(config.timeoutMs), DEFAULT_GEMMA_NARRATIVE_TIMEOUT_MS)
+    : DEFAULT_GEMMA_NARRATIVE_TIMEOUT_MS;
 }
 
 export async function findGemmaModelFile(
@@ -333,6 +450,18 @@ export function buildCombinedPrompt(frame, messages = buildGemmaMessages(frame),
     "",
     "USER:",
     userPrompt
+  ].join("\n");
+}
+
+export function buildCombinedPromptFromMessages(messages = []) {
+  const [systemMessage, userMessage] = messages;
+
+  return [
+    "SYSTEM:",
+    systemMessage?.content || "",
+    "",
+    "USER:",
+    userMessage?.content || ""
   ].join("\n");
 }
 
@@ -456,6 +585,18 @@ function createFallbackResult(frame, fallbackReason, error) {
   return {
     ok: true,
     patch,
+    fallback: true,
+    fallbackReason,
+    reason: fallbackReason,
+    error: normalizeError(error),
+    violations: Array.isArray(error?.violations) ? error.violations : []
+  };
+}
+
+function createNarrativeFallbackResult(fallbackReason, error) {
+  return {
+    ok: false,
+    narrative: "",
     fallback: true,
     fallbackReason,
     reason: fallbackReason,

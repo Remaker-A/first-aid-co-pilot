@@ -1,0 +1,14 @@
+你将收到一份结构化交接事实（facts）与一份确定性交接报告文本（deterministic_report）。请只依据它们生成交接叙述。
+
+要求：
+- 叙述中出现的每一个数字都必须能在 facts 或 deterministic_report 中找到，且写法保持一致。
+- 不要引入任何这两份输入里没有的数字。
+- 缺失的项写"未记录"。
+
+facts（结构化事实，权威数字来源）：
+<<HANDOVER_FACTS_JSON>>
+
+deterministic_report（确定性交接报告全文，作为参照与数字来源）：
+<<HANDOVER_SOURCE_TEXT>>
+
+请输出唯一的顶层 JSON 对象（HandoverNarrative）。

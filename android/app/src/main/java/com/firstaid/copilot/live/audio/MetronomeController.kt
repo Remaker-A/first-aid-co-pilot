@@ -8,8 +8,10 @@ import android.media.AudioTrack
 import android.media.MediaRecorder
 import android.media.audiofx.AcousticEchoCanceler
 import android.media.audiofx.NoiseSuppressor
+import android.os.SystemClock
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.util.Log
 import com.firstaid.copilot.live.HapticState
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
@@ -116,10 +118,14 @@ internal interface MetronomeAudio {
 
 /**
  * Default [MetronomeAudio]: a coroutine click loop on an [AudioTrack] using
- * `USAGE_ASSISTANCE_SONIFICATION` / `CONTENT_TYPE_SONIFICATION` so it layers
- * beneath TTS. Each beat re-primes one short click into a streaming buffer that
- * underruns to silence between beats; the schedule is anchored to a start time so
- * tempo does not drift over a long CPR session.
+ * `USAGE_MEDIA` / `CONTENT_TYPE_SONIFICATION`. USAGE_MEDIA routes to STREAM_MUSIC
+ * so the safety-critical CPR click stays audible even when the phone is in
+ * silent/vibrate ringer mode. (USAGE_ASSISTANCE_SONIFICATION routes to
+ * STREAM_SYSTEM, which silent ringer mode force-mutes — that made the beat
+ * inaudible on a phone left on silent.) The click still ducks under TTS via
+ * [setVolume], not via the audio-focus system. Each beat re-primes one short click
+ * into a streaming buffer that underruns to silence between beats; the schedule is
+ * anchored to a start time so tempo does not drift over a long CPR session.
  */
 internal class AudioTrackMetronome(
     private val sampleRate: Int = SAMPLE_RATE,
@@ -188,7 +194,7 @@ internal class AudioTrackMetronome(
         return AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                     .build(),
             )
@@ -240,6 +246,7 @@ class AndroidTextToSpeechEdge(
     private var lastUtteranceId: String? = null
     private val utteranceLock = Any()
     private val queuedUtteranceIds = linkedSetOf<String>()
+    private val issuedAtMsByUtteranceId = mutableMapOf<String, Long>()
     private val tts = TextToSpeech(context.applicationContext) { status ->
         ready = status == TextToSpeech.SUCCESS
     }
@@ -248,6 +255,12 @@ class AndroidTextToSpeechEdge(
         tts.setOnUtteranceProgressListener(
             object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {
+                    val issuedAt = synchronized(utteranceLock) {
+                        issuedAtMsByUtteranceId[utteranceId]
+                    }
+                    if (issuedAt != null) {
+                        Log.i(TAG, "Android TTS onStart latency=${SystemClock.elapsedRealtime() - issuedAt}ms")
+                    }
                     onSpeakingChanged(true)
                 }
 
@@ -266,6 +279,8 @@ class AndroidTextToSpeechEdge(
             },
         )
     }
+
+    fun isReady(): Boolean = ready
 
     fun speak(
         text: String,
@@ -288,6 +303,7 @@ class AndroidTextToSpeechEdge(
         synchronized(utteranceLock) {
             if (queueMode == TextToSpeech.QUEUE_FLUSH) queuedUtteranceIds.clear()
             queuedUtteranceIds += utteranceId
+            issuedAtMsByUtteranceId[utteranceId] = SystemClock.elapsedRealtime()
         }
         onSpeakingChanged(true)
         if (tts.speak(text, queueMode, null, utteranceId) == TextToSpeech.ERROR) {
@@ -299,6 +315,7 @@ class AndroidTextToSpeechEdge(
         tts.stop()
         synchronized(utteranceLock) {
             queuedUtteranceIds.clear()
+            issuedAtMsByUtteranceId.clear()
         }
         onSpeakingChanged(false)
     }
@@ -310,7 +327,10 @@ class AndroidTextToSpeechEdge(
 
     private fun markUtteranceFinished(utteranceId: String?) {
         val stillSpeaking = synchronized(utteranceLock) {
-            if (utteranceId != null) queuedUtteranceIds.remove(utteranceId)
+            if (utteranceId != null) {
+                queuedUtteranceIds.remove(utteranceId)
+                issuedAtMsByUtteranceId.remove(utteranceId)
+            }
             queuedUtteranceIds.isNotEmpty()
         }
         onSpeakingChanged(stillSpeaking)
@@ -325,6 +345,7 @@ class AndroidTextToSpeechEdge(
         }
 
     companion object {
+        private const val TAG = "AndroidTextToSpeech"
         private const val CALM_TTS_RATE = 0.94f
         private const val SLOW_TTS_RATE = 0.92f
         private const val URGENT_TTS_RATE = 1.0f
@@ -342,6 +363,7 @@ class LiveAudioCapture {
     fun start(
         onLevel: (Float) -> Unit,
         onPcmChunk: (ByteArray) -> Unit,
+        onListeningPcmChunk: ((ByteArray) -> Unit)? = null,
         onUtterancePcm: ((ByteArray) -> Unit)? = null,
         onBargeIn: () -> Unit,
         onError: (String) -> Unit,
@@ -349,7 +371,7 @@ class LiveAudioCapture {
         if (!running.compareAndSet(false, true)) return
         scope.launch {
             runCatching {
-                captureLoop(onLevel, onPcmChunk, onUtterancePcm, onBargeIn)
+                captureLoop(onLevel, onPcmChunk, onListeningPcmChunk, onUtterancePcm, onBargeIn)
             }.onFailure {
                 running.set(false)
                 onError(it.message ?: "Audio capture failed")
@@ -384,6 +406,7 @@ class LiveAudioCapture {
     private fun captureLoop(
         onLevel: (Float) -> Unit,
         onPcmChunk: (ByteArray) -> Unit,
+        onListeningPcmChunk: ((ByteArray) -> Unit)?,
         onUtterancePcm: ((ByteArray) -> Unit)?,
         onBargeIn: () -> Unit,
     ) {
@@ -407,6 +430,7 @@ class LiveAudioCapture {
         var voiceActive = false
         var bargeInSentForUtterance = false
         val utterancePcm = ByteArrayOutputStream(FRAME_SAMPLES * BYTES_PER_SAMPLE * 32)
+        val listeningFramePcm = ByteArrayOutputStream(FRAME_SAMPLES * BYTES_PER_SAMPLE)
 
         try {
             audioRecord.startRecording()
@@ -437,6 +461,17 @@ class LiveAudioCapture {
                 }
 
                 bargeInVoicedMs = 0
+                if (onListeningPcmChunk != null) {
+                    listeningFramePcm.write(framePcm)
+                    while (listeningFramePcm.size() >= FRAME_BYTES) {
+                        val pending = listeningFramePcm.toByteArray()
+                        onListeningPcmChunk.invoke(pending.copyOfRange(0, FRAME_BYTES))
+                        listeningFramePcm.reset()
+                        if (pending.size > FRAME_BYTES) {
+                            listeningFramePcm.write(pending, FRAME_BYTES, pending.size - FRAME_BYTES)
+                        }
+                    }
+                }
                 val speech = rms >= LISTENING_RMS_THRESHOLD
                 if (speech) {
                     utterancePcm.write(framePcm)
@@ -524,11 +559,12 @@ class LiveAudioCapture {
         private const val BYTES_PER_SAMPLE = 2
         private const val FRAME_MS = 40
         private const val FRAME_SAMPLES = SAMPLE_RATE * FRAME_MS / 1000
+        private const val FRAME_BYTES = FRAME_SAMPLES * BYTES_PER_SAMPLE
         private const val LISTENING_RMS_THRESHOLD = 0.035f
         private const val BARGE_IN_RMS_THRESHOLD = 0.08f
         private const val BARGE_IN_SPEECH_MS = 320
         private const val MIN_UTTERANCE_MS = 250
-        private const val COMMIT_SILENCE_MS = 1_200
+        private const val COMMIT_SILENCE_MS = 650
         private const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
         private const val PCM_FORMAT = AudioFormat.ENCODING_PCM_16BIT
     }

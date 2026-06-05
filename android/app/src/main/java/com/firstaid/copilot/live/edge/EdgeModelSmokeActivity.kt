@@ -1,18 +1,21 @@
 package com.firstaid.copilot.live.edge
 
 import android.app.Activity
+import android.media.MediaPlayer
 import android.os.Bundle
 import android.util.Log
 import android.widget.TextView
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.system.measureTimeMillis
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import org.json.JSONArray
 import org.json.JSONObject
 
 class EdgeModelSmokeActivity : Activity() {
@@ -51,12 +54,26 @@ class EdgeModelSmokeActivity : Activity() {
             ?.lowercase()
             ?.takeIf { it in setOf("all", "gemma", "tts", "asr") }
             ?: "all"
+        val runs = intent.getIntExtra("runs", 1).coerceIn(1, 20)
+        val threads = intent.getIntExtra("threads", 2).coerceIn(1, 8)
+        val ttsText = intent.getStringExtra("ttsText")?.takeIf { it.isNotBlank() } ?: DEFAULT_TTS_TEXT
+        val asrSampleName = intent.getStringExtra("asrSample")?.takeIf { it.isNotBlank() } ?: "0.wav"
+        val asrMaxMs = intent.getIntExtra("asrMaxMs", 0).coerceAtLeast(0)
+        val gemmaPrompt = intent.getStringExtra("gemmaPrompt")?.takeIf { it.isNotBlank() }
+            ?: GEMMA_BENCH_DEFAULT_PROMPT
+        val gemmaGateMs = intent.getIntExtra("gemmaGateMs", GEMMA_NEAR_REALTIME_GATE_MS.toInt())
+            .coerceIn(1, 60_000).toLong()
+        val gemmaBudgetMs = intent.getIntExtra("gemmaBudgetMs", GEMMA_GENERATE_BUDGET_MS.toInt())
+            .coerceIn(1, 60_000).toLong()
+        val gemmaTimeoutMs = intent.getIntExtra("gemmaTimeoutMs", GEMMA_BENCH_TIMEOUT_MS.toInt())
+            .coerceIn(1_000, 60_000).toLong()
         fun shouldRun(target: String): Boolean = mode == "all" || mode == target
         sherpaTraceFile().delete()
         val files = EdgeModelPathResolver(defaultEdgeModelRoots(appContext)).resolve()
         val speechEngine = SherpaOnnxSpeechEngine(
             appContext,
             files,
+            numThreads = threads,
             debugTraceFile = sherpaTraceFile(),
         )
         speechEngine.use { engine ->
@@ -64,6 +81,8 @@ class EdgeModelSmokeActivity : Activity() {
             val result = JSONObject()
                 .put("ok", false)
                 .put("mode", mode)
+                .put("runs", runs)
+                .put("threads", threads)
                 .put("modelRoot", report.root)
                 .put("summary", report.summaryLine())
                 .put("gemmaReady", report.gemmaReady)
@@ -88,27 +107,93 @@ class EdgeModelSmokeActivity : Activity() {
                         ),
                         "gemma_prewarm_done",
                     )
-                    val generated = if (warm.ok) {
-                        writeCheckpoint(result, "gemma_generate_start")
-                        withTimeout(20_000L) {
-                            gemma.generate("Reply with exactly: OK", timeoutMs = 15_000L)
+                    if (warm.ok) {
+                        // Warm-up generation primes the LiteRT graph; excluded from p50/p95.
+                        writeCheckpoint(result, "gemma_generate_warm_start")
+                        val warmGen = withTimeout(gemmaTimeoutMs + 5_000L) {
+                            gemma.generate(gemmaPrompt, timeoutMs = gemmaTimeoutMs)
                         }
+                        writeCheckpoint(
+                            result.put(
+                                "gemma",
+                                JSONObject()
+                                    .put("ok", warm.ok)
+                                    .put("latencyMs", warm.latencyMs)
+                                    .put("backend", warm.text)
+                                    .put("prompt", gemmaPrompt)
+                                    .put("warmGenerateOk", warmGen.ok)
+                                    .put("warmGenerateLatencyMs", warmGen.latencyMs)
+                                    .put("warmGenerateError", warmGen.error)
+                                    .put("error", warm.error),
+                            ),
+                            "gemma_generate_warm_done",
+                        )
+
+                        // Measured short-answer runs -> p50/p95 -> WB near-realtime gate.
+                        writeCheckpoint(result, "gemma_generate_measured_start")
+                        val measuredRuns = JSONArray()
+                        val okLatencies = mutableListOf<Long>()
+                        var lastGen = warmGen
+                        repeat(runs) { index ->
+                            val gen = withTimeout(gemmaTimeoutMs + 5_000L) {
+                                gemma.generate(gemmaPrompt, timeoutMs = gemmaTimeoutMs)
+                            }
+                            lastGen = gen
+                            if (gen.ok && gen.text.isNotBlank()) {
+                                okLatencies += gen.latencyMs
+                            }
+                            measuredRuns.put(
+                                JSONObject()
+                                    .put("ok", gen.ok)
+                                    .put("latencyMs", gen.latencyMs)
+                                    .put("text", gen.text.take(80))
+                                    .put("error", gen.error),
+                            )
+                            writeCheckpoint(
+                                result.put("gemmaRuns", measuredRuns),
+                                "gemma_generate_measured_${index + 1}_done",
+                            )
+                        }
+
+                        val gate = gemmaLatencyGate(
+                            okLatenciesMs = okLatencies,
+                            totalRuns = runs,
+                            gateMs = gemmaGateMs,
+                            budgetMs = gemmaBudgetMs,
+                        )
+                        result.put(
+                            "gemma",
+                            JSONObject()
+                                .put("ok", warm.ok)
+                                .put("latencyMs", warm.latencyMs)
+                                .put("backend", warm.text)
+                                .put("prompt", gemmaPrompt)
+                                .put("generateOk", runs > 0 && okLatencies.size == runs)
+                                .put("generateLatencyMs", lastGen.latencyMs)
+                                .put("generateText", lastGen.text.take(80))
+                                .put("generateError", lastGen.error)
+                                .put("warmGenerateOk", warmGen.ok)
+                                .put("warmGenerateLatencyMs", warmGen.latencyMs)
+                                .put("runs", measuredRuns)
+                                .put("latency", gate.stats.toJson())
+                                .put("gate", gate.toJson())
+                                .put("error", warm.error),
+                        )
+                        writeCheckpoint(result, "gemma_done")
                     } else {
-                        EdgeInferenceResult(ok = false, error = "prewarm failed")
+                        result.put(
+                            "gemma",
+                            JSONObject()
+                                .put("ok", false)
+                                .put("latencyMs", warm.latencyMs)
+                                .put("backend", warm.text)
+                                .put("prompt", gemmaPrompt)
+                                .put("generateOk", false)
+                                .put("generateError", "prewarm failed")
+                                .put("error", warm.error),
+                        )
+                        writeCheckpoint(result, "gemma_done")
                     }
-                    result.put(
-                        "gemma",
-                        JSONObject()
-                            .put("ok", warm.ok)
-                            .put("latencyMs", warm.latencyMs)
-                            .put("backend", warm.text)
-                            .put("generateOk", generated.ok)
-                            .put("generateLatencyMs", generated.latencyMs)
-                            .put("generateText", generated.text.take(80))
-                            .put("generateError", generated.error)
-                            .put("error", warm.error),
-                    )
-                    writeCheckpoint(result, "gemma_done")
                 } finally {
                     gemma.close()
                 }
@@ -117,7 +202,7 @@ class EdgeModelSmokeActivity : Activity() {
             if (shouldRun("tts")) {
                 writeCheckpoint(result, "tts_warm_start")
                 val warmTts = withTimeout(45_000L) {
-                    engine.synthesizeToWav("继续按压", File(cacheDir, "edge-smoke/tts-warm.wav"))
+                    engine.synthesizeToWav(ttsText, File(cacheDir, "edge-smoke/tts-warm.wav"))
                 }
                 writeCheckpoint(
                     result.put(
@@ -130,33 +215,110 @@ class EdgeModelSmokeActivity : Activity() {
                     "tts_warm_done",
                 )
                 writeCheckpoint(result, "tts_measured_start")
-                val measuredTts = withTimeout(45_000L) {
-                    engine.synthesizeToWav("继续按压", File(cacheDir, "edge-smoke/tts-measured.wav"))
+                val measuredRuns = JSONArray()
+                var okCount = 0
+                var latencySum = 0L
+                var minLatency: Long? = null
+                var maxLatency: Long? = null
+                var lastTts = warmTts
+                repeat(runs) { index ->
+                    val measuredTts = withTimeout(45_000L) {
+                        engine.synthesizeToWav(
+                            ttsText,
+                            File(cacheDir, "edge-smoke/tts-measured-${index + 1}.wav"),
+                        )
+                    }
+                    lastTts = measuredTts
+                    if (measuredTts.ok) {
+                        okCount += 1
+                        latencySum += measuredTts.latencyMs
+                        minLatency = minOf(minLatency ?: measuredTts.latencyMs, measuredTts.latencyMs)
+                        maxLatency = maxOf(maxLatency ?: measuredTts.latencyMs, measuredTts.latencyMs)
+                    }
+                    measuredRuns.put(
+                        JSONObject()
+                            .put("ok", measuredTts.ok)
+                            .put("latencyMs", measuredTts.latencyMs)
+                            .put("sampleRate", measuredTts.sampleRate)
+                            .put("bytes", measuredTts.audioFile?.length() ?: 0L)
+                            .put("error", measuredTts.error),
+                    )
+                    writeCheckpoint(result.put("ttsRuns", measuredRuns), "tts_measured_${index + 1}_done")
                 }
                 result.put(
                     "tts",
                     JSONObject()
-                        .put("ok", measuredTts.ok)
+                        .put("ok", okCount == runs)
+                        .put("text", ttsText)
                         .put("warmLatencyMs", warmTts.latencyMs)
-                        .put("latencyMs", measuredTts.latencyMs)
-                        .put("sampleRate", measuredTts.sampleRate)
-                        .put("bytes", measuredTts.audioFile?.length() ?: 0L)
-                        .put("error", measuredTts.error),
+                        .put("cachedStartLatencyMs", warmTts.audioFile?.measureMediaPlayerStartMs() ?: JSONObject.NULL)
+                        .put("latencyMs", lastTts.latencyMs)
+                        .put("avgLatencyMs", if (okCount > 0) latencySum.toDouble() / okCount else JSONObject.NULL)
+                        .put("minLatencyMs", minLatency ?: JSONObject.NULL)
+                        .put("maxLatencyMs", maxLatency ?: JSONObject.NULL)
+                        .put("sampleRate", lastTts.sampleRate)
+                        .put("bytes", lastTts.audioFile?.length() ?: 0L)
+                        .put("runs", measuredRuns)
+                        .put("error", lastTts.error),
                 )
                 writeCheckpoint(result, "tts_done")
             }
 
-            val asrSample = files.asr?.modelDir?.resolve("test_wavs/0.wav")
+            val asrSample = files.asr?.modelDir?.resolve("test_wavs/$asrSampleName")
             if (shouldRun("asr") && asrSample?.isFile == true) {
-                writeCheckpoint(result, "asr_start")
-                val asr = withTimeout(60_000L) { engine.transcribePcm16(asrSample.readPcm16Data()) }
+                val asrInput = asrSample.readPcm16Data().limitPcm16Duration(asrMaxMs)
+                writeCheckpoint(result.put("asrInputBytes", asrInput.size), "asr_warm_start")
+                val warmAsr = withTimeout(60_000L) { engine.transcribePcm16(asrInput) }
+                writeCheckpoint(
+                    result.put(
+                        "asr",
+                        JSONObject()
+                            .put("warmOk", warmAsr.ok)
+                            .put("warmLatencyMs", warmAsr.latencyMs)
+                            .put("warmText", warmAsr.text)
+                            .put("warmError", warmAsr.error),
+                    ),
+                    "asr_warm_done",
+                )
+                val measuredRuns = JSONArray()
+                var okCount = 0
+                var latencySum = 0L
+                var minLatency: Long? = null
+                var maxLatency: Long? = null
+                var lastAsr = warmAsr
+                repeat(runs) { index ->
+                    val asr = withTimeout(60_000L) { engine.transcribePcm16(asrInput) }
+                    lastAsr = asr
+                    if (asr.ok && asr.text.isNotBlank()) {
+                        okCount += 1
+                        latencySum += asr.latencyMs
+                        minLatency = minOf(minLatency ?: asr.latencyMs, asr.latencyMs)
+                        maxLatency = maxOf(maxLatency ?: asr.latencyMs, asr.latencyMs)
+                    }
+                    measuredRuns.put(
+                        JSONObject()
+                            .put("ok", asr.ok)
+                            .put("latencyMs", asr.latencyMs)
+                            .put("text", asr.text)
+                            .put("error", asr.error),
+                    )
+                    writeCheckpoint(result.put("asrRuns", measuredRuns), "asr_measured_${index + 1}_done")
+                }
                 result.put(
                     "asr",
                     JSONObject()
-                        .put("ok", asr.ok)
-                        .put("latencyMs", asr.latencyMs)
-                        .put("text", asr.text)
-                        .put("error", asr.error),
+                        .put("ok", okCount == runs)
+                        .put("sample", asrSampleName)
+                        .put("inputMs", asrInput.size / BYTES_PER_SAMPLE * 1000 / ASR_SAMPLE_RATE)
+                        .put("inputBytes", asrInput.size)
+                        .put("warmLatencyMs", warmAsr.latencyMs)
+                        .put("latencyMs", lastAsr.latencyMs)
+                        .put("avgLatencyMs", if (okCount > 0) latencySum.toDouble() / okCount else JSONObject.NULL)
+                        .put("minLatencyMs", minLatency ?: JSONObject.NULL)
+                        .put("maxLatencyMs", maxLatency ?: JSONObject.NULL)
+                        .put("text", lastAsr.text)
+                        .put("runs", measuredRuns)
+                        .put("error", lastAsr.error),
                 )
                 writeCheckpoint(result, "asr_done")
             } else if (shouldRun("asr")) {
@@ -220,7 +382,55 @@ class EdgeModelSmokeActivity : Activity() {
         error("No data chunk in WAV: $absolutePath")
     }
 
+    private fun ByteArray.limitPcm16Duration(maxMs: Int): ByteArray {
+        if (maxMs <= 0) return this
+        val maxBytes = maxMs * ASR_SAMPLE_RATE / 1000 * BYTES_PER_SAMPLE
+        val evenBytes = minOf(size, maxBytes).let { it - (it % BYTES_PER_SAMPLE) }
+        return copyOfRange(0, evenBytes)
+    }
+
+    private fun File.measureMediaPlayerStartMs(): Long? =
+        takeIf { it.isFile && it.length() > 0L }?.let { wav ->
+            var player: MediaPlayer? = null
+            try {
+                measureTimeMillis {
+                    player = MediaPlayer().apply {
+                        setDataSource(wav.absolutePath)
+                        prepare()
+                        start()
+                    }
+                }
+            } finally {
+                runCatching { player?.stop() }
+                runCatching { player?.release() }
+            }
+        }
+
+    private fun LatencyStats.toJson(): JSONObject =
+        JSONObject()
+            .put("count", count)
+            .put("avgMs", avgMs ?: JSONObject.NULL)
+            .put("minMs", minMs ?: JSONObject.NULL)
+            .put("maxMs", maxMs ?: JSONObject.NULL)
+            .put("p50Ms", p50Ms ?: JSONObject.NULL)
+            .put("p95Ms", p95Ms ?: JSONObject.NULL)
+
+    private fun GemmaLatencyGate.toJson(): JSONObject =
+        JSONObject()
+            .put("gateMs", gateMs)
+            .put("budgetMs", budgetMs)
+            .put("totalRuns", totalRuns)
+            .put("okRuns", okRuns)
+            .put("withinBudgetRuns", withinBudgetRuns)
+            .put("p50Ms", stats.p50Ms ?: JSONObject.NULL)
+            .put("p95Ms", stats.p95Ms ?: JSONObject.NULL)
+            .put("nearRealtimeCapable", nearRealtimeCapable)
+            .put("recommendation", recommendation)
+
     private companion object {
         const val TAG = "EdgeModelSmoke"
+        const val DEFAULT_TTS_TEXT = "\u7ee7\u7eed\u6309\u538b"
+        const val ASR_SAMPLE_RATE = 16_000
+        const val BYTES_PER_SAMPLE = 2
     }
 }

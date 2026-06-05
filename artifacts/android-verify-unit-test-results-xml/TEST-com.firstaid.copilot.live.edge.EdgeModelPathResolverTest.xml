@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.firstaid.copilot.live.edge.EdgeModelPathResolverTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-06-05T12:13:35.287Z" hostname="BYMAX" time="0.027">
+  <properties/>
+  <testcase name="resolveAcceptsAdbPushedSpeechLayoutVariants" classname="com.firstaid.copilot.live.edge.EdgeModelPathResolverTest" time="0.011"/>
+  <testcase name="inspectRequiresSherpaRuntimeForAsrAndTtsReadiness" classname="com.firstaid.copilot.live.edge.EdgeModelPathResolverTest" time="0.003"/>
+  <testcase name="resolvePrefersRealInt8TtsModelOverFullModel" classname="com.firstaid.copilot.live.edge.EdgeModelPathResolverTest" time="0.007"/>
+  <testcase name="resolvePrefersInt8StreamingAsrAndRealTtsModel" classname="com.firstaid.copilot.live.edge.EdgeModelPathResolverTest" time="0.006"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,80 @@
+{
+  "ok": true,
+  "mode": "asr",
+  "runs": 5,
+  "threads": 2,
+  "modelRoot": "\/storage\/emulated\/0\/Android\/media\/com.firstaid.copilot.debug\/models",
+  "summary": "Gemma=Ready ASR=Ready TTS=Ready sherpa=Ready",
+  "gemmaReady": true,
+  "asrReady": true,
+  "ttsReady": true,
+  "phase": "finished",
+  "updatedAtMs": 1780674325903,
+  "asrInputBytes": 321700,
+  "asr": {
+    "ok": true,
+    "sample": "0.wav",
+    "inputMs": 10053,
+    "inputBytes": 321700,
+    "warmLatencyMs": 3087,
+    "latencyMs": 1283,
+    "avgLatencyMs": 1300.8,
+    "minLatencyMs": 1273,
+    "maxLatencyMs": 1329,
+    "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三",
+    "runs": [
+      {
+        "ok": true,
+        "latencyMs": 1317,
+        "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三"
+      },
+      {
+        "ok": true,
+        "latencyMs": 1329,
+        "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三"
+      },
+      {
+        "ok": true,
+        "latencyMs": 1302,
+        "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三"
+      },
+      {
+        "ok": true,
+        "latencyMs": 1273,
+        "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三"
+      },
+      {
+        "ok": true,
+        "latencyMs": 1283,
+        "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三"
+      }
+    ]
+  },
+  "asrRuns": [
+    {
+      "ok": true,
+      "latencyMs": 1317,
+      "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三"
+    },
+    {
+      "ok": true,
+      "latencyMs": 1329,
+      "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三"
+    },
+    {
+      "ok": true,
+      "latencyMs": 1302,
+      "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三"
+    },
+    {
+      "ok": true,
+      "latencyMs": 1273,
+      "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三"
+    },
+    {
+      "ok": true,
+      "latencyMs": 1283,
+      "text": "昨天是 MONDAY TODAY IS LIBR THE DAY AFTER TOMORROW是星期三"
+    }
+  ]
+}

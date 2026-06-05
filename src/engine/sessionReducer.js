@@ -335,6 +335,18 @@ function reduceMetadata(next, event, timestamp) {
     next.tool_state.handover_generated = true;
   }
 
+  if (hasOwn(metadata, "entry_source") && metadata.entry_source != null) {
+    next.scope.entry_source = String(metadata.entry_source);
+  }
+
+  if (hasOwn(metadata, "wake_phrase") && metadata.wake_phrase != null) {
+    next.scope.wake_phrase =
+      metadata.wake_phrase === true ? true : String(metadata.wake_phrase);
+    if (!next.scope.entry_source) {
+      next.scope.entry_source = "wake_phrase";
+    }
+  }
+
   if (metadata.local_video_saved === true) {
     next.tool_state.recording_status = "saved";
   }
