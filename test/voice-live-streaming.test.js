@@ -176,6 +176,44 @@ test("live session emits final, guidance, state, and streaming audio", async () 
   assert.deepEqual([...audioEvents[0]], [7, 8]);
 });
 
+test("live session forwards client intent hints from commit_text controls", async () => {
+  let observedInput = null;
+  const session = createLiveSession({
+    sessionId: "sess_client_intent_hint",
+    disableStreamingStt: true,
+    service: {
+      async createGuidance(input) {
+        observedInput = input;
+        return {
+          stt: { transcript: input.text, intent: input.intent },
+          intentResolution: { source: "client_intent_hint", intent: input.intent },
+          pipeline: { state: { current_stage: "S6_CPR_READY" } },
+          gemma: { skipped: true, skipReason: "stub" },
+          gemmaPlan: { live: false },
+          guidanceDecision: { source: "state_machine", responseType: "flow_instruction" },
+          guidanceAction: {
+            action_id: "act_hint",
+            intent: "guide_cpr_position",
+            tts: { text: "双手叠在胸口中央。" },
+          },
+          openQuestion: false,
+        };
+      },
+      reset() {},
+    },
+    tts: {
+      cancel() {},
+      async *speak() {
+        yield { chunk: Buffer.from([1]), sampleRate: 16000, channels: 1, bitsPerSample: 16 };
+      },
+    },
+  });
+
+  await session.handleControl({ type: "commit_text", text: "已拨打 120", intent: "mark_emergency_called" });
+
+  assert.equal(observedInput.intent, "mark_emergency_called");
+});
+
 test("live session emits a per-turn metrics event (timings + tts provider + intent/gemma) when enabled", async () => {
   const session = createLiveSession({
     sessionId: "sess_metrics",

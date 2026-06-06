@@ -1,0 +1,16 @@
+{
+  "version": "gemma_suite_compact_v1",
+  "generatedAt": "2026-06-06T12:51:07.379Z",
+  "source": "gemma_suite_v1",
+  "note": "Compressed prompts for latency; expected metadata is identical to gemma_suite.",
+  "cases": [
+    "patch_main.json",
+    "patch_adversarial.json",
+    "nlu_main.json",
+    "nlu_boundary.json",
+    "open_question_main.json",
+    "open_question_adversarial.json",
+    "handover_main.json",
+    "handover_adversarial.json"
+  ]
+}

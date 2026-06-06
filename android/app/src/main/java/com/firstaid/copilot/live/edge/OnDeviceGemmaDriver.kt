@@ -6,12 +6,11 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
-import kotlin.system.measureTimeMillis
+import kotlin.math.ceil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 
 data class EdgeInferenceResult(
     val ok: Boolean,
@@ -20,7 +19,32 @@ data class EdgeInferenceResult(
     val error: String? = null,
 )
 
-enum class GemmaBackendPreference { GpuThenCpu, CpuOnly }
+enum class GemmaBackendPreference { GpuThenCpu, GpuOnly, CpuOnly }
+
+fun parseGemmaBackendPreference(raw: String?): GemmaBackendPreference =
+    when (raw?.trim()?.lowercase()) {
+        "auto", "gpu-then-cpu", "gpu_then_cpu", "fallback" -> GemmaBackendPreference.GpuThenCpu
+        "gpu", "gpu-only", "gpu_only", "gpuonly" -> GemmaBackendPreference.GpuOnly
+        "cpu", "cpu-only", "cpu_only", "cpuonly" -> GemmaBackendPreference.CpuOnly
+        else -> GemmaBackendPreference.CpuOnly
+    }
+
+data class GemmaSamplerSettings(
+    val topK: Int,
+    val topP: Double,
+    val temperature: Double,
+    val seed: Int,
+) {
+    companion object {
+        val DETERMINISTIC = GemmaSamplerSettings(topK = 1, topP = 1.0, temperature = 0.0, seed = 0)
+    }
+}
+
+fun parseGemmaSamplerSettings(raw: String?): GemmaSamplerSettings? =
+    when (raw?.trim()?.lowercase()) {
+        "deterministic", "greedy", "stable", "top1" -> GemmaSamplerSettings.DETERMINISTIC
+        else -> null
+    }
 
 /**
  * Reflection bridge for LiteRT-LM.
@@ -32,11 +56,22 @@ enum class GemmaBackendPreference { GpuThenCpu, CpuOnly }
 class OnDeviceGemmaDriver(
     private val context: Context,
     private val modelFile: File,
-    private val backendPreference: GemmaBackendPreference = GemmaBackendPreference.GpuThenCpu,
-    private val maxNumTokens: Int = 1536,
+    private val backendPreference: GemmaBackendPreference = GemmaBackendPreference.CpuOnly,
+    private val enableGpuSpeculativeDecoding: Boolean = true,
+    private val cpuThreads: Int = DEFAULT_CPU_THREADS,
+    private val maxNumTokens: Int = DEFAULT_MAX_NUM_TOKENS,
+    private val samplerSettings: GemmaSamplerSettings? = null,
 ) : AutoCloseable {
     private val mutex = Mutex()
+
+    // LiteRT-LM's maxNumTokens is the whole KV-cache budget (prefill + decode), so
+    // a prompt longer than this overflows the cache and can SIGSEGV liblitertlm_jni
+    // instead of failing cleanly. Reserve room for the decoded answer and refuse
+    // anything that would not fit before it ever reaches native sendMessage().
+    private val promptTokenBudget: Int = (maxNumTokens - DECODE_TOKEN_RESERVE).coerceAtLeast(1)
+    @Volatile
     private var engine: Any? = null
+    @Volatile
     private var backendName: String? = null
     @Volatile
     private var activeConversation: Any? = null
@@ -44,20 +79,51 @@ class OnDeviceGemmaDriver(
     suspend fun prewarm(timeoutMs: Long = 30_000L): EdgeInferenceResult =
         mutex.withLock {
             withContext(Dispatchers.IO) {
-                val elapsed = measureTimeMillis {
-                    try {
-                        withTimeout(timeoutMs) {
-                            ensureEngine()
-                        }
-                    } catch (error: Throwable) {
-                        return@withContext EdgeInferenceResult(
-                            ok = false,
-                            latencyMs = 0,
-                            error = edgeErrorDetail(error, "Gemma prewarm failed"),
-                        )
-                    }
+                // ensureEngine()/initialize() are blocking native calls with no
+                // suspension points, so a coroutine withTimeout() cannot interrupt
+                // them. Run on a dedicated thread and enforce a hard bound with
+                // future.get(timeout) + cancel(true) instead.
+                val executor = Executors.newSingleThreadExecutor { runnable ->
+                    Thread(runnable, "litertlm-prewarm").apply { isDaemon = true }
                 }
-                EdgeInferenceResult(ok = true, latencyMs = elapsed, text = backendName ?: "ready")
+                val future = executor.submit<String> {
+                    ensureEngine()
+                    backendName ?: "ready"
+                }
+                val startedMs = System.currentTimeMillis()
+                try {
+                    val backend = future.get(timeoutMs, TimeUnit.MILLISECONDS)
+                    EdgeInferenceResult(
+                        ok = true,
+                        latencyMs = System.currentTimeMillis() - startedMs,
+                        text = backend,
+                    )
+                } catch (timeout: TimeoutException) {
+                    // Initialization is stuck: hard-cancel the worker and report a
+                    // bounded "not ready" so UI readiness stays deterministic and
+                    // the flow can retry later instead of blocking indefinitely.
+                    future.cancel(true)
+                    resetEngine()
+                    EdgeInferenceResult(
+                        ok = false,
+                        latencyMs = System.currentTimeMillis() - startedMs,
+                        error = "Gemma prewarm exceeded ${timeoutMs}ms",
+                    )
+                } catch (error: ExecutionException) {
+                    EdgeInferenceResult(
+                        ok = false,
+                        latencyMs = System.currentTimeMillis() - startedMs,
+                        error = edgeErrorDetail(error.cause ?: error, "Gemma prewarm failed"),
+                    )
+                } catch (error: Throwable) {
+                    EdgeInferenceResult(
+                        ok = false,
+                        latencyMs = System.currentTimeMillis() - startedMs,
+                        error = edgeErrorDetail(error, "Gemma prewarm failed"),
+                    )
+                } finally {
+                    executor.shutdownNow()
+                }
             }
         }
 
@@ -67,6 +133,14 @@ class OnDeviceGemmaDriver(
     ): EdgeInferenceResult =
         mutex.withLock {
             withContext(Dispatchers.IO) {
+                val estimatedTokens = estimateTokenCount(prompt)
+                if (estimatedTokens > promptTokenBudget) {
+                    return@withContext EdgeInferenceResult(
+                        ok = false,
+                        latencyMs = 0,
+                        error = "prompt_too_long: $estimatedTokens tokens > $promptTokenBudget",
+                    )
+                }
                 val localEngine = try {
                     ensureEngine()
                 } catch (error: Throwable) {
@@ -129,13 +203,15 @@ class OnDeviceGemmaDriver(
             if (it.call("isInitialized") as? Boolean == true) return it
         }
         val attempts = when (backendPreference) {
-            GemmaBackendPreference.GpuThenCpu -> listOf(newLitert("Backend\$GPU"), newLitert("Backend\$CPU"))
-            GemmaBackendPreference.CpuOnly -> listOf(newLitert("Backend\$CPU"))
+            GemmaBackendPreference.GpuThenCpu -> listOf(newLitert("Backend\$GPU"), newCpuBackend())
+            GemmaBackendPreference.GpuOnly -> listOf(newLitert("Backend\$GPU"))
+            GemmaBackendPreference.CpuOnly -> listOf(newCpuBackend())
         }
         var lastError: Throwable? = null
         for (backend in attempts) {
             try {
                 enableLowLatencyFlags(backend)
+                val litertCacheDir = File(context.cacheDir, "litertlm").apply { mkdirs() }
                 val config = newLitert(
                     "EngineConfig",
                     modelFile.absolutePath,
@@ -144,7 +220,7 @@ class OnDeviceGemmaDriver(
                     null,
                     maxNumTokens,
                     null,
-                    File(context.cacheDir, "litertlm").absolutePath,
+                    litertCacheDir.absolutePath,
                 )
                 val candidate = newLitert("Engine", config)
                 candidate.call("initialize")
@@ -155,17 +231,24 @@ class OnDeviceGemmaDriver(
                 lastError = error
             }
         }
-        throw IllegalStateException(lastError?.message ?: "Could not initialize LiteRT-LM")
+        val cause = lastError ?: IllegalStateException("Could not initialize LiteRT-LM")
+        throw IllegalStateException(edgeErrorDetail(cause, "Could not initialize LiteRT-LM"), cause)
     }
 
     private fun enableLowLatencyFlags(backend: Any) {
         val flags = litertClass("ExperimentalFlags").getField("INSTANCE").get(null) ?: return
-        flags.call("setEnableBenchmark", true)
-        flags.call("setEnableSpeculativeDecoding", backend.javaClass.name.endsWith("Backend\$GPU"))
+        flags.call("setEnableBenchmark", false)
+        flags.call(
+            "setEnableSpeculativeDecoding",
+            backend.javaClass.name.endsWith("Backend\$GPU") && enableGpuSpeculativeDecoding,
+        )
     }
 
+    private fun newCpuBackend(): Any =
+        if (cpuThreads > 0) newLitert("Backend\$CPU", cpuThreads) else newLitert("Backend\$CPU")
+
     private fun generateBlocking(localEngine: Any, prompt: String): String {
-        val conversation = localEngine.call("createConversation", newLitert("ConversationConfig"))
+        val conversation = localEngine.call("createConversation", newConversationConfig())
             ?: throw IllegalStateException("LiteRT-LM did not create a conversation")
         activeConversation = conversation
         return try {
@@ -180,6 +263,19 @@ class OnDeviceGemmaDriver(
         }
     }
 
+    private fun newConversationConfig(): Any {
+        val sampler = samplerSettings?.let {
+            newLitert("SamplerConfig", it.topK, it.topP, it.temperature, it.seed)
+        } ?: return newLitert("ConversationConfig")
+        return newLitert(
+            "ConversationConfig",
+            null,
+            emptyList<Any>(),
+            emptyList<Any>(),
+            sampler,
+        )
+    }
+
     private fun cancelActiveConversation() {
         activeConversation?.let { conversation ->
             conversation.callQuietly("cancelProcess")
@@ -192,6 +288,33 @@ class OnDeviceGemmaDriver(
         engine.callQuietly("close")
         engine = null
         backendName = null
+    }
+
+    private fun estimateTokenCount(prompt: String): Int {
+        var cjkChars = 0
+        var otherChars = 0
+        var index = 0
+        while (index < prompt.length) {
+            val codePoint = prompt.codePointAt(index)
+            index += Character.charCount(codePoint)
+            if (isCjkLike(codePoint)) cjkChars += 1 else otherChars += 1
+        }
+        return ceil(cjkChars * CJK_TOKENS_PER_CHAR + otherChars / OTHER_CHARS_PER_TOKEN).toInt()
+    }
+
+    private fun isCjkLike(codePoint: Int): Boolean =
+        codePoint in 0x3000..0x303F ||
+            codePoint in 0x3400..0x9FFF ||
+            codePoint in 0xF900..0xFAFF ||
+            codePoint in 0xFF00..0xFFEF ||
+            codePoint in 0x20000..0x2FA1F
+
+    companion object {
+        const val DEFAULT_CPU_THREADS = 0
+        const val DEFAULT_MAX_NUM_TOKENS = 4096
+        private const val DECODE_TOKEN_RESERVE = 512
+        private const val CJK_TOKENS_PER_CHAR = 1.2
+        private const val OTHER_CHARS_PER_TOKEN = 3.0
     }
 }
 

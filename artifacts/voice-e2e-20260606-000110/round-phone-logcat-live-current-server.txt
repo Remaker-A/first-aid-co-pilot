@@ -323,3 +323,113 @@
 06-06 00:21:16.144 D/RefBase (26558): #02 pc 00000000000927f4  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+100)
 06-06 00:22:12.244 D/TrafficStats( 3989): tagSocket(89) with statsTag=0x34000609, statsUid=10163
 06-06 00:22:12.246 D/Linux   ( 3989): [Posix_connect Debug]Process com.google.android.gms.persistent :443 
+06-06 00:22:30.680 D/TrafficStats( 3989): tagSocket(90) with statsTag=0x34000609, statsUid=10163
+06-06 00:22:30.681 D/Linux   ( 3989): [Posix_connect Debug]Process com.google.android.gms.persistent :443 
+06-06 00:22:30.717 D/TrafficStats( 3989): tagSocket(88) with statsTag=0x34000609, statsUid=10163
+06-06 00:22:30.720 D/Linux   ( 3989): [Posix_connect Debug]Process com.google.android.gms.persistent :443 
+06-06 00:22:34.186 I/LiveAudioPlayer(26396): Live audio cancel with no active stream reason=client_barge_in
+06-06 00:22:34.187 I/WebSocketAgentChannel(26396): Sent live JSON type=barge_in ok=true payloadKeys=
+06-06 00:22:34.191 I/WebSocketAgentChannel(26396): Received live text {"type":"audio_cancel","session_id":"android_live_c18feb62","reason":"client_barge_in"}
+06-06 00:22:34.192 I/LiveAudioPlayer(26396): Live audio cancel with no active stream reason=client_barge_in
+06-06 00:22:58.721 I/mars::stn( 9621): [longlink_connect_monitor.cc:536, OnHeartbeatAlarmReceived]:longlink_progress on_heartbeat_alarm, time: 59664758, is_noop_timeout:false
+06-06 00:22:58.785 I/mars::stn( 9621): [longlink_connect_monitor.cc:530, OnHeartbeatAlarmSet]:longlink_progress on_heartbeat_set, time: 59664822, time interval:580000
+06-06 00:22:58.797 I/mars::stn( 9621): [longlink_connect_monitor.cc:530, OnHeartbeatAlarmSet]:longlink_progress on_heartbeat_set, time: 59664835, time interval:580000
+06-06 00:23:27.946 I/LiveAudioPlayer(26396): Live audio cancel with no active stream reason=client_barge_in
+06-06 00:23:27.946 I/WebSocketAgentChannel(26396): Sent live JSON type=barge_in ok=true payloadKeys=
+06-06 00:23:27.952 I/WebSocketAgentChannel(26396): Received live text {"type":"audio_cancel","session_id":"android_live_c18feb62","reason":"client_barge_in"}
+06-06 00:23:27.954 I/LiveAudioPlayer(26396): Live audio cancel with no active stream reason=client_barge_in
+06-06 00:23:30.812 I/LiveAudioPlayer(26396): Live audio cancel with no active stream reason=new_turn
+06-06 00:23:30.813 I/WebSocketAgentChannel(26396): Sent live JSON type=context ok=true payloadKeys=["sessionId"]
+06-06 00:23:30.816 I/WebSocketAgentChannel(26396): Sent live JSON type=commit_text ok=true payloadKeys=
+06-06 00:23:30.863 I/WebSocketAgentChannel(26396): Received live text {"type":"thinking","session_id":"android_live_c18feb62","turn_seq":2}
+06-06 00:23:30.868 I/WebSocketAgentChannel(26396): Received live text {"type":"final","session_id":"android_live_c18feb62","turn_seq":2,"text":"高考马上就要来了座位过来人我想给高考生说几句心里话首先第一点你喜欢","intent":null}
+06-06 00:23:30.869 I/WebSocketAgentChannel(26396): Received live text {"type":"guidance","session_id":"android_live_c18feb62","turn_seq":2,"action":{"action_id":"act_mq14vmi6_000d_bbe729171dd5","session_id":"android_live_c18feb62","timestamp":"2026-06-05T16:23:30.989Z","stage":"S1_SCENE_SAFE","intent":"ensure_scene_safe","priority":"normal","source":"state_machine","r
+06-06 00:23:30.870 I/WebSocketAgentChannel(26396): Received live text {"type":"state","session_id":"android_live_c18feb62","turn_seq":2,"current_stage":"S1_SCENE_SAFE","state":{"schema_version":"session_state.v0.1","session_id":"android_live_c18feb62","mode":"demo_assisted","current_stage":"S1_SCENE_SAFE","previous_stage":"S1_SCENE_SAFE","started_at":"2026-06-05T16:23
+06-06 00:23:30.894 I/EdgeTextToSpeech(26396): Android TTS fast path for '先确认周围安全，再靠近患者。'
+06-06 00:23:30.975 I/AndroidTextToSpeech(26396): Android TTS onStart latency=3ms
+06-06 00:23:30.975 I/SherpaSpeechEngine(26396): TTS generate start chars=14
+06-06 00:23:31.060 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:23:31.060 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:23:31.122 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:23:31.122 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:23:31.844 I/WebSocketAgentChannel(26396): Received live text {"type":"audio_begin","session_id":"android_live_c18feb62","turn_seq":2,"action_id":"act_mq14vmi6_000d_bbe729171dd5","format":"pcm16","sample_rate":44100,"channels":1,"bits_per_sample":16}
+06-06 00:23:31.868 I/WebSocketAgentChannel(26396): Received live audio bytes=118784
+06-06 00:23:32.728 I/WebSocketAgentChannel(26396): Received live audio bytes=111616
+06-06 00:23:32.746 I/WebSocketAgentChannel(26396): Received live text {"type":"audio_end","session_id":"android_live_c18feb62","turn_seq":2,"action_id":"act_mq14vmi6_000d_bbe729171dd5"}
+06-06 00:23:34.333 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:23:34.334 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:23:34.334 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:23:34.334 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:23:36.010 I/LiveAudioPlayer(26396): Live audio cancel with no active stream reason=new_turn
+06-06 00:23:36.011 I/WebSocketAgentChannel(26396): Sent live JSON type=context ok=true payloadKeys=["sessionId"]
+06-06 00:23:36.011 I/WebSocketAgentChannel(26396): Sent live JSON type=commit_text ok=true payloadKeys=
+06-06 00:23:36.065 I/WebSocketAgentChannel(26396): Received live text {"type":"thinking","session_id":"android_live_c18feb62","turn_seq":3}
+06-06 00:23:36.083 I/WebSocketAgentChannel(26396): Received live text {"type":"final","session_id":"android_live_c18feb62","turn_seq":3,"text":"本","intent":null}
+06-06 00:23:36.085 I/WebSocketAgentChannel(26396): Received live text {"type":"guidance","session_id":"android_live_c18feb62","turn_seq":3,"action":{"action_id":"act_mq14vqid_000m_6ef4b9a91acd","session_id":"android_live_c18feb62","timestamp":"2026-06-05T16:23:36.180Z","stage":"S1_SCENE_SAFE","intent":"ensure_scene_safe","priority":"normal","source":"state_machine","r
+06-06 00:23:36.086 I/WebSocketAgentChannel(26396): Received live text {"type":"state","session_id":"android_live_c18feb62","turn_seq":3,"current_stage":"S1_SCENE_SAFE","state":{"schema_version":"session_state.v0.1","session_id":"android_live_c18feb62","mode":"demo_assisted","current_stage":"S1_SCENE_SAFE","previous_stage":"S1_SCENE_SAFE","started_at":"2026-06-05T16:23
+06-06 00:23:36.101 I/EdgeTextToSpeech(26396): Android TTS fast path for '先确认周围安全，再靠近患者。'
+06-06 00:23:36.171 I/AndroidTextToSpeech(26396): Android TTS onStart latency=3ms
+06-06 00:23:36.248 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:23:36.249 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:23:36.269 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:23:36.272 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:23:36.948 I/WebSocketAgentChannel(26396): Received live text {"type":"audio_begin","session_id":"android_live_c18feb62","turn_seq":3,"action_id":"act_mq14vqid_000m_6ef4b9a91acd","format":"pcm16","sample_rate":44100,"channels":1,"bits_per_sample":16}
+06-06 00:23:36.953 I/WebSocketAgentChannel(26396): Received live audio bytes=118784
+06-06 00:23:37.581 D/AudioRecord(26396): stop(229): 0xb4000076609c5940, mActive: 1
+06-06 00:23:37.581 D/AudioRecord(26396): getpackName client name com.firstaid.copilot.debug(26396)
+06-06 00:23:37.582 D/AudioTrackShared(26396): this(0xb4000075f0fec5b0), mCblk(0x780e4c5000), front(3166720), mIsOut 0, interrupt() FUTEX_WAKE
+06-06 00:23:37.582 I/AudioEffect(26396): Destructor 0xb400007630bbc6e0
+06-06 00:23:37.673 I/AudioEffect(26396): Destructor 0xb4000076306c6b90
+06-06 00:23:37.689 D/AudioRecord(26396): stop(229) done
+06-06 00:23:37.689 D/AudioRecord(26396): stop(229): 0xb4000076609c5940, mActive: 0
+06-06 00:23:37.689 D/AudioRecord(26396): getpackName client name com.firstaid.copilot.debug(26396)
+06-06 00:23:37.689 D/AudioRecord(26396): stop(229): 0xb4000076609c5940, mActive: 0
+06-06 00:23:37.690 D/AudioRecord(26396): getpackName client name com.firstaid.copilot.debug(26396)
+06-06 00:23:37.690 D/AudioRecord(26396): ~AudioRecord(229): mStatus 0
+06-06 00:23:37.690 D/AudioRecord(26396): stop(229): 0xb4000076609c5940, mActive: 0
+06-06 00:23:37.690 D/AudioRecord(26396): getpackName client name com.firstaid.copilot.debug(26396)
+06-06 00:23:37.691 D/AudioTrackShared(26396): this(0xb4000075f0fec5b0), mCblk(0x780e4c5000), front(3166720), mIsOut 0, interrupt() FUTEX_WAKE
+06-06 00:23:37.691 I/LiveAudioPlayer(26396): Live audio cancel with no active stream reason=client_stop
+06-06 00:23:37.814 I/WebSocketAgentChannel(26396): Received live audio bytes=111616
+06-06 00:23:37.815 I/WebSocketAgentChannel(26396): Received live text {"type":"audio_end","session_id":"android_live_c18feb62","turn_seq":3,"action_id":"act_mq14vqid_000m_6ef4b9a91acd"}
+06-06 00:23:39.485 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:23:39.485 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:23:39.486 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:23:39.486 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:23:40.571 I/BatteryStatsImpl( 2497): ********** CLEARING HISTORY!
+06-06 00:23:40.639 I/ActivityTaskManager( 1553): Displayed com.android.packageinstaller/.PackageInstallerActivity: +323ms
+06-06 00:23:41.145 D/BLASTBufferQueue(26396): [VRI[MainActivity]#0](f:0,a:1) destructor()
+06-06 00:23:41.145 D/BufferQueueConsumer(26396): [VRI[MainActivity]#0(BLAST Consumer)0](id:671c00000000,api:0,p:-1,c:26396) disconnect
+06-06 00:23:41.912 I/SherpaSpeechEngine(26396): TTS generate done
+06-06 00:23:41.924 I/SherpaSpeechEngine(26396): TTS save done bytes=212012
+06-06 00:23:41.925 I/EdgeTextToSpeech(26396): Sherpa TTS background cached '先确认周围安全，再靠近患者。' in 10949ms
+06-06 00:23:41.932 I/SherpaSpeechEngine(26396): TTS generate start chars=14
+06-06 00:23:47.443 D/BufferQueueConsumer(26396): [](id:671c00000001,api:0,p:-1,c:26396) connect: controlledByApp=false
+06-06 00:23:47.448 I/BLASTBufferQueue(26396): QoSAllocBuff Successful. Ret 0 
+06-06 00:23:47.472 D/BLASTBufferQueue(26396): [VRI[MainActivity]#1](f:0,a:1) acquireNextBufferLocked size=720x1612 mFrameNumber=1 applyTransaction=true mTimestamp=51261405248516(auto) mPendingTransactions.size=0 graphicBufferId=113369956745222 transform=0
+06-06 00:23:47.511 V/ImeFocusController(26396): onWindowFocus: DecorView@3974861[MainActivity] softInputMode=STATE_UNSPECIFIED|ADJUST_PAN
+06-06 00:23:47.511 V/ImeFocusController(26396): Restarting due to isRestartOnNextWindowFocus as true
+06-06 00:23:47.512 D/ImeFocusController(26396): onViewFocusChanged, view=DecorView@3974861[MainActivity], mServedView=DecorView@3974861[MainActivity]
+06-06 00:23:47.512 V/ImeFocusController(26396): checkFocus: view=DecorView@3974861[MainActivity] next=DecorView@3974861[MainActivity] immDelegate=delegate{2dc1b8e displayId=0} force=true package=com.firstaid.copilot.debug
+06-06 00:23:48.028 I/.gms.persistent( 3989): Background concurrent copying GC freed 22363(1303KB) AllocSpace objects, 1(20KB) LOS objects, 49% free, 13MB(RS:11MB + LOS:1896KB)/27MB, paused 64us,39us total 188.481ms
+06-06 00:23:48.518 I/Auth    ( 5058): [SupervisedAccountIntentOperation] onHandleIntent(): android.intent.action.PACKAGE_ADDED
+06-06 00:23:48.527 I/Fitness ( 3989): (REDACTED) FitCleanupIntentOperation received Intent %s
+06-06 00:23:48.534 D/BoundBrokerSvc( 5058): onBind: Intent { act=com.google.android.gms.common.BIND_SHARED_PREFS pkg=com.google.android.gms }
+06-06 00:23:48.534 D/BoundBrokerSvc( 5058): Loading bound service for intent: Intent { act=com.google.android.gms.common.BIND_SHARED_PREFS pkg=com.google.android.gms }
+06-06 00:23:48.545 I/ProximityAuth( 3989): [RecentAppsMediator] Package added: (user=UserHandle{0}) com.firstaid.copilot.debug
+06-06 00:23:48.589 W/SQLiteLog( 5058): (28) double-quoted string literal: "com.firstaid.copilot.debug"
+06-06 00:23:48.651 I/FontLog ( 3989): (REDACTED) Package %s has no metadata
+06-06 00:23:48.729 I/Icing   ( 5058): IndexChimeraService.getServiceInterface callingPackage=com.google.android.gms componentName=AppsCorpus serviceId=36
+06-06 00:23:48.739 D/BoundBrokerSvc( 5058): onBind: Intent { act=com.google.android.gms.feedback.internal.IFeedbackService dat=chimera-action:/... cmp=com.google.android.gms/.chimera.GmsBoundBrokerService }
+06-06 00:23:48.740 D/BoundBrokerSvc( 5058): Loading bound service for intent: Intent { act=com.google.android.gms.feedback.internal.IFeedbackService dat=chimera-action:/... cmp=com.google.android.gms/.chimera.GmsBoundBrokerService }
+06-06 00:23:48.763 D/BoundBrokerSvc( 3989): onBind: Intent { act=com.google.android.gms.icing.LIGHTWEIGHT_INDEX_SERVICE dat=chimera-action:/... cmp=com.google.android.gms/.chimera.PersistentApiService }
+06-06 00:23:48.763 D/BoundBrokerSvc( 3989): Loading bound service for intent: Intent { act=com.google.android.gms.icing.LIGHTWEIGHT_INDEX_SERVICE dat=chimera-action:/... cmp=com.google.android.gms/.chimera.PersistentApiService }
+06-06 00:23:48.821 I/Icing   ( 5058): Usage reports ok 2, Failed Usage reports 0, indexed 0, rejected 0
+06-06 00:23:48.873 I/Icing   ( 5058): Indexing com.google.android.gms-apps from com.google.android.gms
+06-06 00:23:48.883 I/Icing   ( 5058): IndexChimeraService.getServiceInterface callingPackage=com.google.android.gms componentName=null serviceId=30
+06-06 00:23:48.907 I/Icing   ( 5058): Usage reports ok 0, Failed Usage reports 0, indexed 0, rejected 0
+06-06 00:23:48.910 I/Icing   ( 5058): Indexing done com.google.android.gms-apps
+06-06 00:23:48.912 I/Icing   ( 5058): Indexing com.google.android.gms-apps from com.google.android.gms
+06-06 00:23:48.914 I/Icing   ( 5058): Indexing done com.google.android.gms-apps
+06-06 00:24:03.905 D/BoundBrokerSvc( 3989): onUnbind: Intent { act=com.google.android.gms.icing.LIGHTWEIGHT_INDEX_SERVICE dat=chimera-action:/... cmp=com.google.android.gms/.chimera.PersistentApiService }
+06-06 00:24:03.936 D/BoundBrokerSvc( 5058): onUnbind: Intent { act=com.google.android.gms.feedback.internal.IFeedbackService dat=chimera-action:/... cmp=com.google.android.gms/.chimera.GmsBoundBrokerService }

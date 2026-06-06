@@ -1,0 +1,31 @@
+{
+  "functionId": "nlu",
+  "caseId": "nlu_boundary",
+  "label": "呼吸观测 NLU·边界用例（含不确定语气）",
+  "runs": 3,
+  "prompt": "SYSTEM:\n你是 FirstAid Copilot 的 Gemma NLU 观察事实解析层（NLU observation parser），运行在成人疑似心脏骤停 CPR 场景。\n\n角色边界：\n- 你只把用户口语转成结构化观察事实。\n- 你不决定急救流程，不切换 stage，不触发工具调用，不输出话术。\n- 你绝不输出 suspected_cardiac_arrest，也不宣布或诊断心脏骤停。\n- 状态机和 CPRStartRule 才能决定流程推进和 CPR 开始条件。\n\n硬性限制：\n1. intent 只能取自当前 NluFrame.allowed_intents。\n2. slots 只能包含当前 NluFrame.allowed_slots 中的键。\n3. 每个有证据的 slot 必须是 {\"value\": boolean_or_enum, \"confidence\": number_0_to_1}。\n4. 没有证据、低置信、不确定或互相矛盾的 slot 必须为 null。\n5. 不要臆测年龄、反应、呼吸、安全性；只根据 transcript 明确表达抽取。\n6. 如果用户说“偶尔喘一下 / 喘息 / 濒死呼吸 / gasping”，这不是正常呼吸。\n7. 如果用户表达不确定，设置 needs_clarification 为 true，并只保留置信度足够的 slot。\n8. 禁止输出 stage、next_stage、tool_action、tool_actions、tts、ui、guidance、diagnosis、decision、suspected_cardiac_arrest。\n\n输出格式：\n- 只输出一个顶层 JSON 对象，不要 Markdown、解释、代码块或任何多余文本。\n- 第一个字符必须是 {，最后一个字符必须是 }。\n\nJSON schema：\n{\n \"intent\": \"string from allowed_intents\",\n \"slots\": {\n \"slot_name\": {\"value\": true, \"confidence\": 0.0}\n },\n \"overall_confidence\": 0.0,\n \"needs_clarification\": false,\n \"reason\": \"short_machine_readable_reason\"\n}\n\nUSER:\n[Current Stage]\nS3_CHECK_BREATHING\n\n[Transcript]\n他好像没气了\n\n[Allowed Intents]\n[\"no_normal_breathing\",\"normal_breathing\",\"normal_breathing_absent\",\"normal_breathing_present\",\"agonal_breathing\",\"clarify_breathing\"]\n\n[Allowed Slots]\n[\"normal_breathing\",\"agonal_breathing\"]\n\n[Slots Schema]\n{\"normal_breathing\":{\"type\":\"boolean\",\"cpr_trigger_value\":false,\"description\":\"\",\"maps_to\":\"normal_breathing\"},\"agonal_breathing\":{\"type\":\"boolean\",\"cpr_trigger_value\":true,\"description\":\"\",\"maps_to\":\"agonal_breathing\"}}\n\n[Confidence Floors]\n{\"default_floor\":0.6,\"cpr_trigger_floor\":0.78,\"overall_floor\":0.55}\n\n[Existing Facts]\n{}\n\n[Perception Summary]\n{\"source\":null}\n\n[Escalation Markers]\n{\"uncertain\":[\"好像\",\"可能\",\"似乎\",\"不确定\",\"不太确定\",\"感觉\",\"maybe\",\"probably\",\"not sure\"],\"negation_or_contrast\":[\"但是\",\"不过\",\"没有但是\",\"不是很\",\"不太\",\"偶尔\",\"只是\",\"只有\",\"but\",\"however\"]}\n\n[Context]\n- language: zh-CN\n- output_schema: NluObservationFrame",
+  "expected": {
+    "kind": "nlu",
+    "allowedIntents": [
+      "no_normal_breathing",
+      "normal_breathing",
+      "normal_breathing_absent",
+      "normal_breathing_present",
+      "agonal_breathing",
+      "clarify_breathing"
+    ],
+    "requireSlots": {
+      "normal_breathing": false
+    },
+    "forbidKeys": [
+      "suspected_cardiac_arrest",
+      "stage",
+      "next_stage",
+      "tts",
+      "ui",
+      "tool_action",
+      "tool_actions"
+    ],
+    "acceptNeedsClarification": true
+  }
+}

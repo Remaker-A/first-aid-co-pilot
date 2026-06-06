@@ -1,0 +1,58 @@
+--------- beginning of main
+         1780697599.036 27762 27795 I EdgeTextToSpeech: Bundled TTS cache ready: 48/48 phrases (Asset)
+         1780697599.165 27762 27762 I WebSocketAgentChannel: Connecting live WebSocket url=ws://127.0.0.1:8787/ws/live session=android_live_ff398de7 mode=demo_assisted
+         1780697599.189 27762 27819 I WebSocketAgentChannel: Live WebSocket opened code=101
+         1780697599.189 27762 27819 I WebSocketAgentChannel: Sent live JSON type=start ok=true payloadKeys=
+         1780697599.190 27762 27819 I WebSocketAgentChannel: Received live text {"type":"state","session_id":"voice_live_mq1hdgxd_00pm_47d3f1146c09","live":true,"status":"connected","stt_mode":"pending"}
+         1780697599.192 27762 27819 I WebSocketAgentChannel: Received live text {"type":"state","session_id":"android_live_ff398de7","live":true,"status":"connected","stt_mode":"pending"}
+         1780697599.236 27762 27825 I SherpaSpeechEngine: ASR create start modelDir=/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models/speech/stt-stream/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20
+         1780697601.069 27762 27825 I SherpaSpeechEngine: ASR create done
+         1780697601.072 27762 27825 I SherpaSpeechEngine: ASR accept waveform samples=3200
+         1780697601.073 27762 27825 I SherpaSpeechEngine: ASR decode done iterations=0
+         1780697601.109 27762 27795 I SherpaSpeechEngine: ASR create start modelDir=/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models/speech/stt-stream/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20
+         1780697602.953 27762 27795 I SherpaSpeechEngine: ASR create done
+         1780697602.958 27762 27854 I SherpaSpeechEngine: TTS create start model=/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models/speech/tts/model.int8.onnx
+         1780697605.111 27762 27762 I LiveAudioPlayer: Live audio cancel with no active stream reason=new_turn
+         1780697605.111 27762 27762 I WebSocketAgentChannel: Sent live JSON type=turn ok=true payloadKeys=["sessionId","eventSource","eventType","deviceState","metadata"]
+         1780697605.112 27762 27762 I WebSocketAgentChannel: Sent live JSON type=context ok=true payloadKeys=["sessionId"]
+         1780697605.120 27762 27819 I WebSocketAgentChannel: Received live text {"type":"thinking","session_id":"android_live_ff398de7","turn_seq":1}
+         1780697605.122 27762 27797 D AudioRecord: set(): 0xb4000076609c3f80, inputSource 6, sampleRate 16000, format 0x1, channelMask 0x10, frameCount 2560, notificationFrames 0, sessionId 0, transferType 0, flags 0, attributionSource AttributionSourceState{pid: -1, uid: 10299, packageName: com.firstaid.copilot.debug, attributionTag: (null), token: , renouncedPermissions: [], next: []} uid -1, pid -1, latency 200
+         1780697605.122 27762 27819 I WebSocketAgentChannel: Received live text {"type":"final","session_id":"android_live_ff398de7","turn_seq":1,"text":"","intent":null}
+         1780697605.123 27762 27819 I WebSocketAgentChannel: Received live text {"type":"guidance","session_id":"android_live_ff398de7","turn_seq":1,"action":{"action_id":"act_mq1hdli5_00pr_12089257bdce","session_id":"android_live_ff398de7","timestamp":"2026-06-05T22:13:24.893Z","stage":"S1_SCENE_SAFE","intent":"ensure_scene_safe","priority":"normal","source":"state_machine","r
+         1780697605.124 27762 27797 I AudioRecord: set(): getPolicyInputSourceForVoip mAttributes input source= 6,flags:0
+         1780697605.124 27762 27797 D AudioRecord: getpackName client name com.firstaid.copilot.debug(27762)
+         1780697605.125 27762 27797 D AudioRecord: getpackName client name com.firstaid.copilot.debug(27762)
+         1780697605.125 27762 27797 D AudioRecord: getpackName client name com.firstaid.copilot.debug(27762)
+         1780697605.128 27762 27819 I WebSocketAgentChannel: Received live text {"type":"state","session_id":"android_live_ff398de7","turn_seq":1,"current_stage":"S1_SCENE_SAFE","state":{"schema_version":"session_state.v0.1","session_id":"android_live_ff398de7","mode":"demo_assisted","current_stage":"S1_SCENE_SAFE","previous_stage":"S1_SCENE_SAFE","started_at":"2026-06-05T22:13
+         1780697605.146 27762 27797 D AudioRecord: openRecord_l: 0xb4000076609c3f80, mCblk = 0x780e4cf000
+         1780697605.196 27762 27797 D AudioRecord: start(400): 0xb4000076609c3f80, sync event 0 trigger session 0
+         1780697605.196 27762 27797 D AudioRecord: getpackName client name com.firstaid.copilot.debug(27762)
+         1780697605.218 27762 27797 D AudioRecord: start(400): return status 0
+         1780697605.218 27762 27797 I LiveAudioCapture: Audio capture started threshold=0.018 bargeInThreshold=0.06 frameMs=40 minUtteranceMs=180 commitSilenceMs=450
+         1780697605.273 27762 27762 I EdgeTextToSpeech: Foreground Android system TTS for '开始录制，先确认周围安全；安全后'
+         1780697605.273 27762 27762 I AndroidTextToSpeech: Android TTS speak request ready=true utterance=act_mq1hdli5_00pr_12089257bdce chars=21
+         1780697605.315 27762 27797 I LiveAudioCapture: Capture rmsPeak=0.0 voiceActive=false voicedMs=0 tts=false tail=false
+         1780697605.359 27762 27777 I AndroidTextToSpeech: Android TTS onStart latency=86ms
+         1780697607.361 27762 27797 I LiveAudioCapture: Capture rmsPeak=0.0033996385 voiceActive=false voicedMs=0 tts=true tail=false
+         1780697607.830 27762 27819 I WebSocketAgentChannel: Received live text {"type":"audio_begin","session_id":"android_live_ff398de7","turn_seq":1,"action_id":"act_mq1hdli5_00pr_12089257bdce","format":"pcm16","sample_rate":44100,"channels":1,"bits_per_sample":16}
+         1780697607.880 27762 27819 I WebSocketAgentChannel: Received live audio bytes=73728
+         1780697608.301 27762 27819 I WebSocketAgentChannel: Received live audio bytes=105472
+         1780697608.713 27762 27854 I SherpaSpeechEngine: TTS create done
+         1780697608.713 27762 27854 I SherpaSpeechEngine: TTS generate start chars=4
+         1780697609.364 27762 27797 I LiveAudioCapture: Capture rmsPeak=0.0029306442 voiceActive=false voicedMs=0 tts=true tail=false
+         1780697609.556 27762 27819 I WebSocketAgentChannel: Received live audio bytes=138240
+         1780697609.557 27762 27819 I WebSocketAgentChannel: Received live text {"type":"audio_end","session_id":"android_live_ff398de7","turn_seq":1,"action_id":"act_mq1hdli5_00pr_12089257bdce"}
+         1780697609.557 27762 27819 I WebSocketAgentChannel: Received live text {"type":"metrics","session_id":"android_live_ff398de7","turn_seq":1,"current_stage":"S1_SCENE_SAFE","auto_advance":false,"timings":{"stt_ms":0,"intent_resolution_ms":0,"agent_pipeline_ms":1,"gemma_ms":null,"tts_ms":4428,"tts_first_chunk_ms":2712,"total_ms":4430},"tts":{"provider":null,"cache_hit":fa
+         1780697609.562 27762 27762 I LiveSessionViewModel: Live metrics turn=1 stage=S1_SCENE_SAFE source=state_machine intent= intentSource=regex total=4430ms tts=4428ms audio=2712ms openSegment= openWait=-1ms openFallback=false
+         1780697611.395 27762 27797 I LiveAudioCapture: Capture rmsPeak=0.0035600085 voiceActive=false voicedMs=0 tts=false tail=false
+         1780697612.495 27762 27854 I SherpaSpeechEngine: TTS generate done
+         1780697612.497 27762 27854 I SherpaSpeechEngine: TTS save done bytes=71724
+         1780697612.498 27762 27762 I EdgeTextToSpeech: Sherpa TTS cached '继续按压' in 9541ms
+         1780697612.505 27762 27903 I SherpaSpeechEngine: TTS generate start chars=21
+         1780697613.217 27762 27762 I LiveCprCoachScreen: ASR endpoint
+         1780697613.460 27762 27797 I LiveAudioCapture: Capture rmsPeak=4.4136422E-4 voiceActive=false voicedMs=0 tts=false tail=false
+         1780697615.518 27762 27797 I LiveAudioCapture: Capture rmsPeak=4.4796374E-4 voiceActive=false voicedMs=0 tts=false tail=false
+         1780697615.710 27762 27762 I LiveCprCoachScreen: ASR endpoint
+         1780697617.519 27762 27797 I LiveAudioCapture: Capture rmsPeak=4.1424556E-4 voiceActive=false voicedMs=0 tts=false tail=false
+         1780697618.289 27762 27762 I LiveCprCoachScreen: ASR endpoint
+         1780697619.556 27762 27797 I LiveAudioCapture: Capture rmsPeak=4.0893487E-4 voiceActive=false voicedMs=0 tts=false tail=false

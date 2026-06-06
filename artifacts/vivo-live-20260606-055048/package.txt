@@ -1,0 +1,172 @@
+﻿Activity Resolver Table:
+  Non-Data Actions:
+      android.intent.action.MAIN:
+        602cef9 com.firstaid.copilot.debug/com.firstaid.copilot.MainActivity filter 7d82e3e
+          Action: "android.intent.action.MAIN"
+          Category: "android.intent.category.LAUNCHER"
+
+Receiver Resolver Table:
+  Non-Data Actions:
+      androidx.profileinstaller.action.SAVE_PROFILE:
+        69459ec com.firstaid.copilot.debug/androidx.profileinstaller.ProfileInstallReceiver filter 82d0bbb
+          Action: "androidx.profileinstaller.action.SAVE_PROFILE"
+      androidx.profileinstaller.action.INSTALL_PROFILE:
+        69459ec com.firstaid.copilot.debug/androidx.profileinstaller.ProfileInstallReceiver filter 91861b5
+          Action: "androidx.profileinstaller.action.INSTALL_PROFILE"
+      androidx.profileinstaller.action.SKIP_FILE:
+        69459ec com.firstaid.copilot.debug/androidx.profileinstaller.ProfileInstallReceiver filter 424f04a
+          Action: "androidx.profileinstaller.action.SKIP_FILE"
+      androidx.profileinstaller.action.BENCHMARK_OPERATION:
+        69459ec com.firstaid.copilot.debug/androidx.profileinstaller.ProfileInstallReceiver filter 26328d8
+          Action: "androidx.profileinstaller.action.BENCHMARK_OPERATION"
+
+Domain verification status:
+
+Permissions:
+  Permission [com.firstaid.copilot.debug.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION] (add724b):
+    sourcePackage=com.firstaid.copilot.debug
+    uid=10299 gids=[] type=0 prot=signature
+    perm=PermissionInfo{5da1add com.firstaid.copilot.debug.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION}
+
+Registered ContentProviders:
+  com.firstaid.copilot.debug/androidx.startup.InitializationProvider:
+    Provider{5faf652 com.firstaid.copilot.debug/androidx.startup.InitializationProvider}
+
+ContentProvider Authorities:
+  [com.firstaid.copilot.debug.androidx-startup]:
+    Provider{5faf652 com.firstaid.copilot.debug/androidx.startup.InitializationProvider}
+      applicationInfo=ApplicationInfo{a1eb428 com.firstaid.copilot.debug}
+
+Key Set Manager:
+  [com.firstaid.copilot.debug]
+      Signing KeySets: 82
+
+Packages:
+  Package [com.firstaid.copilot.debug] (3dc7220):
+    userId=10299
+    pkg=Package{8f05a8 com.firstaid.copilot.debug}
+    codePath=/data/app/~~np7iDYy1wu4kzNFYF7HaAw==/com.firstaid.copilot.debug-In5jlBMspEDW0VvoMKoq9A==
+    resourcePath=/data/app/~~np7iDYy1wu4kzNFYF7HaAw==/com.firstaid.copilot.debug-In5jlBMspEDW0VvoMKoq9A==
+    legacyNativeLibraryDir=/data/app/~~np7iDYy1wu4kzNFYF7HaAw==/com.firstaid.copilot.debug-In5jlBMspEDW0VvoMKoq9A==/lib
+    extractNativeLibs=false
+    primaryCpuAbi=arm64-v8a
+    secondaryCpuAbi=null
+    cpuAbiOverride=null
+    versionCode=1 minSdk=26 targetSdk=35
+    minExtensionVersions=[]
+    versionName=0.1.0-debug
+    usesNonSdkApi=false
+    splits=[base]
+    apkSigningVersion=2
+    flags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]
+    privateFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]
+    forceQueryable=false
+    dataDir=/data/user/0/com.firstaid.copilot.debug
+    supportsScreens=[small, medium, large, xlarge, resizeable, anyDensity]
+    usesOptionalNativeLibraries:
+      libvndksupport.so
+      libOpenCL.so
+    usesLibraryFiles:
+      libOpenCL.so
+    timeStamp=2026-06-06 05:50:25
+    lastUpdateTime=2026-06-06 05:50:34
+    packageSource=0
+    signatures=PackageSignatures{b53cf07 version:2, signatures:[7760a65f], past signatures:[]}
+    installPermissionsFixed=true
+    pkgFlags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]
+    declared permissions:
+      com.firstaid.copilot.debug.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION: prot=signature, INSTALLED
+    requested permissions:
+      android.permission.INTERNET
+      android.permission.RECORD_AUDIO
+      android.permission.CAMERA
+      android.permission.ACCESS_FINE_LOCATION
+      android.permission.ACCESS_COARSE_LOCATION
+      com.firstaid.copilot.debug.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+      android.permission.ACCESS_NETWORK_STATE
+    install permissions:
+      android.permission.INTERNET: granted=true
+      com.firstaid.copilot.debug.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION: granted=true
+      android.permission.ACCESS_NETWORK_STATE: granted=true
+    User 0: ceDataInode=470229 installed=true hidden=false vHidden=1 suspended=false distractionFlags=0 stopped=false notLaunched=false enabled=0 instant=false virtual=false
+      installReason=0
+      firstInstallTime=2026-06-05 07:44:09
+      uninstallReason=0
+      overlay paths:
+        /data/resource-cache/com.android.systemui-neutral-eVR1.frro
+        /data/resource-cache/com.android.systemui-accent-FO8q.frro
+      gids=[3003]
+      runtime permissions:
+        android.permission.ACCESS_FINE_LOCATION: granted=true, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.ACCESS_COARSE_LOCATION: granted=true, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.CAMERA: granted=true, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+
+Queries:
+  system apps queryable: false
+  queries via forceQueryable:
+  queries via package name:
+  queries via component:
+    [com.vivo.assistant,com.vivo.faceui,com.wapi.wapicertmanager,com.vivo.doubleinstance,com.vivo.fingerprint,android,com.trustonic.teeservice,com.vivo.floatingball,com.vivo.aiengine,com.vivo.gamewatch,com.vivo.abe,com.android.networkstack.inprocess,com.vivo.appfilter,com.vivo.vms,com.android.bbklog,com.vivo.fuelsummary,com.bbk.facewake,com.vivo.dr,com.vivo.upslide,com.android.keychain,com.android.server.telecom,com.vivo.contentcatcher,com.android.networkstack.tethering.inprocess,com.android.providers.settings,com.iqoo.powersaving,com.mediatek,com.android.dynsystem,com.vivo.fuzzylocationmanager,com.vivo.globalanimation,com.mobile.cos.iroaming,com.vivo.vtouch,com.vivo.smartshot,com.android.inputdevices,com.vivo.voicewakeup,com.mediatek.atci.service,com.bbk.SuperPowerSave,com.vivo.multinlp,com.vivo.daemonService,com.vivo.vdfs,com.android.location.fused,com.vivo.gamecube,com.mediatek.location.lppe.main,com.android.settings,com.android.localtransport,com.vivo.healthservice,com.vivo.faceunlock,com.vivo.vivokaraoke,com.vivo.vibrator4d,com.vivo.permissionmanager,com.vivo.epm,com.vivo.networkstate,com.vivo.fingerprintui,com.vivo.basemanager,com.android.wallpaperbackup,com.vivo.car.networking,com.vivo.smartunlock,com.vivo.minscreen,com.vivo.pem,com.vivo.setupwizard,com.android.BBKCrontab,com.vivo.smartmultiwindow,com.vivo.sps,com.iqoo.aftersale.engineermode,com.vivo.audiofx,com.vivo.fingerprintengineer]:
+      com.firstaid.copilot.debug
+    com.sohu.inputmethod.sogou.vivo:
+      com.firstaid.copilot.debug
+    com.vivo.browser:
+      com.firstaid.copilot.debug
+    com.vivo.hiboard:
+      com.firstaid.copilot.debug
+    com.vivo.hybrid:
+      com.firstaid.copilot.debug
+    com.vivo.upnpserver:
+      com.firstaid.copilot.debug
+    com.android.VideoPlayer:
+      com.firstaid.copilot.debug
+    com.chaozh.iReader:
+      com.firstaid.copilot.debug
+    com.zjwh.android_wh_physicalfitness:
+      com.firstaid.copilot.debug
+    com.xunmeng.pinduoduo:
+      com.firstaid.copilot.debug
+    com.sina.weibo:
+      com.firstaid.copilot.debug
+    com.tencent.mm:
+      com.firstaid.copilot.debug
+    com.xingin.xhs:
+      com.firstaid.copilot.debug
+    com.sevenVideo.app.android:
+      com.firstaid.copilot.debug
+    com.zzw.october:
+      com.firstaid.copilot.debug
+    com.ss.android.merchant:
+      com.firstaid.copilot.debug
+    com.juss.sports.app:
+      com.firstaid.copilot.debug
+    com.yaya.zone:
+      com.firstaid.copilot.debug
+  queryable via interaction:
+    User 0:
+  queryable via uses-library:
+
+Dexopt state:
+  [com.firstaid.copilot.debug]
+    path: /data/app/~~np7iDYy1wu4kzNFYF7HaAw==/com.firstaid.copilot.debug-In5jlBMspEDW0VvoMKoq9A==/base.apk
+      arm64: [status=run-from-apk] [reason=unknown]
+  BgDexopt state:
+    enabled:true
+    mDexOptThread:null
+    mDexOptCancellingThread:null
+    mFinishedPostBootUpdate:true
+    mLastExecutionStatus:1
+    mLastExecutionStartTimeMs:74167373
+    mLastExecutionDurationIncludingSleepMs:13793
+    mLastExecutionStartUptimeMs:65715269
+    mLastExecutionDurationMs:13793
+    now:79334777
+    mLastCancelledPackages:com.zjwh.android_wh_physicalfitness
+    mFailedPackageNamesPrimary:
+    mFailedPackageNamesSecondary:
+
+Compiler stats:
+  [com.firstaid.copilot.debug]
+     base.apk - 2622
+

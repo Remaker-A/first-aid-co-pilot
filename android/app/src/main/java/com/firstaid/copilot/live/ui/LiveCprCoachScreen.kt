@@ -6,24 +6,17 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.Preview as CameraPreview
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +33,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -55,7 +49,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,24 +64,28 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.firstaid.copilot.live.AttentionMode
 import com.firstaid.copilot.live.ConnectionState
 import com.firstaid.copilot.live.DemoTurn
+import com.firstaid.copilot.live.LivePhoneticIntentRouter
 import com.firstaid.copilot.live.LiveSessionViewModel
 import com.firstaid.copilot.live.LiveUiState
 import com.firstaid.copilot.live.MicState
+import com.firstaid.copilot.live.ToolConfirmationState
+import com.firstaid.copilot.live.resolvePrimaryButtonIntent
 import com.firstaid.copilot.live.audio.LiveAudioCapture
 import com.firstaid.copilot.live.audio.MetronomeController
 import com.firstaid.copilot.live.demoCprSetupSequence
 import com.firstaid.copilot.live.demoPresetById
 import com.firstaid.copilot.live.demoPresets
+import com.firstaid.copilot.live.edge.EdgeGemmaAgent
+import com.firstaid.copilot.live.edge.EdgeGemmaFeatureFlags
 import com.firstaid.copilot.live.edge.EdgeModelKind
 import com.firstaid.copilot.live.edge.EdgeModelReport
 import com.firstaid.copilot.live.edge.EdgeTextToSpeechEdge
+import com.firstaid.copilot.live.edge.GemmaBackendPreference
 import com.firstaid.copilot.live.edge.OnDeviceGemmaDriver
 import com.firstaid.copilot.live.edge.StreamingAsrEvent
 import com.firstaid.copilot.live.edge.StreamingAsrSession
@@ -97,12 +94,21 @@ import com.firstaid.copilot.live.edge.buildSherpaStreamingAsrSession
 import com.firstaid.copilot.live.edge.inspectEdgeModels
 import com.firstaid.copilot.live.normalizeOverlayMode
 import com.firstaid.copilot.live.toAttentionMode
-import com.firstaid.copilot.live.vision.cpr.CprVisionAnalyzer
-import com.firstaid.copilot.live.vision.cpr.VisionCameraFacing
-import com.firstaid.copilot.live.vision.cpr.VisionCameraMount
+import com.firstaid.copilot.live.perception.PerceptionSignal
+import com.firstaid.copilot.live.ui.components.AedGuidanceCard
+import com.firstaid.copilot.live.ui.components.CountdownRing
+import com.firstaid.copilot.live.ui.components.ErrorBanner
+import com.firstaid.copilot.live.ui.components.PrimaryActionButton
+import com.firstaid.copilot.live.ui.components.ResponseStrip
+import com.firstaid.copilot.live.ui.components.SourceBadgeChip
+import com.firstaid.copilot.live.ui.components.StageProgressRail
+import com.firstaid.copilot.live.ui.theme.FirstAidColors
+import com.firstaid.copilot.live.ui.theme.FirstAidDimens
+import com.firstaid.copilot.live.ui.theme.FirstAidType
 import java.io.File
-import java.util.concurrent.Executor
-import java.util.concurrent.Executors
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -117,12 +123,29 @@ fun LiveCprCoachScreen(
     val skipGemmaWarmup = remember {
         (context as? Activity)?.intent?.getBooleanExtra("skipGemmaWarmup", false) == true
     }
+    // Phase-0 端侧 Gemma 增强层 flags. Default OFF (DISABLED) so behavior is
+    // unchanged; an Activity intent extra can opt individual functions in for
+    // testing without changing the production default.
+    val edgeGemmaFlags = remember {
+        val intent = (context as? Activity)?.intent
+        if (intent == null) {
+            EdgeGemmaFeatureFlags.DISABLED
+        } else {
+            EdgeGemmaFeatureFlags(
+                enabled = intent.getBooleanExtra("edgeGemmaEnabled", false),
+                nluEnabled = intent.getBooleanExtra("edgeGemmaNlu", false),
+                openQuestionEnabled = intent.getBooleanExtra("edgeGemmaOpenQuestion", false),
+                proactiveEnabled = intent.getBooleanExtra("edgeGemmaProactive", false),
+            )
+        }
+    }
     val coroutineScope = rememberCoroutineScope()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val attentionMode = state.attentionModeInputs.toAttentionMode()
 
     var useCameraSource by remember { mutableStateOf(false) }
     var showDemoDrawer by remember { mutableStateOf(false) }
+    var showHandover by remember { mutableStateOf(false) }
     var hasCameraPermission by remember {
         mutableStateOf(context.hasPermission(Manifest.permission.CAMERA))
     }
@@ -132,9 +155,11 @@ fun LiveCprCoachScreen(
     var startAudioAfterPermission by remember { mutableStateOf(false) }
     var rmsLevel by remember { mutableFloatStateOf(0f) }
     var liveAudioEnabled by remember { mutableStateOf(false) }
+    var localTtsSpeaking by remember { mutableStateOf(false) }
     var edgeReport by remember { mutableStateOf<EdgeModelReport?>(null) }
     var edgeSummary by remember { mutableStateOf("Edge models: checking") }
     var gemmaDriver by remember { mutableStateOf<OnDeviceGemmaDriver?>(null) }
+    var gemmaAgent by remember { mutableStateOf<EdgeGemmaAgent?>(null) }
     var streamingAsrSession by remember { mutableStateOf<StreamingAsrSession?>(null) }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
@@ -148,36 +173,47 @@ fun LiveCprCoachScreen(
     val ttsSpeechEngine = remember { buildSherpaSpeechEngine(context, numThreads = 6) }
     val ttsEdge = remember {
         EdgeTextToSpeechEdge(context, ttsSpeechEngine) { speaking ->
-            audioCapture.setTtsSpeaking(speaking)
-            // Single voice: duck the metronome under TTS, restore to full when done.
-            // The beat itself never pauses for TTS — only its volume changes.
-            metronome.setDucked(speaking)
-            viewModel.setMicState(
-                when {
-                    speaking -> MicState.Speaking
-                    liveAudioEnabled -> MicState.Listening
-                    else -> MicState.Idle
-                },
-            )
+            mainHandler.post {
+                localTtsSpeaking = speaking
+            }
         }
     }
     fun handleStreamingAsrEvents(events: List<StreamingAsrEvent>) {
         events.forEach { event ->
             when (event) {
                 is StreamingAsrEvent.Partial -> mainHandler.post {
+                    if (viewModel.uiState.value.isAssistantPlaybackActiveForAsr()) {
+                        Log.i(TAG, "ASR partial ignored during assistant playback")
+                        return@post
+                    }
+                    Log.i(TAG, "ASR partial='${event.text.take(80)}'")
                     viewModel.acceptLocalAsrPartial(event.text)
                 }
                 is StreamingAsrEvent.Final -> mainHandler.post {
+                    if (viewModel.uiState.value.isAssistantPlaybackActiveForAsr()) {
+                        Log.i(TAG, "ASR final ignored during assistant playback")
+                        return@post
+                    }
+                    Log.i(
+                        TAG,
+                        "ASR final='${event.text.take(80)}' intent=${event.intent.orEmpty()} confidence=${event.confidence}",
+                    )
                     if (event.text.isNotBlank()) {
-                        viewModel.submitLiveText(text = event.text, intent = event.intent)
+                        viewModel.submitLiveText(text = event.text, intent = event.intent, fromAsr = true)
                     }
                 }
                 StreamingAsrEvent.Endpoint -> mainHandler.post {
+                    if (viewModel.uiState.value.isAssistantPlaybackActiveForAsr()) {
+                        Log.i(TAG, "ASR endpoint ignored during assistant playback")
+                        return@post
+                    }
+                    Log.i(TAG, "ASR endpoint")
                     if (liveAudioEnabled) {
                         viewModel.setMicState(MicState.Listening)
                     }
                 }
                 is StreamingAsrEvent.Error -> mainHandler.post {
+                    Log.w(TAG, "ASR error ${event.message}", event.cause)
                     viewModel.reportLocalAsrError(event.message)
                 }
             }
@@ -213,16 +249,37 @@ fun LiveCprCoachScreen(
                 }
             },
             onUtterancePcm = { pcm16 ->
+                Log.i(TAG, "Utterance callback bytes=${pcm16.size} streaming=${localStreamingAsr != null} whole=$useWholeUtteranceAsr")
                 when {
                     localStreamingAsr != null -> {
-                        handleStreamingAsrEvents(localStreamingAsr.end())
+                        val events = localStreamingAsr.end()
+                        handleStreamingAsrEvents(events)
+                        val hasFinalText = events.any {
+                            it is StreamingAsrEvent.Final && it.text.isNotBlank()
+                        }
+                        if (!hasFinalText) {
+                            coroutineScope.launch {
+                                Log.i(TAG, "Streaming ASR produced no final text; running whole-utterance fallback")
+                                viewModel.setMicState(MicState.Uploading)
+                                val result = asrSpeechEngine.transcribePcm16(pcm16)
+                                Log.i(
+                                    TAG,
+                                    "Whole-utterance ASR fallback ok=${result.ok} text='${result.text.take(80)}' latency=${result.latencyMs}ms",
+                                )
+                                if (result.ok && result.text.isNotBlank()) {
+                                    viewModel.submitLiveText(text = result.text, fromAsr = true)
+                                } else {
+                                    viewModel.setMicState(MicState.Listening)
+                                }
+                            }
+                        }
                     }
                     useWholeUtteranceAsr -> {
                         coroutineScope.launch {
                             viewModel.setMicState(MicState.Uploading)
                             val result = asrSpeechEngine.transcribePcm16(pcm16)
                             if (result.ok && result.text.isNotBlank()) {
-                                viewModel.submitLiveText(text = result.text)
+                                viewModel.submitLiveText(text = result.text, fromAsr = true)
                             } else {
                                 viewModel.setMicState(MicState.Listening)
                             }
@@ -257,6 +314,9 @@ fun LiveCprCoachScreen(
 
     LaunchedEffect(Unit) {
         viewModel.connect()
+        // Load the shared phonetic safety-net word table so a misheard CPR-live
+        // question still carries the right intent hint (parity with the server).
+        LivePhoneticIntentRouter.warm(context.applicationContext)
         val report = inspectEdgeModels(context, asrSpeechEngine.runtimeAvailable())
         edgeReport = report
         edgeSummary = report.summaryLine()
@@ -304,10 +364,21 @@ fun LiveCprCoachScreen(
 
             val gemmaPath = report.status(EdgeModelKind.Gemma).path
             if (gemmaPath != null && !skipGemmaWarmup) {
-                val driver = OnDeviceGemmaDriver(context.applicationContext, File(gemmaPath))
+                val driver = OnDeviceGemmaDriver(
+                    context.applicationContext,
+                    File(gemmaPath),
+                    backendPreference = GemmaBackendPreference.CpuOnly,
+                )
                 gemmaDriver = driver
                 val warmup = driver.prewarm()
                 gemmaWarmSummary = if (warmup.ok) {
+                    // Wrap the (now warm) exclusive driver in the unified edge agent
+                    // and hand it to the ViewModel, which wires each capability seam
+                    // from the agent's flags. The agent is inert unless its flags are
+                    // on, so this is a no-op for the default (all-off) build.
+                    val agent = EdgeGemmaAgent(driver, edgeGemmaFlags)
+                    gemmaAgent = agent
+                    viewModel.attachEdgeGemmaAgent(agent)
                     "GemmaWarm=${warmup.latencyMs}ms"
                 } else {
                     "GemmaWarm=error"
@@ -324,12 +395,23 @@ fun LiveCprCoachScreen(
         metronome.apply(state.haptic)
     }
 
-    LaunchedEffect(state.isLiveAudioPlaying) {
-        if (state.isLiveAudioPlaying) {
+    LaunchedEffect(state.currentStage) {
+        if (state.currentStage?.startsWith("S9") == true) {
+            showHandover = true
+        }
+    }
+
+    LaunchedEffect(localTtsSpeaking, state.isLiveAudioPlaying, liveAudioEnabled) {
+        val assistantPlaybackActive = localTtsSpeaking || state.isLiveAudioPlaying
+        if (assistantPlaybackActive) {
+            viewModel.setMicState(MicState.Speaking)
+            streamingAsrSession?.reset()
             audioCapture.setTtsSpeaking(true)
             metronome.setDucked(true)
         } else {
             delay(180)
+            viewModel.setMicState(if (liveAudioEnabled) MicState.Listening else MicState.Idle)
+            streamingAsrSession?.reset()
             audioCapture.setTtsSpeaking(false)
             metronome.setDucked(false)
         }
@@ -350,6 +432,25 @@ fun LiveCprCoachScreen(
         }
     }
 
+    // Phase D: proactive nudges ride a *dedicated* low-priority TTS, keyed on the
+    // cue id so they never reuse the server guidance/audio path. They only speak
+    // when nothing else is talking; "do_not_interrupt_critical" guarantees a
+    // critical line is never cut off even if one starts in the same frame.
+    LaunchedEffect(state.proactiveCue?.id) {
+        val cue = state.proactiveCue ?: return@LaunchedEffect
+        if (state.suppressLocalTts || state.isLiveAudioPlaying || state.micState == MicState.Speaking) {
+            return@LaunchedEffect
+        }
+        ttsEdge.speak(
+            text = cue.text,
+            utteranceKey = cue.id,
+            priority = "low",
+            interruptPolicy = "do_not_interrupt_critical",
+            tone = cue.tone,
+            speed = cue.speed,
+        )
+    }
+
     DisposableEffect(Unit) {
         onDispose {
             metronome.release()
@@ -358,6 +459,10 @@ fun LiveCprCoachScreen(
             asrSpeechEngine.close()
             streamingAsrSession?.close()
             ttsSpeechEngine.close()
+            // Detach (clears every seam wired from it) and stop the agent's worker
+            // before closing the shared driver, so no in-flight generation outlives it.
+            viewModel.detachEdgeGemmaAgent()
+            gemmaAgent?.close()
             gemmaDriver?.close()
         }
     }
@@ -369,65 +474,104 @@ fun LiveCprCoachScreen(
         useCameraSource = enabled
     }
 
+    val voice = voiceControlPresentation(state.micState, state.currentStage)
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF070B12)),
+            .background(FirstAidColors.Background),
     ) {
-        CameraPreviewSurface(
-            useCameraSource = useCameraSource,
-            hasCameraPermission = hasCameraPermission,
-            enableVisionAnalysis = useCameraSource && state.currentStage.isCprVisionAnalysisStage(),
-            onVisionMetrics = viewModel::submitVisionMetrics,
-            onVisionUnavailable = viewModel::reportVisionUnavailable,
-            onRequestCameraPermission = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) },
-            modifier = Modifier.fillMaxSize(),
-        )
-
-        CprCoachOverlay(
-            mode = state.visualOverlayMode,
-            correctionArrow = state.correctionArrow,
-            attentionMode = attentionMode,
-            modifier = Modifier.fillMaxSize(),
-        )
-
-        when (attentionMode) {
-            AttentionMode.Coach -> CoachLayout(state)
-            AttentionMode.EyesOff -> EyesOffLayout(state)
-            AttentionMode.Glanceable -> GlanceableLayout(state)
+        // Pulsing ambience only during the compression / assist phases.
+        if (voice.flowStarted && attentionMode != AttentionMode.Coach) {
+            CprCoachOverlay(
+                mode = state.visualOverlayMode,
+                correctionArrow = state.correctionArrow,
+                attentionMode = attentionMode,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
 
-        MinimalTopStatus(
+        if (!voice.flowStarted) {
+            EntryScreen(
+                connectionLabel = state.connectionState.label,
+                onStartFirstAid = {
+                    viewModel.startFirstAid()
+                    if (!hasAudioPermission) {
+                        startAudioAfterPermission = true
+                        audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    } else {
+                        startAudioCapture()
+                    }
+                },
+                modifier = Modifier.align(Alignment.Center),
+            )
+        } else {
+            when (attentionMode) {
+                AttentionMode.Coach -> CoachLayout(state)
+                AttentionMode.EyesOff -> EyesOffLayout(state)
+                AttentionMode.Glanceable -> GlanceableLayout(state)
+            }
+        }
+
+        TopStatusBar(
             state = state,
-            onOpenDebug = { showDemoDrawer = true },
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(16.dp),
+                .padding(FirstAidDimens.ItemGap),
         )
 
-        LiveVoiceControls(
-            state = state,
-            rmsLevel = rmsLevel,
-            hasAudioPermission = hasAudioPermission,
-            onRequestAudioPermission = {
-                startAudioAfterPermission = true
-                audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-            },
-            onStartFirstAid = { viewModel.startFirstAid() },
-            onSubmitText = {
-                ttsEdge.stop()
-                viewModel.submitLiveText(text = it)
-            },
-            onStartAudio = { startAudioCapture() },
-            onStopAudio = {
-                liveAudioEnabled = false
-                audioCapture.stop()
-                viewModel.stopLiveAudio()
-            },
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(16.dp),
-        )
+        if (useCameraSource) {
+            CameraPiPWindow(
+                visible = true,
+                hasCameraPermission = hasCameraPermission,
+                onRequestPermission = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) },
+                onClose = { setCameraSource(false) },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 112.dp, end = FirstAidDimens.ItemGap),
+                enableVisionAnalysis = state.currentStage?.let { it.startsWith("S6") || it.startsWith("S7") } == true,
+                onVisionMetrics = viewModel::submitVisionMetrics,
+                onVisionUnavailable = viewModel::reportVisionUnavailable,
+            )
+        }
+
+        if (voice.flowStarted) {
+            LiveVoiceControls(
+                state = state,
+                rmsLevel = rmsLevel,
+                hasAudioPermission = hasAudioPermission,
+                useCameraSource = useCameraSource,
+                onToggleCamera = { setCameraSource(!useCameraSource) },
+                onOpenMore = { showDemoDrawer = true },
+                onPrimaryButton = {
+                    state.primaryButton?.let { button ->
+                        ttsEdge.stop()
+                        viewModel.submitLiveText(
+                            text = button.label,
+                            intent = resolvePrimaryButtonIntent(button.intent),
+                        )
+                    }
+                },
+                onRequestAudioPermission = {
+                    startAudioAfterPermission = true
+                    audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                },
+                onStartFirstAid = { viewModel.startFirstAid() },
+                onSubmitText = {
+                    ttsEdge.stop()
+                    viewModel.submitLiveText(text = it)
+                },
+                onStartAudio = { startAudioCapture() },
+                onStopAudio = {
+                    liveAudioEnabled = false
+                    audioCapture.stop()
+                    viewModel.stopLiveAudio()
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(FirstAidDimens.ItemGap),
+            )
+        }
 
         if (showDemoDrawer) {
             DemoInjectionDrawer(
@@ -439,6 +583,7 @@ fun LiveCprCoachScreen(
                 onReset = {
                     ttsEdge.stop()
                     viewModel.reset()
+                    showHandover = false
                 },
                 useCameraSource = useCameraSource,
                 onCameraToggle = ::setCameraSource,
@@ -455,142 +600,176 @@ fun LiveCprCoachScreen(
                 modifier = Modifier.align(Alignment.CenterEnd),
             )
         }
+
+        if (state.emergencyCall.requested) {
+            EmergencyCallSimulationDialog(
+                onDismiss = viewModel::dismissEmergencyCallDialog,
+                mock = state.emergencyCall.mock,
+            )
+        }
+
+        state.pendingConfirmation?.let { confirmation ->
+            ToolConfirmationDialog(
+                confirmation = confirmation,
+                onConfirm = viewModel::confirmPendingTool,
+                onDismiss = viewModel::dismissConfirmation,
+            )
+        }
+
+        if (showHandover) {
+            HandoverReportScreen(
+                model = state.toHandoverModel(),
+                onShare = { viewModel.confirmPendingTool() },
+                onSave = { showHandover = false },
+                onClose = { showHandover = false },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun MinimalTopStatus(
+private fun TopStatusBar(
     state: LiveUiState,
-    onOpenDebug: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        color = Color(0x990F172A),
-        shape = RoundedCornerShape(22.dp),
-        modifier = modifier
-            .fillMaxWidth()
-            .combinedClickable(
-                onClick = {},
-                onLongClick = onOpenDebug,
-            ),
+    val flowStarted = voiceControlPresentation(state.micState, state.currentStage).flowStarted
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(FirstAidDimens.TightGap),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(FirstAidDimens.TightGap),
         ) {
             StatusChip(state.connectionState.label, state.connectionState.color)
+            SourceBadgeChip(badge = state.sourceBadge)
+            Spacer(modifier = Modifier.weight(1f))
             Text(
                 text = stageStatusLabel(state.currentStage),
-                color = Color.White,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f),
+                color = FirstAidColors.TextSecondary,
+                style = FirstAidType.Label,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.End,
             )
         }
+        if (flowStarted) {
+            StageProgressRail(currentStage = state.currentStage)
+        }
+        ErrorBanner(message = state.lastErrorMessage)
     }
 }
 
 @Composable
 private fun CoachLayout(state: LiveUiState) {
+    val isBreathingCheck = state.currentStage?.startsWith("S3") == true
+    var breathingSecondsLeft by remember(state.currentStage) { mutableStateOf(10) }
+
+    LaunchedEffect(isBreathingCheck, state.currentStage) {
+        if (isBreathingCheck) {
+            breathingSecondsLeft = 10
+            while (breathingSecondsLeft > 0) {
+                delay(1_000)
+                breathingSecondsLeft -= 1
+            }
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 92.dp),
+            .padding(horizontal = FirstAidDimens.ScreenPadding, vertical = 132.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
-        FlowProgressRail(state.currentStage)
-        GuidanceCard(state, large = false)
+        Text(
+            text = primaryGuidanceText(state.mainText, state.currentStage),
+            color = FirstAidColors.TextPrimary,
+            style = FirstAidType.Headline,
+            maxLines = 5,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (isBreathingCheck) {
+            CountdownRing(
+                secondsTotal = 10,
+                secondsLeft = breathingSecondsLeft,
+                label = "观察呼吸 10 秒",
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
+        }
+        ResponseStrip(
+            text = compactSecondaryText(state.secondaryText, state.statusTags) ?: state.lastAssistantText,
+            speaking = state.micState == MicState.Speaking || state.isLiveAudioPlaying,
+        )
     }
 }
 
 @Composable
 private fun EyesOffLayout(state: LiveUiState) {
+    val handPosition = state.cprHandPosition()
+    val rate = state.cprRate()
+    val armStraight = state.cprArmStraight()
+    val hasLocalVisionCorrection = handPosition != null || rate != null || armStraight != null
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 20.dp, vertical = 116.dp),
-        verticalArrangement = Arrangement.Center,
+            .padding(horizontal = FirstAidDimens.ScreenPadding, vertical = 132.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
             text = primaryGuidanceText(state.mainText, state.currentStage),
-            color = Color.White,
-            fontSize = 46.sp,
-            fontWeight = FontWeight.Black,
+            color = FirstAidColors.TextPrimary,
+            style = FirstAidType.DisplayHero,
             textAlign = TextAlign.Center,
-            lineHeight = 52.sp,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        compactSecondaryText(state.secondaryText, state.statusTags)?.let {
-            Spacer(Modifier.height(16.dp))
-            Text(
-                text = it,
-                color = Color(0xFFE2E8F0),
-                fontSize = 22.sp,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+        BeatPulse(bpm = state.haptic.bpm)
+        if (hasLocalVisionCorrection) {
+            CprCorrectionHint(
+                handPosition = handPosition,
+                rate = rate,
+                armStraight = armStraight,
             )
         }
-        QualityScoreDial(
-            score = state.qualityScore,
-            currentStage = state.currentStage,
-            modifier = Modifier.padding(top = 22.dp),
-        )
     }
 }
 
 @Composable
 private fun GlanceableLayout(state: LiveUiState) {
+    val isAedAssistance = state.currentStage?.startsWith("S8") == true ||
+        state.visualOverlayMode == "aed_assistance"
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 22.dp, vertical = 108.dp),
+            .padding(horizontal = FirstAidDimens.ScreenPadding, vertical = 132.dp),
         verticalArrangement = Arrangement.Bottom,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        GuidanceCard(state, large = true)
-    }
-}
-
-@Composable
-private fun GuidanceCard(
-    state: LiveUiState,
-    large: Boolean,
-) {
-    Surface(
-        color = Color(0xE60B1220),
-        shape = RoundedCornerShape(28.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(
-            modifier = Modifier.padding(22.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text = primaryGuidanceText(state.mainText, state.currentStage),
-                color = Color.White,
-                fontSize = if (large) 36.sp else 28.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+        Text(
+            text = primaryGuidanceText(state.mainText, state.currentStage),
+            color = FirstAidColors.TextPrimary,
+            style = FirstAidType.Headline,
+            textAlign = TextAlign.Center,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(modifier = Modifier.height(FirstAidDimens.SectionGap))
+        if (isAedAssistance) {
+            AedGuidanceCard(
+                currentStep = 1,
+                modifier = Modifier.fillMaxWidth(),
             )
-            compactSecondaryText(state.secondaryText, state.statusTags)?.let {
-                Text(
-                    text = it,
-                    color = Color(0xFFCBD5E1),
-                    fontSize = if (large) 20.sp else 17.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            QualityScoreDial(score = state.qualityScore, currentStage = state.currentStage)
+            Spacer(modifier = Modifier.height(FirstAidDimens.ItemGap))
         }
+        ResponseStrip(
+            text = state.secondaryText.ifBlank { state.lastAssistantText ?: "" },
+            speaking = state.micState == MicState.Speaking || state.isLiveAudioPlaying,
+        )
     }
 }
 
@@ -701,184 +880,14 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCorrectionArrow
 }
 
 @Composable
-private fun CameraPreviewSurface(
-    useCameraSource: Boolean,
-    hasCameraPermission: Boolean,
-    enableVisionAnalysis: Boolean,
-    onVisionMetrics: (Map<String, Any?>) -> Unit,
-    onVisionUnavailable: (String) -> Unit,
-    onRequestCameraPermission: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val latestOnVisionMetrics by rememberUpdatedState(onVisionMetrics)
-    val latestOnVisionUnavailable by rememberUpdatedState(onVisionUnavailable)
-    val mainExecutor = remember {
-        Executor { command -> Handler(Looper.getMainLooper()).post(command) }
-    }
-    val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
-    val mainHandler = remember { Handler(Looper.getMainLooper()) }
-    var previewView by remember { mutableStateOf<PreviewView?>(null) }
-    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
-    var visionAnalyzer by remember { mutableStateOf<CprVisionAnalyzer?>(null) }
-
-    Box(
-        modifier = modifier.background(Color(0xFF111827)),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (useCameraSource && hasCameraPermission) {
-            AndroidView(
-                factory = { viewContext ->
-                    PreviewView(viewContext).apply {
-                        scaleType = PreviewView.ScaleType.FILL_CENTER
-                        previewView = this
-                    }
-                },
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            MockCameraFallback(
-                message = if (useCameraSource) "需要相机权限" else null,
-                showPermissionButton = useCameraSource,
-                onRequestCameraPermission = onRequestCameraPermission,
-            )
-        }
-
-    }
-
-    LaunchedEffect(useCameraSource, hasCameraPermission, enableVisionAnalysis, previewView, lifecycleOwner) {
-        val view = previewView ?: return@LaunchedEffect
-        if (!useCameraSource || !hasCameraPermission) {
-            visionAnalyzer?.close()
-            visionAnalyzer = null
-            cameraProvider?.unbindAll()
-            return@LaunchedEffect
-        }
-        val future = ProcessCameraProvider.getInstance(context)
-        future.addListener(
-            {
-                runCatching {
-                    val provider = future.get()
-                    val preview = CameraPreview.Builder().build().also {
-                        it.setSurfaceProvider(view.surfaceProvider)
-                    }
-                    visionAnalyzer?.close()
-                    visionAnalyzer = null
-                    val analyzer = if (enableVisionAnalysis) {
-                        CprVisionAnalyzer(
-                            context = context,
-                            cameraFacing = VisionCameraFacing.Front,
-                            cameraMount = VisionCameraMount.SideFixed,
-                            mirrored = true,
-                            onMetrics = { metrics ->
-                                mainHandler.post { latestOnVisionMetrics(metrics) }
-                            },
-                            onUnavailable = { message ->
-                                mainHandler.post {
-                                    latestOnVisionUnavailable(message)
-                                }
-                            },
-                        )
-                    } else {
-                        null
-                    }
-                    val analysis = analyzer?.let {
-                        ImageAnalysis.Builder()
-                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                            .build()
-                            .also { imageAnalysis ->
-                                imageAnalysis.setAnalyzer(analysisExecutor, it)
-                            }
-                    }
-                    provider.unbindAll()
-                    if (analysis != null) {
-                        provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_FRONT_CAMERA, preview, analysis)
-                    } else {
-                        provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_FRONT_CAMERA, preview)
-                    }
-                    cameraProvider = provider
-                    visionAnalyzer = analyzer
-                }.onFailure {
-                    val message = "相机预览不可用：${it.message}"
-                    latestOnVisionUnavailable(message)
-                }
-            },
-            mainExecutor,
-        )
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            visionAnalyzer?.close()
-            cameraProvider?.unbindAll()
-            analysisExecutor.shutdown()
-        }
-    }
-}
-
-@Composable
-private fun MockCameraFallback(
-    message: String?,
-    showPermissionButton: Boolean,
-    onRequestCameraPermission: () -> Unit,
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF0F172A)),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(220.dp, 320.dp)
-                .clip(RoundedCornerShape(120.dp))
-                .border(2.dp, Color(0xFF334155), RoundedCornerShape(120.dp))
-                .background(Color(0xFF111827)),
-        )
-        message?.let {
-            Spacer(Modifier.height(18.dp))
-            Text(text = it, color = Color(0xFFCBD5E1), textAlign = TextAlign.Center)
-        }
-        if (showPermissionButton) {
-            OutlinedButton(onClick = onRequestCameraPermission, modifier = Modifier.padding(top = 8.dp)) {
-                Text("请求相机权限")
-            }
-        }
-    }
-}
-
-@Composable
-private fun FlowProgressRail(currentStage: String?) {
-    val currentIndex = currentStage?.let { Regex("""S(\d+)""").find(it)?.groupValues?.getOrNull(1)?.toIntOrNull() } ?: 0
-    Surface(color = Color(0xB30F172A), shape = RoundedCornerShape(20.dp)) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            (0..9).forEach { index ->
-                val active = index <= currentIndex
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(10.dp)
-                        .clip(CircleShape)
-                        .background(if (active) Color(0xFF22C55E) else Color(0xFF334155)),
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun LiveVoiceControls(
     state: LiveUiState,
     rmsLevel: Float,
     hasAudioPermission: Boolean,
+    useCameraSource: Boolean,
+    onToggleCamera: () -> Unit,
+    onOpenMore: () -> Unit,
+    onPrimaryButton: () -> Unit,
     onRequestAudioPermission: () -> Unit,
     onStartFirstAid: () -> Unit,
     onSubmitText: (String) -> Unit,
@@ -890,87 +899,115 @@ private fun LiveVoiceControls(
     var inputExpanded by remember { mutableStateOf(false) }
     val voice = voiceControlPresentation(state.micState, state.currentStage)
     val primaryColor = when {
-        !voice.flowStarted -> Color(0xFF16A34A)
-        voice.active -> Color(0xFFDC2626)
-        else -> Color(0xFF2563EB)
+        !voice.flowStarted -> FirstAidColors.Progress
+        voice.active -> FirstAidColors.Critical
+        else -> FirstAidColors.Info
     }
-    Surface(color = Color(0xE60F172A), shape = RoundedCornerShape(26.dp), modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(FirstAidDimens.ItemGap),
+    ) {
+        state.primaryButton?.let { button ->
+            PrimaryActionButton(label = button.label, onClick = onPrimaryButton)
+        }
+        Surface(
+            color = FirstAidColors.Scrim,
+            shape = RoundedCornerShape(FirstAidDimens.CardRadius),
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            if (inputExpanded) {
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    placeholder = { Text("输入") },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(72.dp),
-                    singleLine = true,
-                )
-                Button(
-                    enabled = text.isNotBlank() && !state.isInFlight,
-                    onClick = {
-                        onSubmitText(text)
-                        text = ""
-                        inputExpanded = false
-                    },
-                    modifier = Modifier.height(72.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        disabledContainerColor = Color(0xFF1E293B),
-                        disabledContentColor = Color(0xFF94A3B8),
-                    ),
-                ) {
-                    Text("发送")
-                }
-                OutlinedButton(
-                    onClick = { inputExpanded = false },
-                    modifier = Modifier.height(72.dp),
-                ) {
-                    Text("收起")
-                }
-            } else {
-                Button(
-                    enabled = !state.isInFlight || voice.active,
-                    onClick = {
-                        if (!voice.flowStarted) {
-                            onStartFirstAid()
-                            if (!hasAudioPermission) {
+            Row(
+                modifier = Modifier.padding(FirstAidDimens.ItemGap),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(FirstAidDimens.TightGap),
+            ) {
+                if (inputExpanded) {
+                    OutlinedTextField(
+                        value = text,
+                        onValueChange = { text = it },
+                        placeholder = { Text("输入") },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(FirstAidDimens.PrimaryControlHeight),
+                        singleLine = true,
+                    )
+                    Button(
+                        enabled = text.isNotBlank() && !state.isInFlight,
+                        onClick = {
+                            onSubmitText(text)
+                            text = ""
+                            inputExpanded = false
+                        },
+                        modifier = Modifier.height(FirstAidDimens.PrimaryControlHeight),
+                    ) {
+                        Text("发送")
+                    }
+                    OutlinedButton(
+                        onClick = { inputExpanded = false },
+                        modifier = Modifier.height(FirstAidDimens.PrimaryControlHeight),
+                    ) {
+                        Text("收起")
+                    }
+                } else {
+                    Button(
+                        enabled = !state.isInFlight || voice.active,
+                        onClick = {
+                            if (!voice.flowStarted) {
+                                onStartFirstAid()
+                                if (!hasAudioPermission) onRequestAudioPermission() else onStartAudio()
+                            } else if (!hasAudioPermission) {
                                 onRequestAudioPermission()
+                            } else if (voice.active) {
+                                onStopAudio()
                             } else {
                                 onStartAudio()
                             }
-                        } else if (!hasAudioPermission) {
-                            onRequestAudioPermission()
-                        } else if (voice.active) {
-                            onStopAudio()
-                        } else {
-                            onStartAudio()
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(72.dp),
-                ) {
-                    Text(voice.label, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                }
-                VoiceLevelDot(
-                    micState = state.micState,
-                    rmsLevel = rmsLevel,
-                )
-                OutlinedButton(
-                    onClick = { inputExpanded = !inputExpanded },
-                    modifier = Modifier.height(72.dp),
-                ) {
-                    Text("输入")
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = primaryColor,
+                            contentColor = FirstAidColors.OnAccent,
+                        ),
+                        shape = RoundedCornerShape(FirstAidDimens.ButtonRadius),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(FirstAidDimens.PrimaryControlHeight),
+                    ) {
+                        Text(
+                            text = voiceButtonLabel(voice),
+                            style = FirstAidType.Title,
+                            color = FirstAidColors.OnAccent,
+                        )
+                    }
+                    VoiceLevelDot(micState = state.micState, rmsLevel = rmsLevel)
+                    ControlChip(label = if (useCameraSource) "关镜头" else "镜头", onClick = onToggleCamera)
+                    ControlChip(label = "输入", onClick = { inputExpanded = true })
+                    ControlChip(label = "更多", onClick = onOpenMore)
                 }
             }
         }
     }
 }
+
+@Composable
+private fun ControlChip(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        shape = RoundedCornerShape(FirstAidDimens.ButtonRadius),
+        modifier = modifier.height(FirstAidDimens.PrimaryControlHeight),
+    ) {
+        Text(text = label, style = FirstAidType.Label, color = FirstAidColors.TextSecondary)
+    }
+}
+
+private fun voiceButtonLabel(voice: VoiceControlPresentation): String =
+    when {
+        !voice.flowStarted -> "开始急救"
+        voice.active -> "停止聆听"
+        else -> "开始聆听"
+    }
 
 @Composable
 private fun VoiceLevelDot(
@@ -1051,6 +1088,11 @@ private fun DemoInjectionDrawer(
                 color = Color(0xFF93C5FD),
                 fontSize = 12.sp,
             )
+            Text(
+                text = "OpenQ: ${state.openQuestionStatusLine()}",
+                color = Color(0xFF86EFAC),
+                fontSize = 12.sp,
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(onClick = onReset, modifier = Modifier.weight(1f)) {
                     Text("重置")
@@ -1103,61 +1145,6 @@ private fun DemoInjectionDrawer(
 }
 
 @Composable
-private fun QualityScoreDial(
-    score: Int?,
-    currentStage: String?,
-    modifier: Modifier = Modifier,
-) {
-    val presentation = qualityScorePresentation(score, currentStage) ?: return
-    val color = presentation.tone.toColor()
-
-    Surface(
-        color = color.copy(alpha = 0.2f),
-        shape = RoundedCornerShape(28.dp),
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = "质量",
-                color = Color(0xFFCBD5E1),
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = presentation.valueText,
-                    color = Color.White,
-                    fontSize = if (presentation.tone == QualityScoreTone.Pending) 24.sp else 44.sp,
-                    fontWeight = FontWeight.Black,
-                    maxLines = 1,
-                )
-                if (presentation.labelText.isNotBlank()) {
-                    Text(
-                        text = presentation.labelText,
-                        color = color,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Black,
-                        modifier = Modifier.padding(bottom = 6.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
-private fun QualityScoreTone.toColor(): Color =
-    when (this) {
-        QualityScoreTone.Good -> Color(0xFF22C55E)
-        QualityScoreTone.Steady -> Color(0xFFF59E0B)
-        QualityScoreTone.Adjust -> Color(0xFFEF4444)
-        QualityScoreTone.Pending -> Color(0xFF38BDF8)
-    }
-
-@Composable
 private fun StatusChip(text: String, color: Color) {
     Surface(color = color.copy(alpha = 0.22f), shape = CircleShape) {
         Text(
@@ -1172,9 +1159,6 @@ private fun StatusChip(text: String, color: Color) {
 
 private fun Context.hasPermission(permission: String): Boolean =
     checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
-
-private fun String?.isCprVisionAnalysisStage(): Boolean =
-    this?.startsWith("S6") == true || this?.startsWith("S7") == true
 
 private val ConnectionState.label: String
     get() = when (this) {
@@ -1192,4 +1176,180 @@ private val ConnectionState.color: Color
         ConnectionState.Error -> Color(0xFFDC2626)
     }
 
+private fun LiveUiState.openQuestionStatusLine(): String {
+    val metrics = lastOpenQuestionMetrics
+    val phase = when (openQuestionPhase) {
+        com.firstaid.copilot.live.OpenQuestionPhase.Idle -> "idle"
+        com.firstaid.copilot.live.OpenQuestionPhase.Ack -> "ack"
+        com.firstaid.copilot.live.OpenQuestionPhase.Answer -> "answer"
+        com.firstaid.copilot.live.OpenQuestionPhase.Cancelled -> "cancelled"
+    }
+    if (metrics == null) return phase
+    val segment = metrics.openQuestion.segment?.let { "segment=$it" }
+    val total = metrics.timings["total_ms"]?.let { "total=${it}ms" }
+    val gemma = metrics.timings["gemma_ms"]?.let { "gemma=${it}ms" }
+    val wait = metrics.openQuestion.waitMs?.let { "wait=${it}ms" }
+    val firstAudio = metrics.timings["tts_first_chunk_ms"]?.let { "audio=${it}ms" }
+    val tts = metrics.tts.provider?.let { provider ->
+        val cache = when (metrics.tts.cacheHit) {
+            true -> "hit"
+            false -> "miss"
+            null -> "n/a"
+        }
+        "tts=$provider/$cache"
+    }
+    val answerCache = metrics.openQuestion.cacheHit?.let { cacheHit ->
+        "answerCache=${if (cacheHit) "hit" else "miss"}"
+    }
+    val gemmaRoute = when {
+        metrics.gemma.live -> "gemma=live"
+        metrics.gemma.skipped -> "gemma=skip:${metrics.gemma.skipReason ?: "unknown"}"
+        else -> null
+    }
+    return listOfNotNull(phase, segment, total, gemma, wait, firstAudio, tts, answerCache, gemmaRoute)
+        .joinToString(" ")
+}
+
+private fun LiveUiState.isAssistantPlaybackActiveForAsr(): Boolean =
+    micState == MicState.Speaking || isLiveAudioPlaying
+
 private val recordingMicStates = setOf(MicState.Listening, MicState.Capturing, MicState.Uploading)
+private const val TAG = "LiveCprCoachScreen"
+
+@Composable
+private fun EntryScreen(
+    connectionLabel: String,
+    onStartFirstAid: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(FirstAidDimens.ScreenPadding),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(FirstAidDimens.SectionGap),
+    ) {
+        Text(
+            text = "急救助手",
+            style = FirstAidType.DisplayHero,
+            color = FirstAidColors.TextPrimary,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            text = "有人倒地、没有反应或没有呼吸时，点下面的按钮，我会一步步语音指导你急救。",
+            style = FirstAidType.Body,
+            color = FirstAidColors.TextSecondary,
+            textAlign = TextAlign.Center,
+        )
+        PrimaryActionButton(label = "一键急救", onClick = onStartFirstAid)
+        Text(
+            text = "也可以直接说\u201C有人没有呼吸了\u201D唤起",
+            style = FirstAidType.Label,
+            color = FirstAidColors.TextTertiary,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            text = "连接状态：$connectionLabel",
+            style = FirstAidType.Label,
+            color = FirstAidColors.TextTertiary,
+        )
+    }
+}
+
+@Composable
+private fun ToolConfirmationDialog(
+    confirmation: ToolConfirmationState,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(text = confirmation.title, style = FirstAidType.Title, color = FirstAidColors.TextPrimary)
+        },
+        text = {
+            confirmation.message?.let {
+                Text(text = it, style = FirstAidType.Body, color = FirstAidColors.TextSecondary)
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = FirstAidColors.Progress,
+                    contentColor = FirstAidColors.OnAccent,
+                ),
+            ) {
+                Text("确认")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) { Text("取消") }
+        },
+        containerColor = FirstAidColors.Surface,
+    )
+}
+
+private fun LiveUiState.signalValue(key: String): Any? =
+    perceptionSignals
+        .filterIsInstance<PerceptionSignal<*>>()
+        .firstOrNull { it.key == key && it.isFresh() }
+        ?.value
+
+private fun LiveUiState.cprHandPosition(): String? =
+    signalValue("hand_position") as? String
+
+private fun LiveUiState.cprRate(): Int? =
+    (signalValue("compression_rate") as? Number)?.toInt()
+
+private fun LiveUiState.cprArmStraight(): Boolean? =
+    signalValue("arm_straight") as? Boolean
+
+internal fun LiveUiState.toHandoverModel(nowMs: Long = System.currentTimeMillis()): HandoverReportUiModel {
+    val total = (signalValue("total_compressions") as? Number)?.toInt()
+    val latestTimeText = sessionStartedAtMs?.let { formatTimelineOffset(nowMs - it) } ?: "当前"
+    val events = buildList {
+        cprStartedAtMs?.let { startedAt ->
+            add(HandoverEvent(formatTimelineTime(startedAt, sessionStartedAtMs), "CPR 开始"))
+        }
+        lastUserTranscript?.takeIf { it.isNotBlank() }?.let {
+            add(HandoverEvent(latestTimeText, "用户反馈：$it"))
+        }
+        lastAssistantText?.takeIf { it.isNotBlank() }?.let {
+            add(HandoverEvent(latestTimeText, "语音指导：$it"))
+        }
+        statusTags.forEach { tag -> add(HandoverEvent(latestTimeText, "状态：$tag")) }
+    }
+    return HandoverReportUiModel(
+        startedAtText = sessionStartedAtMs?.let(::formatClockTime) ?: "未记录",
+        durationText = sessionStartedAtMs?.let { formatDurationText(nowMs - it) } ?: "—",
+        totalCompressions = total,
+        averageRate = cprRate(),
+        averageQuality = qualityScore,
+        symptomSummary = "疑似心脏骤停：依现场判断为无反应、无正常呼吸",
+        events = events,
+        aedStatus = if (currentStage?.startsWith("S8") == true) "进入协助/AED 阶段" else "未记录",
+        videoSaved = true,
+        reportText = null,
+    )
+}
+
+private fun formatClockTime(epochMs: Long): String =
+    SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(epochMs))
+
+private fun formatDurationText(durationMs: Long): String {
+    val totalSeconds = (durationMs.coerceAtLeast(0L) / 1_000L).toInt()
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "$minutes 分 $seconds 秒"
+}
+
+private fun formatTimelineTime(eventMs: Long, sessionStartedAtMs: Long?): String =
+    sessionStartedAtMs?.let { formatTimelineOffset(eventMs - it) } ?: formatClockTime(eventMs)
+
+private fun formatTimelineOffset(durationMs: Long): String {
+    val totalSeconds = (durationMs.coerceAtLeast(0L) / 1_000L).toInt()
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return String.format(Locale.US, "%02d:%02d", minutes, seconds)
+}

@@ -1,0 +1,23 @@
+{
+  "ok": false,
+  "mode": "gemma",
+  "runs": 3,
+  "threads": 2,
+  "gemmaBackendPreference": "GpuOnly",
+  "modelRoot": "\/storage\/emulated\/0\/Android\/media\/com.firstaid.copilot.debug\/models",
+  "summary": "Gemma=Ready ASR=Ready TTS=Ready sherpa=Ready",
+  "gemmaReady": true,
+  "asrReady": true,
+  "ttsReady": true,
+  "phase": "finished",
+  "updatedAtMs": 1780748396071,
+  "gemma": {
+    "ok": false,
+    "latencyMs": 15302,
+    "backend": "",
+    "prompt": "你是急救语音助手。用一句不超过15个字的中文回答：成人心肺复苏的按压频率是多少？",
+    "generateOk": false,
+    "generateError": "prewarm failed",
+    "error": "java.lang.IllegalStateException: java.lang.reflect.InvocationTargetException: Failed to create engine: INTERNAL: ERROR: [third_party\/odml\/litert_lm\/runtime\/executor\/llm_litert_compiled_model_executor.cc:1928]\n└ ERROR: [.\/third_party\/odml\/litert\/litert\/cc\/litert_compiled_model.h:1472]"
+  }
+}

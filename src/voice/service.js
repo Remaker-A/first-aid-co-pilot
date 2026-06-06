@@ -31,10 +31,15 @@ const DEFAULT_VOICE_EVENT_TTL_MS = 30 * 60 * 1000;
 const DEFAULT_GEMMA_LIVE_TIMEOUT_MS = 1200;
 const DEFAULT_GEMMA_TURN_TIMEOUT_MS = 1000;
 const DEFAULT_GEMMA_OPEN_QUESTION_LIVE_TIMEOUT_MS = 800;
-const DEFAULT_GEMMA_OPEN_QUESTION_TURN_TIMEOUT_MS = 1200;
+const DEFAULT_GEMMA_OPEN_QUESTION_TURN_TIMEOUT_MS = 800;
+const DEFAULT_GEMMA_OPEN_QUESTION_TEXT_TIMEOUT_MS = 800;
+const DEFAULT_GEMMA_OPEN_QUESTION_TEXT_MAX_TOKENS = 32;
+const DEFAULT_GEMMA_OPEN_QUESTION_TEXT_STREAM = true;
+const DEFAULT_GEMMA_OPEN_QUESTION_TEXT_STREAM_MAX_CHARS = 24;
 const DEFAULT_OPEN_QUESTION_CACHE_TTL_MS = 10 * 60 * 1000;
 const DEFAULT_OPEN_QUESTION_CACHE_MAX_ENTRIES = 64;
 const CPR_READINESS_FAST_PATH = "s6_readiness_continue_cpr";
+const S5_CALL_TO_CPR_FAST_PATH = "s5_call_done_continue_cpr";
 
 // At the S6 confirm gate, readiness/start phrases ("开始"/"可以了"/"没有呼吸"/
 // "准备好了"…) all mean "start compressions now". They sometimes classify as a
@@ -50,6 +55,19 @@ const READINESS_FAST_PATH_OVERRIDABLE_INTENTS = new Set([
   "compressions_reported",
   "step_done",
 ]);
+
+const CLIENT_INTENT_ALIASES = Object.freeze({
+  mark_scene_safe: "scene_safe",
+  mark_scene_unsafe: "scene_unsafe",
+  mark_unresponsive: "patient_unresponsive",
+  mark_responsive: "patient_responsive",
+  mark_no_normal_breathing: "no_normal_breathing",
+  mark_normal_breathing: "normal_breathing",
+  mark_emergency_called: "emergency_called",
+  mark_cpr_ready: "continue_cpr",
+  mark_aed_available: "aed_available",
+  mark_paramedics_arrived: "paramedics_arrived",
+});
 
 export function createVoiceDemoService(options = {}) {
   const sessions = new Map();
@@ -192,7 +210,7 @@ export async function runVoiceGuidanceCore({
   options = {},
   now = () => new Date().toISOString(),
   timings = {},
-} = {}) {
+  } = {}) {
   const priorState = getPriorSessionState(session, input);
   const resolverStage = resolveIntentStage(priorState, input, session);
   const rawIntentResolution = await timed(timings, "intent_resolution_ms", () => resolveUserIntent({
@@ -207,11 +225,15 @@ export async function runVoiceGuidanceCore({
       recentTts: priorState?.dialogue_state?.recent_tts,
     },
   }));
-  const intentResolution = applyCprReadinessFastPath(rawIntentResolution, {
+  const hintedIntentResolution = applyClientIntentHint(rawIntentResolution, {
+    input,
+    stage: resolverStage,
+  });
+  const intentResolution = applyCprFlowFastPaths(hintedIntentResolution, {
     stt,
     stage: resolverStage,
   });
-  const event = createVoiceEvent({ sessionId, stt, input, now, intentResolution });
+  const event = createVoiceEvent({ sessionId, stt, input, now, intentResolution, stage: resolverStage });
 
   session.events.push(event);
 
@@ -537,6 +559,10 @@ function planGemmaSupplement(stateAction, stt, context = {}) {
       timeoutMs: cprLive
         ? resolveGemmaOpenQuestionTimeoutMs(context.options, { live: true })
         : resolveGemmaOpenQuestionTimeoutMs(context.options, { live: false }),
+      textTimeoutMs: resolveGemmaOpenQuestionTextTimeoutMs(context.options),
+      textMaxTokens: resolveGemmaOpenQuestionTextMaxTokens(context.options),
+      textStream: resolveGemmaOpenQuestionTextStream(context.options),
+      textStreamMaxChars: resolveGemmaOpenQuestionTextStreamMaxChars(context.options),
       timeoutReason: "gemma_open_question_timeout",
     };
   }
@@ -648,7 +674,7 @@ async function generateGemmaPatch(runtime, frame, plan = {}) {
   }
 
   const timeoutReason = plan.timeoutReason || (plan.live ? "gemma_live_timeout" : "gemma_turn_timeout");
-  return withTimeout(invoke(), plan.timeoutMs, timeoutReason);
+  return withTimeout(Promise.resolve().then(invoke), plan.timeoutMs, timeoutReason);
 }
 
 // WB: build the immediate stabilizing ack (CPR-live only). Routed through the live
@@ -729,6 +755,10 @@ function startOpenQuestionAnswer({ runtime, frame, plan, state, sessionId, cache
     plan: {
       timeoutMs: plan.timeoutMs,
       live: plan.live,
+      textTimeoutMs: plan.textTimeoutMs,
+      textMaxTokens: plan.textMaxTokens,
+      textStream: plan.textStream,
+      textStreamMaxChars: plan.textStreamMaxChars,
       timeoutReason: plan.timeoutReason || "gemma_open_question_timeout",
       promptOptions: { systemPromptFile: OPEN_QUESTION_GEMMA_SYSTEM_PROMPT_FILE },
     },
@@ -771,6 +801,22 @@ function startOpenQuestionAnswer({ runtime, frame, plan, state, sessionId, cache
 
 async function resolveOpenQuestionAnswer({ runtime, frame, plan, state, sessionId, stage, answerIntents }) {
   const validatorIntents = [...answerIntents, ...SPECIAL_GEMMA_INTENTS];
+  const textAnswer = await resolveOpenQuestionTextAnswer({
+    runtime,
+    frame,
+    plan,
+    state,
+    sessionId,
+    stage,
+    validatorIntents,
+  });
+  if (textAnswer?.ok) {
+    return textAnswer;
+  }
+  if (textAnswer?.attempted) {
+    return openQuestionFallback(stage, state, sessionId, textAnswer.reason || "gemma_text_unavailable");
+  }
+
   const gemma = await generateGemmaPatch(runtime, frame, plan);
   const patch = gemma?.patch || null;
 
@@ -798,6 +844,71 @@ async function resolveOpenQuestionAnswer({ runtime, frame, plan, state, sessionI
     responseType: LiveResponseType.OPEN_QUESTION_ANSWER,
     reason: "open_question_answered",
   };
+}
+
+async function resolveOpenQuestionTextAnswer({ runtime, frame, plan, state, sessionId, stage, validatorIntents }) {
+  if (typeof runtime?.generateText !== "function") {
+    return { attempted: false, reason: "gemma_text_unavailable" };
+  }
+
+  const invokeText = () => runtime.generateText(
+    buildOpenQuestionTextMessages(frame, stage),
+    {
+      timeoutMs: plan.textTimeoutMs || plan.timeoutMs,
+      maxTokens: plan.textMaxTokens,
+      stream: plan.textStream,
+      streamMaxChars: plan.textStreamMaxChars,
+      streamStopPattern: "(继续按压|别停|保持按压)",
+    }
+  );
+  const result = plan.textTimeoutMs
+    ? await withTimeout(Promise.resolve().then(invokeText), plan.textTimeoutMs, plan.timeoutReason || "gemma_open_question_text_timeout")
+    : await invokeText();
+  if (!result?.ok || !result.text) {
+    return {
+      attempted: result?.reason !== "gemma_text_daemon_disabled",
+      reason: result?.reason || result?.skipReason || "gemma_text_unavailable",
+    };
+  }
+
+  const text = normalizeOpenQuestionTextAnswer(result.text);
+  if (!text) {
+    return { attempted: true, reason: "gemma_text_empty" };
+  }
+
+  const candidate = {
+    intent: answerIntentsForStage(stage)[0] || "fallback_template",
+    tts: { text, tone: "calm_firm", speed: "normal" },
+    ui: {
+      main_text: "继续按压",
+      secondary_text: text,
+    },
+    reason: "gemma_open_question_text",
+    confidence: 0.7,
+  };
+  const validation = validateAction(
+    toGuidanceCandidate(candidate, state, sessionId),
+    state,
+    { allowedIntents: validatorIntents }
+  );
+  if (!validation.ok || !validation.action?.tts?.text) {
+    return { attempted: true, reason: "gemma_text_blocked", validation };
+  }
+  if (stage === AgentStage.S7_CPR_LOOP || stage === AgentStage.S8_ASSISTANCE) {
+    validation.action.tts.interrupt_policy = "do_not_interrupt_critical";
+  }
+
+  return {
+    ok: true,
+    action: validation.action,
+    source: result.streamed ? "gemma_open_question_text_stream" : "gemma_open_question_text",
+    responseType: LiveResponseType.OPEN_QUESTION_ANSWER,
+    reason: result.streamed ? "open_question_text_stream_answered" : "open_question_text_answered",
+  };
+}
+
+function answerIntentsForStage(stage) {
+  return openQuestionAnswerIntents(stage);
 }
 
 // Restrict the answer frame to the stage's controlled-answer intents so both the
@@ -842,6 +953,62 @@ function buildOpenQuestionFrame(frame, answerIntents) {
     output_schema: frame?.output_schema,
     language: frame?.language || "zh-CN",
   });
+}
+
+function buildOpenQuestionTextMessages(frame = {}, stage = AgentStage.S7_CPR_LOOP) {
+  const question = frame.user_input?.stt_text || "";
+  const stageText = stage === AgentStage.S8_ASSISTANCE
+    ? "正在CPR和AED协助"
+    : "正在CPR";
+  const context = `只用简体中文，必须以“继续按压”开头。成人疑似心脏骤停，${stageText}。施救者问：${question}。只答一句，不超25字；不诊断、不承诺、不新增步骤。`;
+
+  return [{ role: "user", content: context }];
+}
+
+function normalizeOpenQuestionTextAnswer(value) {
+  let text = String(value || "").trim();
+  if (!text) {
+    return "";
+  }
+
+  text = text
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/i, "")
+    .trim();
+  try {
+    const parsed = JSON.parse(text);
+    if (typeof parsed?.text === "string") {
+      text = parsed.text;
+    }
+  } catch {
+    // Plain text is the preferred fast-path output.
+  }
+
+  text = text
+    .replace(/\*\*/g, "")
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .find(Boolean) || "";
+  text = text
+    .replace(/^["'“”]+/u, "")
+    .replace(/["'“”]+$/u, "")
+    .trim();
+  text = pickOpenQuestionSafetySentence(text) || text;
+
+  if (!/(继续按压|别停|保持按压)/u.test(text)) {
+    return "";
+  }
+  if (/(停止按压|可以停|不用按|不要按|一定|保证|心梗|脑卒中|会死)/u.test(text)) {
+    return "";
+  }
+  return text;
+}
+
+function pickOpenQuestionSafetySentence(text) {
+  const sentences = String(text || "").match(/[^。！？!?.]+[。！？!?.]?/gu) || [];
+  return sentences
+    .map((sentence) => sentence.trim())
+    .find((sentence) => /(继续按压|别停|保持按压)/u.test(sentence)) || "";
 }
 
 function compactOpenQuestionPerception(summary) {
@@ -1114,6 +1281,104 @@ function openQuestionTemplateSpec(stage, transcript = "") {
       reason: "template_cpr_principle",
     };
   }
+  if (/(节奏|频率|快慢|每分钟|为什么.*按|为何.*按)/.test(text)) {
+    return {
+      ...base,
+      text: "这个节奏能维持血流，继续按压别停。",
+      reason: "template_cpr_rhythm",
+    };
+  }
+  if (/(下一分钟|接下来|怎么安排|安排什么|之后做什么|后面做什么)/.test(text)) {
+    return {
+      ...base,
+      text: "下一分钟继续按压，有人在旁边就准备换手。",
+      reason: "template_next_minute",
+    };
+  }
+  if (/(人工呼吸|口对口|吹气|渡气)/.test(text)) {
+    return {
+      ...base,
+      text: "现在先不要停下来做人工呼吸，继续按压，等AED或急救员。",
+      reason: "template_hands_only_cpr",
+    };
+  }
+  if (/(别的办法|其他办法|换.*办法|为什么不能|为何不能|流程.*依据|依据|指南|标准)/.test(text)) {
+    return {
+      ...base,
+      text: "这是急救指南的做法，现在最重要是继续按压。",
+      reason: "template_guideline_basis",
+    };
+  }
+  if (/(没力气|没劲|手酸|手臂酸|太累|坚持不住|没人帮|没有人帮)/.test(text)) {
+    return {
+      ...base,
+      text: "能坚持就继续按压，有人靠近时立刻换手。",
+      reason: "template_rescuer_fatigue_plan",
+    };
+  }
+  if (/(吐了|呕吐|吐东西|口鼻.*堵|嘴.*堵|气道.*堵)/.test(text)) {
+    return {
+      ...base,
+      text: "先继续按压；口鼻若被堵住，只快速清开口边再继续按压。",
+      reason: "template_vomit_airway",
+    };
+  }
+  if (/(地上有水|有水|水里|漏电|触电|电线|电源)/.test(text)) {
+    return {
+      ...base,
+      text: "注意用电安全，能安全就继续按压；用AED前让电极处干燥。",
+      reason: "template_environment_safety",
+    };
+  }
+  if (/(我一个人|只有我|没人|没有人|旁边没人)/.test(text)) {
+    return {
+      ...base,
+      text: "你一个人也先继续按压，手机保持免提，有人靠近就让他帮忙。",
+      reason: "template_solo_rescuer",
+    };
+  }
+  if (/(搬动|移动|挪动|翻身|扶起来|坐起来|抬起来)/.test(text)) {
+    return {
+      ...base,
+      text: "不要为了处理他而搬动，继续按压；除非现场不安全必须避险。",
+      reason: "template_do_not_move_patient",
+    };
+  }
+  if (/(喂水|喝水|喂吃|吃东西|喂药|吃药|找药|拿药|药在哪里|药呢)/.test(text)) {
+    return {
+      ...base,
+      text: "不要喂水喂药，也不要停下来找药；继续按压，等急救员。",
+      reason: "template_no_water_or_medicine",
+    };
+  }
+  if (/(掐人中|按人中|拍脸|扇脸|泼水|刺激他)/.test(text)) {
+    return {
+      ...base,
+      text: "不要掐人中或刺激他，现在最重要是继续按压，别停。",
+      reason: "template_no_stimulation",
+    };
+  }
+  if (/(摸脉搏|测脉搏|看脉搏|有没有脉搏|还有脉搏|量血压|测血压)/.test(text)) {
+    return {
+      ...base,
+      text: "不要花时间反复测脉搏，继续按压，等AED或急救员接手。",
+      reason: "template_no_pulse_check",
+    };
+  }
+  if (/(肋骨|骨折|按坏|压坏|弄断|受伤)/.test(text)) {
+    return {
+      ...base,
+      text: "可能会受伤，但现在继续按压更重要。",
+      reason: "template_possible_rib_injury",
+    };
+  }
+  if (/(脸色|脸.*白|发白|发青|发紫|嘴唇.*紫|嘴唇.*青)/.test(text)) {
+    return {
+      ...base,
+      text: "继续按压，脸色变化说明情况紧急，现在按压最重要。",
+      reason: "template_pale_or_blue",
+    };
+  }
   if (/(救回来|救活|活过来|还有希望|能不能活|会不会死)/.test(text)) {
     return {
       ...base,
@@ -1126,13 +1391,6 @@ function openQuestionTemplateSpec(stage, transcript = "") {
       ...base,
       text: "害怕很正常，盯着节拍继续按，我陪着你。",
       reason: "template_rescuer_fear",
-    };
-  }
-  if (/(肋骨|骨折|按坏|压坏|弄断|受伤)/.test(text)) {
-    return {
-      ...base,
-      text: "可能会受伤，但现在继续按压更重要。",
-      reason: "template_possible_rib_injury",
     };
   }
   return null;
@@ -1260,6 +1518,48 @@ function resolveGemmaOpenQuestionTimeoutMs(options = {}, { live = false } = {}) 
   );
 }
 
+function resolveGemmaOpenQuestionTextTimeoutMs(options = {}) {
+  const env = options.env || process.env;
+  return firstPositiveNumber(
+    options.gemmaOpenQuestionTextTimeoutMs,
+    options.gemma_open_question_text_timeout_ms,
+    env.GEMMA_OPEN_QUESTION_TEXT_TIMEOUT_MS,
+    DEFAULT_GEMMA_OPEN_QUESTION_TEXT_TIMEOUT_MS
+  );
+}
+
+function resolveGemmaOpenQuestionTextMaxTokens(options = {}) {
+  const env = options.env || process.env;
+  return firstPositiveNumber(
+    options.gemmaOpenQuestionTextMaxTokens,
+    options.gemma_open_question_text_max_tokens,
+    env.GEMMA_OPEN_QUESTION_TEXT_MAX_TOKENS,
+    DEFAULT_GEMMA_OPEN_QUESTION_TEXT_MAX_TOKENS
+  );
+}
+
+function resolveGemmaOpenQuestionTextStream(options = {}) {
+  const env = options.env || process.env;
+  const value =
+    options.gemmaOpenQuestionTextStream ??
+    options.gemma_open_question_text_stream ??
+    env.GEMMA_OPEN_QUESTION_TEXT_STREAM;
+  if (value === undefined || value === null || value === "") {
+    return DEFAULT_GEMMA_OPEN_QUESTION_TEXT_STREAM;
+  }
+  return !/^(0|false|no|off)$/i.test(String(value).trim());
+}
+
+function resolveGemmaOpenQuestionTextStreamMaxChars(options = {}) {
+  const env = options.env || process.env;
+  return firstPositiveNumber(
+    options.gemmaOpenQuestionTextStreamMaxChars,
+    options.gemma_open_question_text_stream_max_chars,
+    env.GEMMA_OPEN_QUESTION_TEXT_STREAM_MAX_CHARS,
+    DEFAULT_GEMMA_OPEN_QUESTION_TEXT_STREAM_MAX_CHARS
+  );
+}
+
 export function resolveGemmaTurnTimeoutMs(options = {}) {
   return firstPositiveNumber(
     options.gemmaTurnTimeoutMs,
@@ -1317,17 +1617,17 @@ function createSessionStartedEvent(sessionId, now) {
   };
 }
 
-function createVoiceEvent({ sessionId, stt, input, now, intentResolution = null }) {
+function createVoiceEvent({ sessionId, stt, input, now, intentResolution = null, stage = null }) {
   const resolvedIntent = intentResolution?.intent ?? stt.intent;
   const resolvedConfidence = numberOrNull(intentResolution?.confidence) ?? stt.confidence;
   const resolvedSource = intentResolution?.source || "stt";
-  const inferredDeviceState = inferDeviceState(resolvedIntent);
-  const inferredCprQuality = inferCprQuality(resolvedIntent);
+  const inferredDeviceState = inferDeviceState(resolvedIntent, stage, intentResolution);
+  const inferredCprQuality = inferCprQuality(resolvedIntent, stage);
   const rawSource = input.eventSource || input.event_source || inferEventSource(input);
   const eventType =
     input.eventType ||
     input.event_type ||
-    inferEventType(input, resolvedIntent);
+    inferEventType(input, resolvedIntent, stage);
   const source = canonicalizeVoiceEventSource(rawSource, eventType, input);
   const sourceMetadata = createCanonicalSourceMetadata(rawSource, source, input.metadata);
   const patientState = mergeResolvedPatientState(
@@ -1364,6 +1664,59 @@ function createVoiceEvent({ sessionId, stt, input, now, intentResolution = null 
       audio: stt.audio,
       intent_resolution: createIntentResolutionDebug(intentResolution),
     },
+  };
+}
+
+function applyClientIntentHint(intentResolution, { input = {}, stage = null } = {}) {
+  const hint = resolveClientIntentHint(input);
+  if (!hint || !isClientIntentHintAllowed(hint, stage)) {
+    return intentResolution;
+  }
+
+  return {
+    ...(intentResolution || {}),
+    ok: true,
+    intent: hint,
+    slots: intentResolution?.intent === hint ? intentResolution?.slots || {} : {},
+    confidence: Math.max(numberOrNull(intentResolution?.confidence) ?? 0, 0.98),
+    source: "client_intent_hint",
+    needsClarification: false,
+    needs_clarification: false,
+    escalated: intentResolution?.escalated === true,
+    clientIntentHint: true,
+  };
+}
+
+function applyCprFlowFastPaths(intentResolution, { stt = {}, stage = null } = {}) {
+  const withCallBridge = applyS5EmergencyCallBridgeFastPath(intentResolution, { stt, stage });
+  return applyCprReadinessFastPath(withCallBridge, { stt, stage });
+}
+
+function applyS5EmergencyCallBridgeFastPath(intentResolution, { stt = {}, stage = null } = {}) {
+  if (stage !== AgentStage.S5_CALL_EMERGENCY) {
+    return intentResolution;
+  }
+
+  const existingIntent = intentResolution?.intent ?? stt.intent ?? null;
+  if (existingIntent !== "continue_cpr" && !isCprReadinessUtterance(stt.transcript)) {
+    return intentResolution;
+  }
+
+  return {
+    ...(intentResolution || {}),
+    ok: true,
+    intent: "continue_cpr",
+    slots: intentResolution?.slots || {},
+    confidence: Math.max(
+      numberOrNull(intentResolution?.confidence) ?? 0,
+      numberOrNull(stt.confidence) ?? 0,
+      0.9,
+    ),
+    source: intentResolution?.source === "client_intent_hint" ? "client_intent_hint" : "rule_flow_fast_path",
+    needsClarification: false,
+    needs_clarification: false,
+    escalated: intentResolution?.escalated === true,
+    fastPath: S5_CALL_TO_CPR_FAST_PATH,
   };
 }
 
@@ -1412,8 +1765,12 @@ function isCprReadinessUtterance(transcript = "") {
   return (
     /^(?:我)?(?:已|已经)?准备好了?$/.test(text) ||
     /^(?:我)?准备就绪$/.test(text) ||
+    /^(?:好|好的|好啊|好了|行|行了|可以)$/.test(text) ||
     // "开始" / "现在开始" / "这就开始" / "开始吧" / "开始按压" / "开始CPR" …
-    /^(?:我|我们)?(?:这就|现在|马上)?开始(?:吧|啊|了|按|按压|心肺复苏|cpr)?$/i.test(text) ||
+    /^(?:我|我们)?(?:这就|现在|马上)?开始(?:吧|啊|了|按|按压|胸外按压|心肺复苏|cpr)?$/i.test(text) ||
+    /^(?:我|我们)?(?:继续|接着)(?:吧|啊|了|按|按压|胸外按压|心肺复苏|cpr)?$/i.test(text) ||
+    /^(?:现在)?(?:怎么|如何)(?:开始)?按压$/.test(text) ||
+    /^按压(?:怎么做|怎么开始)$/.test(text) ||
     // "可以" / "可以了" / "可以开始" / "可以按了"
     /^可以(?:了|的|开始了?|按了?|按压了?)?$/.test(text) ||
     // Re-confirming arrest at the gate also means "start now".
@@ -1426,6 +1783,60 @@ function normalizeReadinessText(value) {
   return typeof value === "string"
     ? value.trim().replace(/[。！？!,.，、\s]+$/g, "")
     : "";
+}
+
+function resolveClientIntentHint(input = {}) {
+  const metadata = input.metadata && typeof input.metadata === "object" ? input.metadata : {};
+  const raw =
+    input.intent ??
+    input.intentHint ??
+    input.intent_hint ??
+    input.userIntent ??
+    input.user_intent ??
+    metadata.intent_hint ??
+    metadata.intent ??
+    null;
+  if (typeof raw !== "string" || !raw.trim()) {
+    return null;
+  }
+  return normalizeClientIntent(raw.trim());
+}
+
+function normalizeClientIntent(intent) {
+  return CLIENT_INTENT_ALIASES[intent] || intent;
+}
+
+function isClientIntentHintAllowed(intent, stage) {
+  if (!intent) {
+    return false;
+  }
+  if (intent === "continue_cpr" || intent === "compressions_reported") {
+    return isCprControlStage(stage);
+  }
+  if (intent === "emergency_called") {
+    return isEmergencyCallStage(stage);
+  }
+  return true;
+}
+
+function isCprControlStage(stage) {
+  return [
+    AgentStage.S5_CALL_EMERGENCY,
+    AgentStage.S6_CPR_READY,
+    AgentStage.S7_CPR_LOOP,
+    AgentStage.S8_ASSISTANCE,
+    AgentStage.MONITOR_RESPONSE,
+    AgentStage.MONITOR_BREATHING,
+  ].includes(stage);
+}
+
+function isEmergencyCallStage(stage) {
+  return [
+    AgentStage.S5_CALL_EMERGENCY,
+    AgentStage.S6_CPR_READY,
+    AgentStage.S7_CPR_LOOP,
+    AgentStage.S8_ASSISTANCE,
+  ].includes(stage);
 }
 
 function canonicalizeVoiceEventSource(rawSource, eventType, input = {}) {
@@ -1570,8 +1981,13 @@ function getVoiceEventTtlMs() {
     : DEFAULT_VOICE_EVENT_TTL_MS;
 }
 
-function inferDeviceState(intent) {
-  if (intent !== "emergency_called") {
+function inferDeviceState(intent, stage = null, intentResolution = null) {
+  const callStarted =
+    intent === "emergency_called" ||
+    (stage === AgentStage.S5_CALL_EMERGENCY &&
+      intent === "continue_cpr" &&
+      intentResolution?.fastPath === S5_CALL_TO_CPR_FAST_PATH);
+  if (!callStarted) {
     return null;
   }
 
@@ -1610,10 +2026,13 @@ function isSoftAedAlias(transcript = "") {
   return /起搏器|心脏起搏/.test(String(transcript || ""));
 }
 
-function inferCprQuality(intent) {
+function inferCprQuality(intent, stage = null) {
   // compressions_reported ("按了30次"/"在按了") reuses the same continue_cpr ->
   // cpr_state.started link so the "你说我做" press_30 step can drive S6 -> S7.
   if (intent !== "continue_cpr" && intent !== "compressions_reported") {
+    return null;
+  }
+  if (!isCprStartStage(stage)) {
     return null;
   }
 
@@ -1622,6 +2041,16 @@ function inferCprQuality(intent) {
     compression_rate: 110,
     quality_score: 0.72,
   };
+}
+
+function isCprStartStage(stage) {
+  return [
+    AgentStage.S6_CPR_READY,
+    AgentStage.S7_CPR_LOOP,
+    AgentStage.S8_ASSISTANCE,
+    AgentStage.MONITOR_RESPONSE,
+    AgentStage.MONITOR_BREATHING,
+  ].includes(stage);
 }
 
 function inferEventSource(input = {}) {
@@ -1640,7 +2069,7 @@ function inferEventSource(input = {}) {
   return "stt";
 }
 
-function inferEventType(input = {}, intent) {
+function inferEventType(input = {}, intent, stage = null) {
   if (input.toolResult || input.tool_result) {
     return "tool_result";
   }
@@ -1669,6 +2098,9 @@ function inferEventType(input = {}, intent) {
   }
   if (intent === "normal_breathing" || intent === "no_normal_breathing") {
     return "breathing_update";
+  }
+  if (intent === "continue_cpr" && stage === AgentStage.S5_CALL_EMERGENCY) {
+    return "device_state_update";
   }
   if (intent === "continue_cpr" || intent === "compressions_reported") {
     return "cpr_quality_update";

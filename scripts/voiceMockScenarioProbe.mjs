@@ -187,7 +187,7 @@ const ACCEPTANCE_STEPS = [
       intent: "start_cpr_loop",
       eventSource: "vision_cpr",
       ttsIncludes: ["开始按压", "节拍"],
-      guidanceSourceAny: ["rule_flow_fast_path"],
+      guidanceSourceAny: ["rule_flow_fast_path", "state_machine_critical"],
       gemmaSkipped: true,
       maxTotalMs: 12000,
     },
@@ -243,8 +243,8 @@ const ACCEPTANCE_STEPS = [
   },
   {
     id: "ask_aed_help",
-    label: "Answer live AED question immediately",
-    spokenText: "除颤仪来了怎么办",
+    label: "Answer live AED usage question immediately",
+    spokenText: "除颤仪怎么用",
     idealAnswer: "继续按压。让旁边的人打开 AED，跟着它的语音做。",
     advanceMs: 1500,
     payload: {},
@@ -266,7 +266,7 @@ const ACCEPTANCE_STEPS = [
     // open-question ack. Exercises both text and tts-stt (round-trip) paths.
     id: "ask_aed_help_phonetic",
     label: "Rescue a misheard AED question via the phonetic safety net",
-    spokenText: "出差移来了怎么办",
+    spokenText: "出差移怎么用",
     idealAnswer: "继续按压。让旁边的人打开 AED，跟着它的语音做。",
     advanceMs: 1500,
     payload: {},

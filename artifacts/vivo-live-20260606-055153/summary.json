@@ -1,0 +1,90 @@
+﻿{
+    "ok":  true,
+    "artifactDir":  "D:\\文档\\Codex\\first aid\\artifacts\\vivo-live-20260606-055153",
+    "log":  "D:\\文档\\Codex\\first aid\\artifacts\\vivo-live-20260606-055153\\logcat-live.txt",
+    "counts":  {
+                   "metrics":  1,
+                   "asrPartials":  0,
+                   "asrFinals":  0,
+                   "utteranceCommits":  0,
+                   "ttsStarts":  0,
+                   "liveAudioStarts":  0,
+                   "serverAudioBegins":  1,
+                   "serverAudioChunks":  3,
+                   "serverAudioEnds":  1,
+                   "errors":  0
+               },
+    "websocketOpened":  true,
+    "latencyMs":  {
+                      "turnTotal":  {
+                                        "count":  1,
+                                        "p50":  4519,
+                                        "p95":  4519,
+                                        "max":  4519
+                                    },
+                      "tts":  {
+                                  "count":  1,
+                                  "p50":  4518,
+                                  "p95":  4518,
+                                  "max":  4518
+                              },
+                      "serverAudioFirstChunk":  {
+                                                    "count":  1,
+                                                    "p50":  2749,
+                                                    "p95":  2749,
+                                                    "max":  2749
+                                                },
+                      "androidTtsOnStart":  {
+                                                "count":  0,
+                                                "p50":  null,
+                                                "p95":  null,
+                                                "max":  null
+                                            },
+                      "liveAudioStart":  {
+                                             "count":  0,
+                                             "p50":  null,
+                                             "p95":  null,
+                                             "max":  null
+                                         },
+                      "openQuestionWait":  {
+                                               "count":  0,
+                                               "p50":  null,
+                                               "p95":  null,
+                                               "max":  null
+                                           }
+                  },
+    "intents":  [
+
+                ],
+    "stages":  [
+                   "S1_SCENE_SAFE"
+               ],
+    "asrFinals":  [
+
+                  ],
+    "asrPartials":  [
+
+                    ],
+    "metrics":  [
+                    {
+                        "turn":  1,
+                        "stage":  "S1_SCENE_SAFE",
+                        "source":  "state_machine",
+                        "intent":  "",
+                        "intentSource":  "regex",
+                        "totalMs":  4519,
+                        "ttsMs":  4518,
+                        "audioMs":  2749,
+                        "openSegment":  "",
+                        "openWaitMs":  -1,
+                        "openFallback":  false
+                    }
+                ],
+    "errors":  [
+
+               ],
+    "notes":  [
+                  "mic_frame_to_partial and speech_end_to_final require timestamp-paired voice input; this summary reports stable Android/server metrics available from logcat.",
+                  "For final acceptance, run 2-3 human spoken rounds and inspect ASR partial/final plus Live metrics counts."
+              ]
+}

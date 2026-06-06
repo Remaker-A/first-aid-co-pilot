@@ -1,0 +1,99 @@
+{
+  "ok": true,
+  "mode": "gemma",
+  "runs": 5,
+  "threads": 2,
+  "gemmaBackendPreference": "GpuOnly",
+  "gemmaSpeculative": false,
+  "modelRoot": "\/storage\/emulated\/0\/Android\/media\/com.firstaid.copilot.debug\/models",
+  "summary": "Gemma=Ready ASR=Ready TTS=Ready sherpa=Ready",
+  "gemmaReady": true,
+  "asrReady": true,
+  "ttsReady": true,
+  "phase": "finished",
+  "updatedAtMs": 1780750769616,
+  "gemma": {
+    "ok": true,
+    "latencyMs": 11792,
+    "backend": "GPU",
+    "prompt": "你是急救语音助手。用一句不超过15个字的中文回答：成人心肺复苏的按压频率是多少？",
+    "generateOk": true,
+    "generateLatencyMs": 3399,
+    "generateText": "**每分钟1 bombe（100次）。**",
+    "warmGenerateOk": true,
+    "warmGenerateLatencyMs": 3752,
+    "runs": [
+      {
+        "ok": true,
+        "latencyMs": 3446,
+        "text": "**每分钟1 bombe（100次）。**"
+      },
+      {
+        "ok": true,
+        "latencyMs": 3415,
+        "text": "**每分钟1 bombe（100次）。**"
+      },
+      {
+        "ok": true,
+        "latencyMs": 3448,
+        "text": "**每分钟1 bombe（100次）。**"
+      },
+      {
+        "ok": true,
+        "latencyMs": 3416,
+        "text": "**每分钟1 bombe（100次）。**"
+      },
+      {
+        "ok": true,
+        "latencyMs": 3399,
+        "text": "**每分钟1 bombe（100次）。**"
+      }
+    ],
+    "latency": {
+      "count": 5,
+      "avgMs": 3424.8,
+      "minMs": 3399,
+      "maxMs": 3448,
+      "p50Ms": 3416,
+      "p95Ms": 3448
+    },
+    "gate": {
+      "gateMs": 1200,
+      "budgetMs": 1500,
+      "totalRuns": 5,
+      "okRuns": 5,
+      "withinBudgetRuns": 0,
+      "p50Ms": 3416,
+      "p95Ms": 3448,
+      "nearRealtimeCapable": false,
+      "recommendation": "ack_then_async"
+    }
+  },
+  "gemmaRuns": [
+    {
+      "ok": true,
+      "latencyMs": 3446,
+      "text": "**每分钟1 bombe（100次）。**"
+    },
+    {
+      "ok": true,
+      "latencyMs": 3415,
+      "text": "**每分钟1 bombe（100次）。**"
+    },
+    {
+      "ok": true,
+      "latencyMs": 3448,
+      "text": "**每分钟1 bombe（100次）。**"
+    },
+    {
+      "ok": true,
+      "latencyMs": 3416,
+      "text": "**每分钟1 bombe（100次）。**"
+    },
+    {
+      "ok": true,
+      "latencyMs": 3399,
+      "text": "**每分钟1 bombe（100次）。**"
+    }
+  ]
+}

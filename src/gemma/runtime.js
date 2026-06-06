@@ -40,6 +40,10 @@ export class GemmaRuntime {
     return this.run(frame, callOptions);
   }
 
+  async generateText(messages, callOptions = {}) {
+    return this.runText(messages, callOptions);
+  }
+
   async parseUserIntent(frame) {
     const config = resolveGemmaConfig(this.options);
     const nluTimeoutMs = resolveGemmaNluTimeoutMs(this.options);
@@ -352,6 +356,74 @@ export class GemmaRuntime {
       fallback: false
     };
   }
+
+  async runText(messages, callOptions = {}) {
+    const config = resolveGemmaConfig(this.options);
+    if (!config.daemon) {
+      return {
+        ok: false,
+        skipped: true,
+        skipReason: "gemma_text_daemon_disabled",
+        reason: "gemma_text_daemon_disabled",
+      };
+    }
+
+    const timeoutMs = resolveGemmaCallTimeoutMs(callOptions, this.options, config);
+    const requestConfig = {
+      ...config,
+      timeoutMs,
+      serveRequestTimeoutMs: timeoutMs,
+    };
+    const modelFile = await resolveModelFile(config);
+
+    if (!modelFile) {
+      return {
+        ok: false,
+        skipped: true,
+        skipReason: "model_missing",
+        reason: "model_missing",
+        error: normalizeError({ message: `No Gemma model file found in ${config.modelDir}.` }),
+      };
+    }
+
+    try {
+      const result = await this.serverRunner({
+        config: requestConfig,
+        messages,
+        prompt: null,
+        modelFile,
+        timeoutMs,
+        maxTokens: resolveGemmaTextMaxTokens(callOptions, this.options, config),
+        stream: resolveGemmaTextStream(callOptions, this.options, config),
+        streamMaxChars: resolveGemmaTextStreamMaxChars(callOptions, this.options, config),
+        streamStopPattern: callOptions.streamStopPattern || callOptions.stream_stop_pattern || null,
+      });
+      const text = String(result?.stdout || "").trim();
+      if (!text) {
+        return {
+          ok: false,
+          skipped: true,
+          skipReason: "empty_text",
+          reason: "empty_text",
+        };
+      }
+      return {
+        ok: true,
+        text,
+        daemon: result?.daemon === true,
+        streamed: result?.streamed === true,
+      };
+    } catch (error) {
+      const reason = classifyRunnerError(error);
+      return {
+        ok: false,
+        skipped: true,
+        skipReason: reason,
+        reason,
+        error: normalizeError(error),
+      };
+    }
+  }
 }
 
 function positiveWarmupTimeout(...values) {
@@ -396,6 +468,50 @@ export function resolveGemmaCallTimeoutMs(callOptions = {}, runtimeOptions = {},
 function hasExplicitRealtimeBudget(callOptions = {}) {
   const value = Number(callOptions.timeoutMs ?? callOptions.gemmaTimeoutMs);
   return Number.isFinite(value) && value > 0;
+}
+
+export function resolveGemmaTextMaxTokens(callOptions = {}, runtimeOptions = {}, config = {}) {
+  const env = config.env || runtimeOptions.env || process.env;
+  const value = Number(
+    callOptions.maxTokens ??
+    callOptions.max_tokens ??
+    runtimeOptions.textMaxTokens ??
+    runtimeOptions.gemmaTextMaxTokens ??
+    runtimeOptions.gemma_text_max_tokens ??
+    env.GEMMA_TEXT_MAX_TOKENS
+  );
+
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : null;
+}
+
+export function resolveGemmaTextStream(callOptions = {}, runtimeOptions = {}, config = {}) {
+  const env = config.env || runtimeOptions.env || process.env;
+  const value =
+    callOptions.stream ??
+    callOptions.textStream ??
+    callOptions.text_stream ??
+    runtimeOptions.textStream ??
+    runtimeOptions.gemmaTextStream ??
+    runtimeOptions.gemma_text_stream ??
+    env.GEMMA_TEXT_STREAM;
+  if (value === undefined || value === null || value === "") {
+    return false;
+  }
+  return !/^(0|false|no|off)$/i.test(String(value).trim());
+}
+
+export function resolveGemmaTextStreamMaxChars(callOptions = {}, runtimeOptions = {}, config = {}) {
+  const env = config.env || runtimeOptions.env || process.env;
+  const value = Number(
+    callOptions.streamMaxChars ??
+    callOptions.stream_max_chars ??
+    runtimeOptions.textStreamMaxChars ??
+    runtimeOptions.gemmaTextStreamMaxChars ??
+    runtimeOptions.gemma_text_stream_max_chars ??
+    env.GEMMA_TEXT_STREAM_MAX_CHARS
+  );
+
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : null;
 }
 
 export function resolveGemmaNarrativeTimeoutMs(options = {}, config = {}) {

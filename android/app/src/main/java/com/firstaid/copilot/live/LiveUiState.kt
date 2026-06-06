@@ -15,6 +15,8 @@ data class LiveUiState(
 
     /** Current medical stage from `state.current_stage`, e.g. `S7_CPR_LOOP`. */
     val currentStage: String? = null,
+    val sessionStartedAtMs: Long? = null,
+    val cprStartedAtMs: Long? = null,
 
     // --- Latest guidance mapped from guidance_action.ui / .tts ---
     val mainText: String = "",
@@ -54,10 +56,25 @@ data class LiveUiState(
     val guidanceSource: String? = null,
     val eventSource: String? = null,
     val eventMode: String? = null,
+    val openQuestionPhase: OpenQuestionPhase = OpenQuestionPhase.Idle,
+    val lastOpenQuestionMetrics: LiveTurnMetrics? = null,
+
+    /**
+     * Latest on-device proactive nudge (Phase D). Written only by the proactive
+     * monitor; the screen plays it through a dedicated low-priority TTS effect
+     * keyed on [ProactiveCue.id] so it never touches the server guidance/audio
+     * dedup path. Null means "no pending proactive cue".
+     */
+    val proactiveCue: ProactiveCue? = null,
 
     // --- Transport status surface ---
     val lastErrorMessage: String? = null,
     val isInFlight: Boolean = false,
+
+    // --- Tool / action surface (tool UI consumes these; medical flow stays server-driven) ---
+    val primaryButton: PrimaryButtonState? = null,
+    val pendingConfirmation: ToolConfirmationState? = null,
+    val emergencyCall: EmergencyCallState = EmergencyCallState(),
 
     /**
      * D4 perception-signal holder. The detailed `{value,confidence,source,
@@ -90,6 +107,9 @@ enum class SourceBadge { DemoData, RecordingOnly, LiveRecognition }
 /** Microphone / half-duplex state. Populated by the voice phase. */
 enum class MicState { Idle, Listening, Capturing, Uploading, Speaking, Off }
 
+/** Visible lifecycle for low-latency Gemma open Q&A on the live voice path. */
+enum class OpenQuestionPhase { Idle, Ack, Answer, Cancelled }
+
 /** Haptic metronome intent derived from `guidance_action.haptic` / tool actions. */
 data class HapticState(
     val enabled: Boolean = false,
@@ -109,3 +129,50 @@ data class AttentionModeInputs(
  * this; nothing else should.
  */
 interface PerceptionSignalMarker
+
+internal fun LiveUiState.withSessionStartedAt(nowMs: Long): LiveUiState =
+    if (sessionStartedAtMs == null) copy(sessionStartedAtMs = nowMs) else this
+
+internal fun LiveUiState.withCprStartedAtIfNeeded(
+    previousStage: String?,
+    nowMs: Long,
+): LiveUiState =
+    if (
+        cprStartedAtMs == null &&
+        previousStage?.startsWith("S7") != true &&
+        currentStage?.startsWith("S7") == true
+    ) {
+        copy(cprStartedAtMs = nowMs)
+    } else {
+        this
+    }
+
+/**
+ * A primary call-to-action mapped from `guidance_action.ui.primary_button`.
+ * Purely presentational; tapping it routes back through the normal turn loop.
+ */
+data class PrimaryButtonState(
+    val label: String,
+    val intent: String? = null,
+    val style: String? = null,
+)
+
+/**
+ * A tool that needs explicit, visible user confirmation before it may run
+ * (share / send / delete). Surfaced so the UI can show a confirmation sheet;
+ * nothing is sent externally without the user acting on it.
+ */
+data class ToolConfirmationState(
+    val toolType: String,
+    val title: String,
+    val message: String? = null,
+)
+
+/**
+ * 120 emergency-call simulation surface. Demo builds never dial a real number;
+ * [mock] stays true unless a real, separately-approved call path sets it.
+ */
+data class EmergencyCallState(
+    val requested: Boolean = false,
+    val mock: Boolean = true,
+)

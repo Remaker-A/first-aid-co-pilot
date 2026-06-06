@@ -46,6 +46,8 @@ import com.firstaid.copilot.execution.GuidanceFixtureRepository
 import com.firstaid.copilot.execution.HAPTIC_TOOL_TYPES
 import com.firstaid.copilot.execution.ToolAction
 import com.firstaid.copilot.live.ui.LiveCprCoachScreen
+import com.firstaid.copilot.live.ui.theme.FirstAidColors
+import com.firstaid.copilot.live.ui.theme.FirstAidTheme
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
@@ -59,17 +61,25 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun FirstAidCopilotApp() {
-    MaterialTheme {
+    FirstAidTheme {
         var showFixtureDebug by remember { mutableStateOf(false) }
-        Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFFF8FAFC)),
-            color = Color(0xFFF8FAFC),
-        ) {
-            if (showFixtureDebug) {
+        if (showFixtureDebug) {
+            // Legacy fixture debug screen keeps its light scheme for readability.
+            Surface(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFFF8FAFC)),
+                color = Color(0xFFF8FAFC),
+            ) {
                 GuidanceActionShell(onBackToLive = { showFixtureDebug = false })
-            } else {
+            }
+        } else {
+            Surface(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(FirstAidColors.Background),
+                color = FirstAidColors.Background,
+            ) {
                 LiveCprCoachScreen(onOpenFixtureDebug = { showFixtureDebug = true })
             }
         }

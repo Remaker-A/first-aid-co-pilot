@@ -1,0 +1,14 @@
+{
+  "version": "gemma_suite_v1",
+  "generatedAt": "2026-06-06T09:26:49.959Z",
+  "cases": [
+    "patch_main.json",
+    "patch_adversarial.json",
+    "nlu_main.json",
+    "nlu_boundary.json",
+    "open_question_main.json",
+    "open_question_adversarial.json",
+    "handover_main.json",
+    "handover_adversarial.json"
+  ]
+}

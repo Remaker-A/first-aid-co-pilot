@@ -101,4 +101,22 @@ class GemmaLatencyBenchmarkTest {
         assertEquals(GEMMA_GENERATE_BUDGET_MS, gate.budgetMs)
         assertTrue(gate.nearRealtimeCapable)
     }
+
+    @Test
+    fun gemmaBackendParserDefaultsToCpuOnly() {
+        assertEquals(GemmaBackendPreference.CpuOnly, parseGemmaBackendPreference(null))
+        assertEquals(GemmaBackendPreference.CpuOnly, parseGemmaBackendPreference("cpu-only"))
+        assertEquals(GemmaBackendPreference.GpuOnly, parseGemmaBackendPreference("gpu-only"))
+        assertEquals(GemmaBackendPreference.GpuThenCpu, parseGemmaBackendPreference("auto"))
+    }
+
+    @Test
+    fun deterministicSamplerParserUsesGreedySettings() {
+        assertNull(parseGemmaSamplerSettings(null))
+        val sampler = parseGemmaSamplerSettings("deterministic")
+        assertEquals(1, sampler?.topK)
+        assertEquals(1.0, sampler?.topP ?: 0.0, 0.0001)
+        assertEquals(0.0, sampler?.temperature ?: -1.0, 0.0001)
+        assertEquals(0, sampler?.seed)
+    }
 }

@@ -23,6 +23,10 @@ export async function requestGemma({
   config,
   messages,
   timeoutMs,
+  maxTokens,
+  stream,
+  streamMaxChars,
+  streamStopPattern,
   modelFile,
   fetchImpl = globalThis.fetch,
   spawnImpl = nodeSpawn,
@@ -35,7 +39,7 @@ export async function requestGemma({
   }
 
   const daemon = getGemmaDaemon({ config, modelFile, fetchImpl, spawnImpl });
-  return daemon.request({ messages, timeoutMs });
+  return daemon.request({ messages, timeoutMs, maxTokens, stream, streamMaxChars, streamStopPattern });
 }
 
 export function buildGemmaServeArgs({
@@ -112,7 +116,7 @@ class GemmaServerDaemon {
     this.modelId = config.serveModelId || "";
   }
 
-  async request({ messages, timeoutMs }) {
+  async request({ messages, timeoutMs, maxTokens, stream = false, streamMaxChars, streamStopPattern }) {
     await this.ensureStarted();
 
     const requestTimeoutMs = positiveTimeout(
@@ -122,40 +126,54 @@ class GemmaServerDaemon {
       DEFAULT_GEMMA_SERVE_REQUEST_TIMEOUT_MS
     );
     const abort = createAbort(requestTimeoutMs);
-    let response;
+    const body = {
+      model: this.modelId || this.modelFile || modelIdFromFile(this.modelFile) || this.config.modelRepo || "gemma",
+      messages: messages || [],
+      temperature: 0,
+    };
+    const normalizedMaxTokens = normalizeMaxTokens(maxTokens);
+    if (normalizedMaxTokens) {
+      body.max_tokens = normalizedMaxTokens;
+    }
+    if (stream === true) {
+      body.stream = true;
+    }
     try {
-      response = await this.fetchImpl(`${this.baseUrl()}/v1/chat/completions`, {
+      const response = await this.fetchImpl(`${this.baseUrl()}/v1/chat/completions`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          model: this.modelId || this.modelFile || modelIdFromFile(this.modelFile) || this.config.modelRepo || "gemma",
-          messages: messages || [],
-          temperature: 0,
-        }),
+        body: JSON.stringify(body),
         signal: abort.signal,
       });
+
+      if (!response?.ok) {
+        const detail = await readResponseText(response);
+        throw new Error(`Gemma daemon HTTP ${response?.status || "failed"}: ${detail}`);
+      }
+
+      const text = stream === true
+        ? await readOpenAiStreamText(response, { maxChars: streamMaxChars, stopPattern: streamStopPattern })
+        : extractOpenAiText(await response.json());
+      if (typeof text !== "string" || text.trim() === "") {
+        throw new Error("Gemma daemon returned an empty completion.");
+      }
+
+      return {
+        stdout: text,
+        stderr: "",
+        exitCode: 0,
+        timedOut: false,
+        daemon: true,
+        streamed: stream === true,
+      };
+    } catch (error) {
+      if (isRequestTimeoutError(error)) {
+        this.stop();
+      }
+      throw error;
     } finally {
       abort.cancel();
     }
-
-    if (!response?.ok) {
-      const detail = await readResponseText(response);
-      throw new Error(`Gemma daemon HTTP ${response?.status || "failed"}: ${detail}`);
-    }
-
-    const json = await response.json();
-    const text = extractOpenAiText(json);
-    if (typeof text !== "string" || text.trim() === "") {
-      throw new Error("Gemma daemon returned an empty completion.");
-    }
-
-    return {
-      stdout: text,
-      stderr: "",
-      exitCode: 0,
-      timedOut: false,
-      daemon: true,
-    };
   }
 
   async ensureStarted() {
@@ -289,11 +307,123 @@ function extractOpenAiText(json) {
   return choice?.message?.content ?? choice?.text ?? json?.content ?? json?.text;
 }
 
+async function readOpenAiStreamText(response, { maxChars, stopPattern } = {}) {
+  const reader = response?.body?.getReader?.();
+  if (!reader) {
+    throw new Error("Gemma daemon streaming response has no readable body.");
+  }
+
+  const decoder = new TextDecoder();
+  const targetChars = normalizeMaxTokens(maxChars) || 28;
+  let buffer = "";
+  let text = "";
+  const canStop = createStreamStopPredicate(stopPattern);
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) {
+      break;
+    }
+    buffer += decoder.decode(value, { stream: true });
+    let doneByServer = false;
+    const parsed = consumeSseLines(buffer, (data) => {
+      if (data === "[DONE]") {
+        doneByServer = true;
+        return;
+      }
+      const delta = extractOpenAiStreamDelta(data);
+      if (delta) {
+        text += delta;
+      }
+    });
+    buffer = parsed.remainder;
+    if (doneByServer) {
+      break;
+    }
+    const completeEnough = /[。！？!?]/u.test(text) || text.length >= targetChars;
+    if (completeEnough && canStop(text)) {
+      drainReader(reader);
+      return text.trim();
+    }
+  }
+
+  return text.trim();
+}
+
+function createStreamStopPredicate(pattern) {
+  if (!pattern) {
+    return () => true;
+  }
+  if (pattern instanceof RegExp) {
+    return (text) => {
+      pattern.lastIndex = 0;
+      return pattern.test(text);
+    };
+  }
+  const regex = new RegExp(String(pattern), "u");
+  return (text) => regex.test(text);
+}
+
+function drainReader(reader) {
+  Promise.resolve().then(async () => {
+    try {
+      while (true) {
+        const { done } = await reader.read();
+        if (done) {
+          break;
+        }
+      }
+    } catch {
+      // Background drain only protects the daemon from a client-side early cancel.
+    }
+  });
+}
+
+function consumeSseLines(buffer, onData) {
+  let remainder = buffer;
+  let index = remainder.indexOf("\n");
+  while (index >= 0) {
+    const line = remainder.slice(0, index).trim();
+    remainder = remainder.slice(index + 1);
+    if (line.startsWith("data:")) {
+      onData(line.slice(5).trim());
+    }
+    index = remainder.indexOf("\n");
+  }
+  return { remainder };
+}
+
+function extractOpenAiStreamDelta(data) {
+  if (!data) {
+    return "";
+  }
+  try {
+    const json = JSON.parse(data);
+    const choice = Array.isArray(json?.choices) ? json.choices[0] : null;
+    return choice?.delta?.content ?? choice?.message?.content ?? choice?.text ?? json?.content ?? json?.text ?? "";
+  } catch {
+    return "";
+  }
+}
+
 function modelIdFromFile(modelFile) {
   if (!modelFile) {
     return "";
   }
   return path.basename(modelFile, path.extname(modelFile));
+}
+
+function normalizeMaxTokens(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? Math.floor(number) : null;
+}
+
+function isRequestTimeoutError(error) {
+  return (
+    error?.name === "AbortError" ||
+    error?.code === "ABORT_ERR" ||
+    /abort|timeout|timed out/i.test(String(error?.message || ""))
+  );
 }
 
 async function readResponseText(response) {

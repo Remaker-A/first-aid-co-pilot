@@ -171,10 +171,20 @@ class WebSocketAgentChannel(
                             ?: json.stringOrNull("guidance_source"),
                         responseType = json.stringOrNull("response_type")
                             ?: json.stringOrNull("responseType"),
+                        suppressLocalTts = json.booleanOrNull("suppress_local_tts")
+                            ?: json.booleanOrNull("suppressLocalTts")
+                            ?: false,
+                        autoAdvanceBridge = json.booleanOrNull("auto_advance_bridge")
+                            ?: json.booleanOrNull("autoAdvanceBridge")
+                            ?: false,
+                        openQuestionAnswer = json.booleanOrNull("open_question_answer")
+                            ?: json.booleanOrNull("openQuestionAnswer")
+                            ?: false,
                     ),
                 )
             }
             "state" -> emit(LiveAgentEvent.State(json.stringOrNull("current_stage")))
+            "metrics" -> emit(LiveAgentEvent.Metrics(parseLiveTurnMetrics(json)))
             "audio_begin" -> emit(
                 LiveAgentEvent.AudioBegin(
                     streamId = json.stringOrNull("id") ?: json.stringOrNull("stream_id"),

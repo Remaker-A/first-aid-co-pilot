@@ -13,6 +13,14 @@ param(
   [string]$AsrSample = "",
   [int]$AsrMaxMs = 0,
   [string]$GemmaPrompt = "",
+  [ValidateSet("auto", "gpu", "gpu-only", "cpu", "cpu-only")]
+  [string]$GemmaBackend = "cpu-only",
+  [ValidateSet("on", "off")]
+  [string]$GemmaSpeculative = "on",
+  [int]$GemmaCpuThreads = 0,
+  [int]$GemmaMaxNumTokens = 0,
+  [ValidateSet("default", "deterministic", "greedy", "stable", "top1")]
+  [string]$GemmaSampler = "default",
   [int]$GemmaGateMs = 0,
   [int]$GemmaBudgetMs = 0,
   [int]$GemmaTimeoutMs = 0,
@@ -116,6 +124,21 @@ if ($AsrMaxMs -gt 0) {
 }
 if (![string]::IsNullOrWhiteSpace($GemmaPrompt)) {
   $startArgs += @("--es", "gemmaPrompt", $GemmaPrompt)
+}
+if ($GemmaBackend -ne "auto") {
+  $startArgs += @("--es", "gemmaBackend", $GemmaBackend)
+}
+if ($GemmaSpeculative -ne "on") {
+  $startArgs += @("--es", "gemmaSpeculative", $GemmaSpeculative)
+}
+if ($GemmaCpuThreads -gt 0) {
+  $startArgs += @("--ei", "gemmaCpuThreads", "$GemmaCpuThreads")
+}
+if ($GemmaMaxNumTokens -gt 0) {
+  $startArgs += @("--ei", "gemmaMaxNumTokens", "$GemmaMaxNumTokens")
+}
+if ($GemmaSampler -ne "default") {
+  $startArgs += @("--es", "gemmaSampler", $GemmaSampler)
 }
 if ($GemmaGateMs -gt 0) {
   $startArgs += @("--ei", "gemmaGateMs", "$GemmaGateMs")

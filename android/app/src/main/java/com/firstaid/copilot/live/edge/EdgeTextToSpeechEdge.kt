@@ -2,11 +2,13 @@ package com.firstaid.copilot.live.edge
 
 import android.content.Context
 import android.media.MediaPlayer
+import android.os.SystemClock
 import android.util.Log
 import com.firstaid.copilot.live.audio.AndroidTextToSpeechEdge
 import java.io.File
 import java.lang.Integer.toHexString
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,6 +36,8 @@ class EdgeTextToSpeechEdge(
     private var bundleLoaded = false
     private var player: MediaPlayer? = null
     private var lastUtteranceId: String? = null
+    private var lastAcceptedText: String = ""
+    private var lastAcceptedTextAtMs: Long = Long.MIN_VALUE
 
     init {
         scope.launch(Dispatchers.IO) { preloadBundledCache() }
@@ -74,51 +78,42 @@ class EdgeTextToSpeechEdge(
         if (text.isBlank()) return
         val utteranceId = utteranceKey ?: UUID.randomUUID().toString()
         if (utteranceId == lastUtteranceId) return
+        val normalizedText = normalizeCacheText(text)
+        val nowMs = SystemClock.elapsedRealtime()
+        if (
+            shouldSuppressRepeatedLocalTts(
+                text = normalizedText,
+                lastText = lastAcceptedText,
+                nowMs = nowMs,
+                lastAtMs = lastAcceptedTextAtMs,
+                priority = priority,
+                interruptPolicy = interruptPolicy,
+                tone = tone,
+            )
+        ) {
+            Log.i(TAG, "Suppress repeated local TTS for '${text.take(16)}'")
+            return
+        }
         lastUtteranceId = utteranceId
+        lastAcceptedText = normalizedText
+        lastAcceptedTextAtMs = nowMs
 
-        scope.launch {
-            val cached = cachedPhrases[cacheKey(text, tone, speed)]
-                ?.takeIf { it.isFile && it.length() > 0L }
-            if (cached != null) {
-                Log.i(TAG, "Sherpa TTS cache hit ${cached.length()} bytes for '${text.take(16)}'")
-                play(cached)
-                return@launch
-            }
-            val bundled = bundledByText[normalizeCacheText(text)]
-                ?.takeIf { it.isFile && it.length() > 0L }
-            if (bundled != null) {
-                // Pre-rendered sherpa audio: best quality + correct digit reading,
-                // so prefer it over the system-TTS fast path.
-                Log.i(TAG, "Sherpa TTS bundle hit ${bundled.length()} bytes for '${text.take(16)}'")
-                play(bundled)
-                return@launch
-            }
-            if (shouldUseFastSystemTts(text, priority, tone) && fallback.isReady()) {
-                Log.i(TAG, "Android TTS fast path for '${text.take(16)}'")
-                fallback.speak(
-                    text = text,
-                    utteranceKey = utteranceId,
-                    priority = priority,
-                    interruptPolicy = interruptPolicy,
-                    tone = tone,
-                    speed = speed,
-                    flushQueue = flushQueue || interruptPolicy == "interrupt_lower_priority",
-                )
+        val shouldFlushQueue = shouldFlushSystemTtsQueue(
+            priority = priority,
+            interruptPolicy = interruptPolicy,
+            tone = tone,
+            explicitFlush = flushQueue,
+        )
+        Log.i(TAG, "Foreground Android system TTS for '${text.take(16)}'")
+        fallback.speak(text, utteranceId, priority, interruptPolicy, tone, speed, shouldFlushQueue)
+
+        scope.launch(Dispatchers.IO) {
+            preloadBundledCache()
+            val key = cacheKey(text, tone, speed)
+            val hasCache = cachedPhrases[key]?.takeIf { it.isFile && it.length() > 0L } != null ||
+                bundledByText[normalizeCacheText(text)]?.takeIf { it.isFile && it.length() > 0L } != null
+            if (!hasCache) {
                 synthesizeCacheOnly(text, tone, speed)
-                return@launch
-            }
-            val rate = resolveSpeechRate(tone, speed)
-            val outFile = File(appContext.cacheDir, "edge-tts/$utteranceId.wav")
-            val result = speechEngine.synthesizeToWav(text, outFile, speed = rate)
-            if (result.ok && result.audioFile?.isFile == true) {
-                Log.i(TAG, "Sherpa TTS synthesized ${result.audioFile.length()} bytes in ${result.latencyMs}ms")
-                if (text.length <= CACHEABLE_TEXT_MAX_CHARS) {
-                    cachedPhrases[cacheKey(text, tone, speed)] = result.audioFile
-                }
-                play(result.audioFile)
-            } else {
-                Log.w(TAG, "Sherpa TTS unavailable, falling back to Android TTS: ${result.error}")
-                fallback.speak(text, utteranceKey, priority, interruptPolicy, tone, speed, flushQueue)
             }
         }
     }
@@ -183,6 +178,7 @@ class EdgeTextToSpeechEdge(
         player = null
         fallback.stop()
         onSpeakingChanged(false)
+        lastUtteranceId = null
     }
 
     fun shutdown() {
@@ -191,26 +187,63 @@ class EdgeTextToSpeechEdge(
         scope.cancel()
     }
 
-    private suspend fun play(file: File) {
+    // Plays a pre-rendered/synthesized Sherpa WAV. If MediaPlayer cannot prepare,
+    // start, or fails mid-playback, fall back to the system TTS so a critical
+    // instruction is never silently dropped. The original text + speech params
+    // are threaded through purely to enable that fallback.
+    private suspend fun play(
+        file: File,
+        text: String,
+        utteranceId: String,
+        priority: String?,
+        interruptPolicy: String?,
+        tone: String?,
+        speed: String?,
+        flushQueue: Boolean,
+    ) {
         withContext(Dispatchers.Main) {
             stopPlayerOnly()
-            val next = MediaPlayer().apply {
-                setDataSource(file.absolutePath)
-                setOnCompletionListener {
+            val fellBack = AtomicBoolean(false)
+            fun fallbackToSystemTts(reason: String) {
+                if (!fellBack.compareAndSet(false, true)) return
+                Log.w(TAG, "MediaPlayer playback failed ($reason); falling back to Android TTS for '${text.take(16)}'")
+                stopPlayerOnly()
+                if (fallback.isReady()) {
+                    fallback.speak(
+                        text = text,
+                        utteranceKey = utteranceId,
+                        priority = priority,
+                        interruptPolicy = interruptPolicy,
+                        tone = tone,
+                        speed = speed,
+                        flushQueue = flushQueue,
+                    )
+                } else {
+                    onSpeakingChanged(false)
+                }
+            }
+            var pending: MediaPlayer? = null
+            try {
+                val next = MediaPlayer()
+                pending = next
+                next.setDataSource(file.absolutePath)
+                next.setOnCompletionListener {
                     stopPlayerOnly()
                     onSpeakingChanged(false)
                 }
-                setOnErrorListener { _, _, _ ->
-                    Log.w(TAG, "MediaPlayer failed to play Sherpa TTS output")
-                    stopPlayerOnly()
-                    onSpeakingChanged(false)
+                next.setOnErrorListener { _, what, extra ->
+                    fallbackToSystemTts("onError what=$what extra=$extra")
                     true
                 }
-                prepare()
+                next.prepare()
+                player = next
+                pending = null
+                onSpeakingChanged(true)
+                next.start()
+            } catch (error: Throwable) {
+                runCatching { pending?.release() }
+                fallbackToSystemTts(error.message ?: error::class.java.simpleName)
             }
-            player = next
-            onSpeakingChanged(true)
-            next.start()
         }
     }
 
@@ -233,25 +266,49 @@ class EdgeTextToSpeechEdge(
     private fun normalizeCacheText(text: String): String =
         text.trim().replace(WHITESPACE_REGEX, " ")
 
-    private fun shouldUseFastSystemTts(text: String, priority: String?, tone: String?): Boolean =
-        text.length <= FAST_SYSTEM_TTS_MAX_CHARS ||
+    private fun shouldFlushSystemTtsQueue(
+        priority: String?,
+        interruptPolicy: String?,
+        tone: String?,
+        explicitFlush: Boolean,
+    ): Boolean =
+        explicitFlush ||
             priority == "critical" ||
             priority == "high" ||
             tone == "urgent" ||
-            text in FAST_SYSTEM_TTS_TEXTS
+            interruptPolicy == "interrupt_lower_priority"
 
     private companion object {
         const val TAG = "EdgeTextToSpeech"
         const val CACHEABLE_TEXT_MAX_CHARS = 24
-        const val FAST_SYSTEM_TTS_MAX_CHARS = 24
         const val RUNTIME_CACHE_MAX_ENTRIES = 64
         val WHITESPACE_REGEX = Regex("\\s+")
-        val FAST_SYSTEM_TTS_TEXTS = setOf(
-            "\u7ee7\u7eed\u6309\u538b",
-            "\u4e0d\u8981\u505c",
-            "\u7528\u529b\u6309\u538b",
-            "\u6253\u5f00 AED",
-            "\u547c\u53eb 120",
-        )
     }
 }
+
+internal fun shouldSuppressRepeatedLocalTts(
+    text: String,
+    lastText: String,
+    nowMs: Long,
+    lastAtMs: Long,
+    priority: String?,
+    interruptPolicy: String?,
+    tone: String?,
+    cooldownMs: Long = DEFAULT_LOCAL_TTS_REPEAT_SUPPRESSION_MS,
+): Boolean {
+    if (text.isBlank() || text != lastText) return false
+    if (nowMs < lastAtMs || nowMs - lastAtMs > cooldownMs) return false
+    return !isRepeatSuppressionExempt(priority, interruptPolicy, tone)
+}
+
+private fun isRepeatSuppressionExempt(
+    priority: String?,
+    interruptPolicy: String?,
+    tone: String?,
+): Boolean =
+    priority == "critical" ||
+        priority == "high" ||
+        tone == "urgent" ||
+        interruptPolicy == "interrupt_lower_priority"
+
+internal const val DEFAULT_LOCAL_TTS_REPEAT_SUPPRESSION_MS = 60_000L

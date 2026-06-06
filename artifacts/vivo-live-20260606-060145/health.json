@@ -1,0 +1,6 @@
+﻿{
+  "ok": true,
+  "service": "firstaid-voice-server",
+  "live_ws_path": "/ws/live",
+  "tts_provider": "sherpa-onnx"
+}

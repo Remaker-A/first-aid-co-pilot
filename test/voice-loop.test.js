@@ -355,6 +355,59 @@ test("voice service follows the design demo mainline from one-key start through 
   assert.match(abnormalBreathing.guidance_action.tts.text, /疑似心脏骤停/);
 });
 
+test("voice service accepts client emergency-call button intent and then starts CPR from short start word", async () => {
+  const service = createVoiceDemoService({
+    runtime: neverResolvingAnyRuntime(),
+    tts: { provider: "mock" },
+    gemmaTurnTimeoutMs: 5,
+    now: () => new Date().toISOString()
+  });
+  const sessionId = "sess_client_emergency_button_then_start";
+  await driveVoiceSessionToS5(service, sessionId);
+
+  const clicked = await service.handleTurn({
+    sessionId,
+    text: "已拨打 120",
+    intent: "mark_emergency_called"
+  });
+  assert.equal(clicked.event.user_input.intent, "emergency_called");
+  assert.equal(clicked.intent_resolution.source, "client_intent_hint");
+  assert.equal(clicked.state.current_stage, AgentStage.S6_CPR_READY);
+  assert.equal(clicked.guidance_action.intent, "guide_cpr_position");
+
+  const start = await service.handleTurn({ sessionId, text: "开始" });
+  assert.equal(start.event.user_input.intent, "continue_cpr");
+  assert.equal(start.intent_resolution.source, "rule_flow_fast_path");
+  assert.equal(start.state.current_stage, AgentStage.S7_CPR_LOOP);
+  assert.equal(start.guidance_action.intent, "start_cpr_loop");
+  assert.equal(start.state.cpr_state.started, true);
+});
+
+test("voice service bridges S5 CPR start/help utterances without prematurely marking CPR started", async () => {
+  const service = createVoiceDemoService({
+    runtime: neverResolvingAnyRuntime(),
+    tts: { provider: "mock" },
+    gemmaTurnTimeoutMs: 5,
+    now: () => new Date().toISOString()
+  });
+  const sessionId = "sess_s5_start_bridge";
+  await driveVoiceSessionToS5(service, sessionId);
+
+  const bridge = await service.handleTurn({ sessionId, text: "继续" });
+  assert.equal(bridge.event.user_input.intent, "continue_cpr");
+  assert.equal(bridge.intent_resolution.fastPath, "s5_call_done_continue_cpr");
+  assert.equal(bridge.event.device_state.emergency_call_started, true);
+  assert.equal(bridge.event.cpr_quality, null);
+  assert.equal(bridge.state.current_stage, AgentStage.S6_CPR_READY);
+  assert.notEqual(bridge.state.cpr_state.started, true);
+
+  const start = await service.handleTurn({ sessionId, text: "怎么按压" });
+  assert.equal(start.event.user_input.intent, "continue_cpr");
+  assert.equal(start.state.current_stage, AgentStage.S7_CPR_LOOP);
+  assert.equal(start.guidance_action.intent, "start_cpr_loop");
+  assert.equal(start.state.cpr_state.started, true);
+});
+
 test("voice service uses validator fallback when Gemma text is unsafe", async () => {
   const service = createVoiceDemoService({
     runtime: {
@@ -1063,6 +1116,34 @@ async function advanceVoiceSessionToCpr(service, sessionId) {
     }
   });
   assert.equal(cprStart.state.current_stage, AgentStage.S7_CPR_LOOP);
+}
+
+async function driveVoiceSessionToS5(service, sessionId) {
+  await service.handleTurn({
+    sessionId,
+    eventSource: "demo_script",
+    eventType: "session_started",
+    deviceState: {
+      camera_available: true,
+      mic_available: true,
+      gps_available: true,
+      recording: true,
+      emergency_call_started: false,
+      network: "offline"
+    },
+    metadata: { adult_likely: true, recording: true }
+  });
+  await service.handleTurn({ sessionId, text: "现场安全了" });
+  await service.handleTurn({ sessionId, text: "他没有反应" });
+  await service.handleTurn({ sessionId, text: "没有正常呼吸" });
+  const call = await service.handleTurn({
+    sessionId,
+    eventSource: "system",
+    eventType: "auto_followup",
+    metadata: { auto_advance: true, auto_advance_from: AgentStage.S4_SUSPECTED_ARREST }
+  });
+  assert.equal(call.state.current_stage, AgentStage.S5_CALL_EMERGENCY);
+  assert.equal(call.guidance_action.intent, "start_emergency_call_and_cpr");
 }
 
 function sameIntentRuntime() {

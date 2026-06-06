@@ -22,6 +22,29 @@ test("intent resolver keeps confident regex hits on the fast path", async () => 
   assert.equal(result.slots.responsive.value, false);
 });
 
+test("intent resolver does not turn response-check questions into patient facts", async () => {
+  const runtime = {
+    parseUserIntent: async () => {
+      throw new Error("NLU should not run for a response-check question");
+    }
+  };
+
+  const result = await resolveUserIntent({
+    transcript: "患者有没有反应",
+    stage: AgentStage.S2_CHECK_RESPONSE,
+    runtime,
+    options: {
+      classification: { intent: "patient_unresponsive", score: 0.9 },
+      env: { INTENT_NLU: "on" }
+    }
+  });
+
+  assert.equal(result.intent, null);
+  assert.equal(result.escalated, false);
+  assert.equal(result.escalationReason, "response_check_question");
+  assert.deepEqual(result.slots, {});
+});
+
 test("intent resolver escalates fuzzy diagnostic text to Gemma NLU", async () => {
   let observedFrame = null;
   const runtime = {
@@ -124,4 +147,45 @@ test("intent resolver honors INTENT_NLU off switch", () => {
 
   assert.equal(result.escalate, false);
   assert.equal(result.reason, "nlu_disabled");
+});
+
+test("intent resolver maps short CPR start words only after the call/CPR gate", async () => {
+  const beforeCpr = await resolveUserIntent({
+    transcript: "继续",
+    stage: AgentStage.S2_CHECK_RESPONSE,
+    options: { env: {} }
+  });
+  assert.equal(beforeCpr.intent, null);
+
+  const atCall = await resolveUserIntent({
+    transcript: "继续",
+    stage: AgentStage.S5_CALL_EMERGENCY,
+    options: { env: {} }
+  });
+  assert.equal(atCall.intent, "continue_cpr");
+  assert.equal(atCall.source, "rule_flow_fast_path");
+
+  const shortAckAtCall = await resolveUserIntent({
+    transcript: "好",
+    stage: AgentStage.S5_CALL_EMERGENCY,
+    options: { env: {} }
+  });
+  assert.equal(shortAckAtCall.intent, "continue_cpr");
+  assert.equal(shortAckAtCall.source, "rule_flow_fast_path");
+
+  const atReady = await resolveUserIntent({
+    transcript: "怎么按压",
+    stage: AgentStage.S6_CPR_READY,
+    options: { env: {} }
+  });
+  assert.equal(atReady.intent, "continue_cpr");
+  assert.equal(atReady.source, "rule_flow_fast_path");
+
+  const startCompressions = await resolveUserIntent({
+    transcript: "开始胸外按压",
+    stage: AgentStage.S6_CPR_READY,
+    options: { env: {} }
+  });
+  assert.equal(startCompressions.intent, "continue_cpr");
+  assert.equal(startCompressions.source, "rule_flow_fast_path");
 });

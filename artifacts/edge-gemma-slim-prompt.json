@@ -1,0 +1,82 @@
+{
+  "ok": true,
+  "mode": "gemma",
+  "runs": 3,
+  "threads": 2,
+  "gemmaBackendPreference": "CpuOnly",
+  "gemmaSpeculative": true,
+  "gemmaCpuThreads": 0,
+  "gemmaMaxNumTokens": 4096,
+  "gemmaSampler": "default",
+  "modelRoot": "\/storage\/emulated\/0\/Android\/media\/com.firstaid.copilot.debug\/models",
+  "summary": "Gemma=Ready ASR=Ready TTS=Ready sherpa=Ready",
+  "gemmaReady": true,
+  "asrReady": true,
+  "ttsReady": true,
+  "phase": "finished",
+  "updatedAtMs": 1780768229790,
+  "gemma": {
+    "ok": true,
+    "latencyMs": 679,
+    "backend": "CPU",
+    "prompt": "你是急救受控问答层，成人疑似心脏骤停CPR场景，施救者问：会不会把肋骨按断？请只用一句不超过20字的简体中文回答，先肯定继续按压再简短作答，不诊断不承诺，CPR进行中绝不让其停止按压。只输出一个JSON，形如｛intent:answer_current_cpr_question，tts:｛text:一句话｝｝，不要多余文本。",
+    "generateOk": true,
+    "generateLatencyMs": 8551,
+    "generateText": "```json\n{\n  \"intent\": \"answer_current_cpr_question\",\n  \"tts\": {\n    \"text\": \"继续按",
+    "warmGenerateOk": true,
+    "warmGenerateLatencyMs": 8609,
+    "runs": [
+      {
+        "ok": true,
+        "latencyMs": 8386,
+        "text": "```json\n{\n  \"intent\": \"answer_current_cpr_question\",\n  \"tts\": {\n    \"text\": \"继续按"
+      },
+      {
+        "ok": true,
+        "latencyMs": 8389,
+        "text": "```json\n{\n  \"intent\": \"answer_current_cpr_question\",\n  \"tts\": {\n    \"text\": \"继续按"
+      },
+      {
+        "ok": true,
+        "latencyMs": 8551,
+        "text": "```json\n{\n  \"intent\": \"answer_current_cpr_question\",\n  \"tts\": {\n    \"text\": \"继续按"
+      }
+    ],
+    "latency": {
+      "count": 3,
+      "avgMs": 8442,
+      "minMs": 8386,
+      "maxMs": 8551,
+      "p50Ms": 8389,
+      "p95Ms": 8551
+    },
+    "gate": {
+      "gateMs": 1200,
+      "budgetMs": 1500,
+      "totalRuns": 3,
+      "okRuns": 3,
+      "withinBudgetRuns": 0,
+      "p50Ms": 8389,
+      "p95Ms": 8551,
+      "nearRealtimeCapable": false,
+      "recommendation": "ack_then_async"
+    }
+  },
+  "gemmaRuns": [
+    {
+      "ok": true,
+      "latencyMs": 8386,
+      "text": "```json\n{\n  \"intent\": \"answer_current_cpr_question\",\n  \"tts\": {\n    \"text\": \"继续按"
+    },
+    {
+      "ok": true,
+      "latencyMs": 8389,
+      "text": "```json\n{\n  \"intent\": \"answer_current_cpr_question\",\n  \"tts\": {\n    \"text\": \"继续按"
+    },
+    {
+      "ok": true,
+      "latencyMs": 8551,
+      "text": "```json\n{\n  \"intent\": \"answer_current_cpr_question\",\n  \"tts\": {\n    \"text\": \"继续按"
+    }
+  ]
+}

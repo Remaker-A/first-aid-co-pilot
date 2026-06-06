@@ -9,8 +9,8 @@
 // This module rescues exactly those misses: it converts the transcript and a tiny
 // closed set of canonical keywords into toneless pinyin syllables (声母+韵母,
 // 忽略声调) and runs a restricted (fuzzy-substring) edit distance. It only ever
-// returns one of a few critical intents (ask_aed_help / ask_can_stop /
-// ask_emergency_call) and is wired so it runs ONLY when the regex missed and we
+// returns one of a few critical intents (AED, stop, call, CPR-quality, etc.) and
+// is wired so it runs ONLY when the regex missed and we
 // are in a CPR-live stage (see intentResolver.resolveUserIntent). It never
 // fabricates observation facts (breathing/response) and never overrides a
 // confident regex intent. Zero third-party dependencies: the pinyin table ships

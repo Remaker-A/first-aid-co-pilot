@@ -1,0 +1,296 @@
+{
+  "ok": false,
+  "summary_paths": [
+    "D:\\文档\\Codex\\first aid\\artifacts\\vivo-live-20260606-063054\\summary.json",
+    "D:\\文档\\Codex\\first aid\\artifacts\\vivo-live-20260606-063102\\summary.json"
+  ],
+  "thresholds": {
+    "minFinals": 12,
+    "minRounds": 2,
+    "minMetrics": 12,
+    "minVoiceActive": 12,
+    "minOpenAnswers": 2,
+    "maxCriticalP95Ms": 1000,
+    "maxOpenQuestionP95Ms": 3000,
+    "requiredIntents": [
+      "scene_safe",
+      "patient_unresponsive",
+      "agonal_breathing",
+      "continue_cpr",
+      "aed_available",
+      "paramedics_arrived"
+    ],
+    "requiredStages": [
+      "S6_CPR_READY",
+      "S7_CPR_LOOP",
+      "S8_ASSISTANCE",
+      "S9_HANDOVER"
+    ]
+  },
+  "aggregate": {
+    "counts": {
+      "metrics": 0,
+      "asrPartials": 0,
+      "asrFinals": 0,
+      "utteranceCommits": 0,
+      "ttsStarts": 0,
+      "liveAudioStarts": 0,
+      "serverAudioBegins": 0,
+      "serverAudioChunks": 0,
+      "serverAudioEnds": 0,
+      "errors": 0
+    },
+    "websocketOpened": 0,
+    "captureStarted": 0,
+    "voiceActiveEvents": 0,
+    "errors": 0,
+    "intents": [],
+    "intentCounts": {},
+    "stages": [],
+    "stageCounts": {},
+    "voicePathLatencyMs": {
+      "voiceActiveToFirstPartial": {
+        "count": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "speechEndToFinal": {
+        "count": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "finalToGuidance": {
+        "count": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "guidanceToAndroidTtsStart": {
+        "count": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "finalToAndroidTtsStart": {
+        "count": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "speechEndToAndroidTtsStart": {
+        "count": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      }
+    },
+    "openQuestionWait": {
+      "count": 0,
+      "p50": null,
+      "p95": null,
+      "max": null
+    }
+  },
+  "checks": [
+    {
+      "name": "summaries_present",
+      "ok": true,
+      "expected": ">0",
+      "actual": "2"
+    },
+    {
+      "name": "round_summaries",
+      "ok": true,
+      "expected": ">=2",
+      "actual": "2"
+    },
+    {
+      "name": "all_websocket_opened",
+      "ok": false,
+      "expected": "2",
+      "actual": "0"
+    },
+    {
+      "name": "all_capture_started",
+      "ok": false,
+      "expected": "2",
+      "actual": "0"
+    },
+    {
+      "name": "no_errors",
+      "ok": true,
+      "expected": "0",
+      "actual": "0"
+    },
+    {
+      "name": "asr_finals",
+      "ok": false,
+      "expected": ">=12",
+      "actual": "0"
+    },
+    {
+      "name": "utterance_commits",
+      "ok": false,
+      "expected": ">=12",
+      "actual": "0"
+    },
+    {
+      "name": "voice_active_events",
+      "ok": false,
+      "expected": ">=12",
+      "actual": "0"
+    },
+    {
+      "name": "metrics",
+      "ok": false,
+      "expected": ">=12",
+      "actual": "0"
+    },
+    {
+      "name": "open_question_answers",
+      "ok": false,
+      "expected": ">=2",
+      "actual": "0"
+    },
+    {
+      "name": "intent:scene_safe",
+      "ok": false,
+      "expected": ">=2",
+      "actual": "0 (<none>)"
+    },
+    {
+      "name": "intent:patient_unresponsive",
+      "ok": false,
+      "expected": ">=2",
+      "actual": "0 (<none>)"
+    },
+    {
+      "name": "intent:agonal_breathing",
+      "ok": false,
+      "expected": ">=2",
+      "actual": "0 (<none>)"
+    },
+    {
+      "name": "intent:continue_cpr",
+      "ok": false,
+      "expected": ">=2",
+      "actual": "0 (<none>)"
+    },
+    {
+      "name": "intent:aed_available",
+      "ok": false,
+      "expected": ">=2",
+      "actual": "0 (<none>)"
+    },
+    {
+      "name": "intent:paramedics_arrived",
+      "ok": false,
+      "expected": ">=2",
+      "actual": "0 (<none>)"
+    },
+    {
+      "name": "stage:S6_CPR_READY",
+      "ok": false,
+      "expected": ">=2",
+      "actual": "0 (<none>)"
+    },
+    {
+      "name": "stage:S7_CPR_LOOP",
+      "ok": false,
+      "expected": ">=2",
+      "actual": "0 (<none>)"
+    },
+    {
+      "name": "stage:S8_ASSISTANCE",
+      "ok": false,
+      "expected": ">=2",
+      "actual": "0 (<none>)"
+    },
+    {
+      "name": "stage:S9_HANDOVER",
+      "ok": false,
+      "expected": ">=2",
+      "actual": "0 (<none>)"
+    },
+    {
+      "name": "latency:voiceActiveToFirstPartial:present",
+      "ok": false,
+      "expected": ">0",
+      "actual": "0"
+    },
+    {
+      "name": "latency:voiceActiveToFirstPartial:p95",
+      "ok": false,
+      "expected": "<=1000ms",
+      "actual": "count=0, p50=null, p95=null, max=null"
+    },
+    {
+      "name": "latency:speechEndToFinal:present",
+      "ok": false,
+      "expected": ">0",
+      "actual": "0"
+    },
+    {
+      "name": "latency:speechEndToFinal:p95",
+      "ok": false,
+      "expected": "<=1000ms",
+      "actual": "count=0, p50=null, p95=null, max=null"
+    },
+    {
+      "name": "latency:finalToGuidance:present",
+      "ok": false,
+      "expected": ">0",
+      "actual": "0"
+    },
+    {
+      "name": "latency:finalToGuidance:p95",
+      "ok": false,
+      "expected": "<=1000ms",
+      "actual": "count=0, p50=null, p95=null, max=null"
+    },
+    {
+      "name": "latency:guidanceToAndroidTtsStart:present",
+      "ok": false,
+      "expected": ">0",
+      "actual": "0"
+    },
+    {
+      "name": "latency:guidanceToAndroidTtsStart:p95",
+      "ok": false,
+      "expected": "<=1000ms",
+      "actual": "count=0, p50=null, p95=null, max=null"
+    },
+    {
+      "name": "latency:finalToAndroidTtsStart:present",
+      "ok": false,
+      "expected": ">0",
+      "actual": "0"
+    },
+    {
+      "name": "latency:finalToAndroidTtsStart:p95",
+      "ok": false,
+      "expected": "<=1000ms",
+      "actual": "count=0, p50=null, p95=null, max=null"
+    },
+    {
+      "name": "latency:speechEndToAndroidTtsStart:present",
+      "ok": false,
+      "expected": ">0",
+      "actual": "0"
+    },
+    {
+      "name": "latency:speechEndToAndroidTtsStart:p95",
+      "ok": false,
+      "expected": "<=1000ms",
+      "actual": "count=0, p50=null, p95=null, max=null"
+    },
+    {
+      "name": "latency:openQuestionWait:p95",
+      "ok": false,
+      "expected": "count>=2, p95<=3000ms",
+      "actual": "count=0, p50=null, p95=null, max=null"
+    }
+  ]
+}

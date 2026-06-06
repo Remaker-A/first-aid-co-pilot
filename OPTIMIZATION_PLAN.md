@@ -19,6 +19,17 @@
 - **P2 背压**：`MiniWebSocketConnection.sendBinary` 改为"有损背压"——音频帧在 socket 积压超 1MB 时丢弃并计数，控制/状态 JSON 帧永不丢，弱网不再堆爆内存。
 - 启用方式见根目录 `.env.example`（本轮新增的完整模板）。
 
+### 端侧 Gemma 扩能层（C/D/E，全部 on-device）
+
+> 让端侧 Gemma 真正进入实时会话并在 Node 服务端不可达时离线增强；医疗流程决策权仍归服务端状态机。组件 `EdgeGemmaAgent` 实现三项产品功能：（E）NLU 意图/观察事实兜底、（C）受控开放问答、（D）主动话术润色。
+
+- **不可逾越的红线**：端侧 Gemma 永不切 stage、不发起工具调用、不做诊断、CPR 进行中绝不让施救者停下按压；CPR 高频纠错与 `critical` 动作的热路径**绝不**等待 Gemma。
+- **核心模式**：确定性先行 + Gemma 异步增强（`ack_then_async`）——先出确定性结果，模型答复只增强**下一轮**。
+- **单驱动调度**：独占唯一 `OnDeviceGemmaDriver`（`generate()` 是 `Mutex`），内部优先级队列保证 NLU（E）/开放问答（C）优先于主动润色（D），低优请求不会饿死交互请求。全部 flag-gated、默认 OFF，接线即默认行为不变。
+- **安全校验**：一切端侧输出先过 `GemmaSuiteAsserts`（benchmark grader 升级为生产 guard，**逻辑不变**），命中禁词/停止按压词/超长/越权 intent/NLU 越权键（如泄漏 `stage`、`suspected_cardiac_arrest`）/不可解析即拒绝并回退确定性模板。
+- **延迟门（复用 `gemmaLatencyGate`）**：NLU 近实时门 `GEMMA_NEAR_REALTIME_GATE_MS=1200ms`、单次预算 `GEMMA_GENERATE_BUDGET_MS=1500ms`，超门即 `ack_then_async`（正则即时、Gemma 下一轮纠正）；开放问答即时确定性 ack + 异步答复 **p95 < 3000ms**（与 Vivo 实机验收同门）。
+- **Phase 4 测试与文档**：新增 JVM 单测 `EdgeGuardContractTest`（禁词 / 停止按压词 / 超长 / 越权 intent + NLU 安全红线，按 S7 CPR-loop 与呼吸观测场景取例）与 `EdgeGemmaLatencyAcceptanceTest`（NLU / 开放问答 p50/p95，复用 `gemmaLatencyGate` / `LatencyStats`）；guard 的完整评分契约另由既有 `GemmaFunctionSuiteTest` 覆盖（与生产 guard 同一 SSOT）。测试均为纯 JVM（`org.json` + `kotlinx-coroutines-test`），不依赖设备或真实模型。
+
 ---
 
 ## 优先级总览

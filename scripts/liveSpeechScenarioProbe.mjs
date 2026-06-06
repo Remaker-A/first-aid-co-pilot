@@ -143,6 +143,7 @@ const STEPS = [
           sourceAny: ["state_machine_critical"],
           intent: "state_suspected_arrest_handling",
           ttsIncludes: ["疑似", "胸外按压"],
+          audioEnvelope: false,
         },
         {
           stage: "S5_CALL_EMERGENCY",
@@ -151,13 +152,15 @@ const STEPS = [
           ttsIncludes: ["我将为你拨打", "120", "免提"],
           callBriefIncludes: ["坐标", "无反应", "无正常呼吸", "按疑似心脏骤停处理", "请派救护车"],
           hasTool: "emergency_call",
+          audioEnvelope: false,
         },
         {
           // S6 is the single confirm gate now (你说我做 coach retired): one
           // positioning line + "说开始/点开始按压".
           stage: "S6_CPR_READY",
           sourceAny: ["state_machine_critical"],
-          ttsIncludes: ["胸口中央", "胳膊伸直", "开始按压"],
+          ttsIncludes: ["胸口中央", "胳膊伸直", "开始"],
+          audioEnvelope: true,
         },
       ],
       // The chain must stop at S6 (no further auto-advance into S7).
@@ -241,27 +244,84 @@ const STEPS = [
     },
   },
   {
-    id: "s7_ask_aed",
-    label: "段④被动问答：AED 来了怎么办 -> rule_fast_path 即时作答（stage 不变）",
-    contract: "段④被动问答（S7 即时命中 rule_fast_path）",
+    id: "s7_open_question_gemma_answer",
+    label: "段④开放问答：非模板问题 -> live 先 ack，随后 Gemma answer 追播",
+    contract: "段④开放问答（ack_then_async_answer）",
     bonus: true,
-    controls: [{ type: "final", text: "AED 来了怎么办" }],
+    controls: [{ type: "final", text: "为什么他的鞋子湿了" }],
     expect: {
       baseline: true,
-      finalIntent: "ask_aed_help",
+      finalIntent: null,
       finalStage: "S7_CPR_LOOP",
       segments: [
         {
           stage: "S7_CPR_LOOP",
-          sourceAny: ["rule_fast_path"],
-          responseType: "question_answer",
+          sourceAny: ["open_question_ack"],
+          responseType: "open_question_ack",
           intent: "answer_current_cpr_question",
-          // AED 只引导：跟着它的语音做，不再口述"贴电极/设备提示分析时暂停"。
-          ttsIncludes: ["继续按压", "跟着它的语音"],
+          ttsIncludes: ["按住别停"],
+        },
+        {
+          stage: "S7_CPR_LOOP",
+          sourceAny: ["gemma_open_question_text_stream", "gemma_open_question_text"],
+          responseType: "open_question_answer",
+          intent: "answer_current_cpr_question",
+          ttsIncludes: ["继续按压"],
+        },
+      ],
+      metrics: { guidanceSource: "open_question_ack" },
+      openQuestionMetrics: {
+        ackPending: true,
+        answerSourceAny: ["gemma_open_question_text_stream", "gemma_open_question_text"],
+        answerFallback: false,
+        maxAnswerWaitMs: 60,
+      },
+    },
+  },
+  {
+    id: "s7_ask_aed",
+    label: "段④事实到达：AED 来了怎么办 -> rule_fast_path 进入 AED 协助",
+    contract: "段④ AED 到达（S7 即时命中 aed_available -> S8）",
+    bonus: true,
+    controls: [{ type: "final", text: "AED 来了怎么办" }],
+    expect: {
+      baseline: true,
+      finalIntent: "aed_available",
+      finalStage: "S8_ASSISTANCE",
+      segments: [
+        {
+          stage: "S8_ASSISTANCE",
+          sourceAny: ["rule_fast_path"],
+          responseType: "flow_instruction",
+          intent: "assist_aed",
+          ttsIncludes: ["继续按压", "语音"],
           ttsIncludesAny: ["打开 AED", "打开AED", "AED"],
         },
       ],
       metrics: { guidanceSource: "rule_fast_path" },
+    },
+  },
+  {
+    id: "s8_ems_arrived",
+    label: "段④事实到达：120 到了 -> paramedics_arrived 进入 S9 交接并停止节拍",
+    contract: "段④ EMS 到达（S8/S7 本地识别 paramedics_arrived，状态机进入 S9）",
+    bonus: true,
+    controls: [{ type: "final", text: "120 到了" }],
+    expect: {
+      baseline: true,
+      finalIntent: "paramedics_arrived",
+      finalStage: "S9_HANDOVER",
+      segments: [
+        {
+          stage: "S9_HANDOVER",
+          sourceAny: ["state_machine_critical"],
+          responseType: "flow_instruction",
+          intent: "generate_handover_report",
+          ttsIncludes: ["急救员到达", "交接报告"],
+          hasTools: ["stop_haptic_metronome", "generate_handover_report"],
+        },
+      ],
+      metrics: { guidanceSource: "state_machine_critical", intentSource: "regex" },
     },
   },
 ];
@@ -322,6 +382,14 @@ function buildLiveSession() {
     },
     async parseUserIntent() {
       return { ok: false, reason: "stub_runtime", intent: null, slots: {}, confidence: 0 };
+    },
+    async generateText(_messages, options = {}) {
+      return {
+        ok: true,
+        text: "继续按压，鞋子湿不影响当前处置。",
+        streamed: options.stream === true,
+        reason: options.stream ? "stub_text_stream" : "stub_text",
+      };
     },
     async prewarm() {
       return { ok: true, warmed: false, reason: "stub_runtime" };
@@ -473,16 +541,23 @@ function evaluateStep(step, turnJson, turnAudio) {
         const found = got.toolTypes.includes(want.hasTool);
         addCheck(checks, `${tag}:tool:${want.hasTool}`, found, want.hasTool, got.toolTypes.join(",") || "<none>");
       }
+      for (const tool of want.hasTools || []) {
+        const found = got.toolTypes.includes(tool);
+        addCheck(checks, `${tag}:tool:${tool}`, found, tool, got.toolTypes.join(",") || "<none>");
+      }
       if (typeof want.cprStarted === "boolean") {
         const started = got.state?.cpr_state?.started === true;
         addCheck(checks, `${tag}:cpr_started`, started === want.cprStarted, String(want.cprStarted), String(started));
       }
-      // Each speaking segment must carry a complete audio envelope.
+      // Each speaking segment must carry a complete audio envelope. The S4->S5
+      // bridge intentionally coalesces three guidance actions into one spoken
+      // audio envelope, so earlier synthetic segments opt out.
+      const expectAudio = want.audioEnvelope !== false;
       addCheck(
         checks,
         `${tag}:audio_envelope`,
-        got.hasAudioBegin && got.hasAudioEnd,
-        "audio_begin+audio_end",
+        !expectAudio || (got.hasAudioBegin && got.hasAudioEnd),
+        expectAudio ? "audio_begin+audio_end" : "audio optional",
         `${got.hasAudioBegin}/${got.hasAudioEnd}`
       );
     }
@@ -536,6 +611,50 @@ function evaluateStep(step, turnJson, turnAudio) {
     }
   }
 
+  if (expect.openQuestionMetrics) {
+    const ackMetric = metricsEvents.find((event) => event.open_question?.segment === "ack") || null;
+    const answerMetric = metricsEvents.find((event) => event.open_question?.segment === "answer") || null;
+    if (typeof expect.openQuestionMetrics.ackPending === "boolean") {
+      addCheck(
+        checks,
+        "open_question:ack_pending",
+        ackMetric?.open_question?.pending === expect.openQuestionMetrics.ackPending,
+        String(expect.openQuestionMetrics.ackPending),
+        String(ackMetric?.open_question?.pending)
+      );
+    }
+    if (Array.isArray(expect.openQuestionMetrics.answerSourceAny)) {
+      const source = answerMetric?.guidance_source ?? null;
+      addCheck(
+        checks,
+        "open_question:answer_source",
+        expect.openQuestionMetrics.answerSourceAny.includes(source),
+        expect.openQuestionMetrics.answerSourceAny.join(" | "),
+        source ?? "<none>"
+      );
+    }
+    if (typeof expect.openQuestionMetrics.answerFallback === "boolean") {
+      const fallback = answerMetric?.open_question?.fallback === true;
+      addCheck(
+        checks,
+        "open_question:answer_fallback",
+        fallback === expect.openQuestionMetrics.answerFallback,
+        String(expect.openQuestionMetrics.answerFallback),
+        String(fallback)
+      );
+    }
+    if (typeof expect.openQuestionMetrics.maxAnswerWaitMs === "number") {
+      const waitMs = answerMetric?.open_question?.wait_ms;
+      addCheck(
+        checks,
+        "open_question:answer_wait",
+        typeof waitMs === "number" && waitMs <= expect.openQuestionMetrics.maxAnswerWaitMs,
+        `<=${expect.openQuestionMetrics.maxAnswerWaitMs}ms`,
+        `${waitMs ?? "null"}ms`
+      );
+    }
+  }
+
   if (expect.finalStage) {
     const finalStage = lastStage(turnJson);
     addCheck(checks, "final_stage", finalStage === expect.finalStage, expect.finalStage, finalStage ?? "<none>");
@@ -557,7 +676,9 @@ function evaluateStep(step, turnJson, turnAudio) {
   }
 
   if (turnAudio.length > 0 || (Array.isArray(expect.segments) && expect.segments.length > 0)) {
-    const expectedAudio = Array.isArray(expect.segments) ? expect.segments.length : 0;
+    const expectedAudio = Array.isArray(expect.segments)
+      ? expect.segments.filter((segment) => segment.audioEnvelope !== false).length
+      : 0;
     addCheck(checks, "audio_frames", turnAudio.length >= expectedAudio, `>= ${expectedAudio}`, String(turnAudio.length));
   }
 

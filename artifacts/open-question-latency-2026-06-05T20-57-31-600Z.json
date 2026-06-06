@@ -1,0 +1,655 @@
+{
+  "summary": {
+    "ok": true,
+    "rounds": 3,
+    "real_gemma": false,
+    "require_gemma_answer": false,
+    "text_timeout_ms": 1000,
+    "prewarm_ms": 0,
+    "prewarm": {
+      "ok": true,
+      "warmed": false,
+      "reason": "fake_runtime"
+    },
+    "total_cases": 9,
+    "passed": 9,
+    "failed": 0,
+    "failed_cases": [],
+    "latency_ms_by_kind": {
+      "closed_set": {
+        "count": 3,
+        "p50": 1,
+        "p95": 2,
+        "max": 2
+      },
+      "template": {
+        "count": 3,
+        "p50": 3,
+        "p95": 5,
+        "max": 5
+      },
+      "gemma": {
+        "count": 3,
+        "p50": 37,
+        "p95": 42,
+        "max": 42
+      }
+    },
+    "open_question_answer_wait_ms": {
+      "count": 6,
+      "p50": 0,
+      "p95": 38,
+      "max": 38
+    },
+    "gemma_sources": {
+      "none": 3,
+      "open_question_template": 3,
+      "gemma_open_question_text_stream": 3
+    }
+  },
+  "results": [
+    {
+      "round": 1,
+      "id": "closed_quality_mishear",
+      "kind": "closed_set",
+      "ok": true,
+      "checks": [
+        {
+          "name": "prepared_s7",
+          "ok": true,
+          "expected": "S7_CPR_LOOP",
+          "actual": "S7_CPR_LOOP"
+        },
+        {
+          "name": "stage_stays_live",
+          "ok": true,
+          "expected": "S7/S8",
+          "actual": "S7_CPR_LOOP"
+        },
+        {
+          "name": "open_question",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "intent",
+          "ok": true,
+          "expected": "ask_cpr_quality",
+          "actual": "ask_cpr_quality"
+        },
+        {
+          "name": "guidance_source",
+          "ok": true,
+          "expected": "rule_fast_path",
+          "actual": "rule_fast_path"
+        },
+        {
+          "name": "response_type",
+          "ok": true,
+          "expected": "question_answer",
+          "actual": "question_answer"
+        }
+      ],
+      "actual": {
+        "ready": {
+          "ok": true,
+          "stage": "S7_CPR_LOOP",
+          "intent": "start_cpr_loop"
+        },
+        "text": "我爱的对吗",
+        "stage": "S7_CPR_LOOP",
+        "intent": "ask_cpr_quality",
+        "guidance_intent": "answer_current_cpr_question",
+        "guidance_source": "rule_fast_path",
+        "response_type": "question_answer",
+        "open_question": false,
+        "answer_source": null,
+        "answer_ok": false,
+        "answer_fallback": false,
+        "answer_reason": null,
+        "answer_wait_ms": null,
+        "tts_text": "按压可以，继续保持 100 到 120 次每分钟。",
+        "total_ms": 2,
+        "elapsed_ms": 2,
+        "timings": {
+          "stt_ms": 0,
+          "intent_resolution_ms": 0,
+          "agent_pipeline_ms": 2,
+          "tts_ms": 0,
+          "total_ms": 2
+        }
+      }
+    },
+    {
+      "round": 1,
+      "id": "template_no_breaths",
+      "kind": "template",
+      "ok": true,
+      "checks": [
+        {
+          "name": "prepared_s7",
+          "ok": true,
+          "expected": "S7_CPR_LOOP",
+          "actual": "S7_CPR_LOOP"
+        },
+        {
+          "name": "stage_stays_live",
+          "ok": true,
+          "expected": "S7/S8",
+          "actual": "S7_CPR_LOOP"
+        },
+        {
+          "name": "open_question",
+          "ok": true,
+          "expected": "true",
+          "actual": "true"
+        },
+        {
+          "name": "answer_source",
+          "ok": true,
+          "expected": "open_question_template",
+          "actual": "open_question_template"
+        },
+        {
+          "name": "answer_wait",
+          "ok": true,
+          "expected": "<=5ms",
+          "actual": "0ms"
+        }
+      ],
+      "actual": {
+        "ready": {
+          "ok": true,
+          "stage": "S7_CPR_LOOP",
+          "intent": "start_cpr_loop"
+        },
+        "text": "为什么不能人工呼吸",
+        "stage": "S7_CPR_LOOP",
+        "intent": null,
+        "guidance_intent": "answer_current_cpr_question",
+        "guidance_source": "open_question_ack",
+        "response_type": "open_question_ack",
+        "open_question": true,
+        "answer_source": "open_question_template",
+        "answer_ok": true,
+        "answer_fallback": false,
+        "answer_reason": "template_hands_only_cpr",
+        "answer_wait_ms": 0,
+        "tts_text": "我在，按住别停，听我说。",
+        "total_ms": 5,
+        "elapsed_ms": 5,
+        "timings": {
+          "stt_ms": 0,
+          "intent_resolution_ms": 1,
+          "agent_pipeline_ms": 2,
+          "tts_ms": 0,
+          "total_ms": 5
+        }
+      }
+    },
+    {
+      "round": 1,
+      "id": "gemma_text_stream",
+      "kind": "gemma",
+      "ok": true,
+      "checks": [
+        {
+          "name": "prepared_s7",
+          "ok": true,
+          "expected": "S7_CPR_LOOP",
+          "actual": "S7_CPR_LOOP"
+        },
+        {
+          "name": "stage_stays_live",
+          "ok": true,
+          "expected": "S7/S8",
+          "actual": "S7_CPR_LOOP"
+        },
+        {
+          "name": "open_question",
+          "ok": true,
+          "expected": "true",
+          "actual": "true"
+        },
+        {
+          "name": "answer_source",
+          "ok": true,
+          "expected": "gemma_open_question_text_stream | gemma_open_question_text",
+          "actual": "gemma_open_question_text_stream"
+        }
+      ],
+      "actual": {
+        "ready": {
+          "ok": true,
+          "stage": "S7_CPR_LOOP",
+          "intent": "start_cpr_loop"
+        },
+        "text": "为什么他的鞋子湿了",
+        "stage": "S7_CPR_LOOP",
+        "intent": null,
+        "guidance_intent": "answer_current_cpr_question",
+        "guidance_source": "open_question_ack",
+        "response_type": "open_question_ack",
+        "open_question": true,
+        "answer_source": "gemma_open_question_text_stream",
+        "answer_ok": true,
+        "answer_fallback": false,
+        "answer_reason": "open_question_text_stream_answered",
+        "answer_wait_ms": 38,
+        "tts_text": "我在，按住别停，听我说。",
+        "total_ms": 42,
+        "elapsed_ms": 42,
+        "timings": {
+          "stt_ms": 0,
+          "intent_resolution_ms": 1,
+          "agent_pipeline_ms": 2,
+          "tts_ms": 1,
+          "total_ms": 42
+        }
+      }
+    },
+    {
+      "round": 2,
+      "id": "closed_quality_mishear",
+      "kind": "closed_set",
+      "ok": true,
+      "checks": [
+        {
+          "name": "prepared_s7",
+          "ok": true,
+          "expected": "S7_CPR_LOOP",
+          "actual": "S7_CPR_LOOP"
+        },
+        {
+          "name": "stage_stays_live",
+          "ok": true,
+          "expected": "S7/S8",
+          "actual": "S7_CPR_LOOP"
+        },
+        {
+          "name": "open_question",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "intent",
+          "ok": true,
+          "expected": "ask_cpr_quality",
+          "actual": "ask_cpr_quality"
+        },
+        {
+          "name": "guidance_source",
+          "ok": true,
+          "expected": "rule_fast_path",
+          "actual": "rule_fast_path"
+        },
+        {
+          "name": "response_type",
+          "ok": true,
+          "expected": "question_answer",
+          "actual": "question_answer"
+        }
+      ],
+      "actual": {
+        "ready": {
+          "ok": true,
+          "stage": "S7_CPR_LOOP",
+          "intent": "start_cpr_loop"
+        },
+        "text": "我爱的对吗",
+        "stage": "S7_CPR_LOOP",
+        "intent": "ask_cpr_quality",
+        "guidance_intent": "answer_current_cpr_question",
+        "guidance_source": "rule_fast_path",
+        "response_type": "question_answer",
+        "open_question": false,
+        "answer_source": null,
+        "answer_ok": false,
+        "answer_fallback": false,
+        "answer_reason": null,
+        "answer_wait_ms": null,
+        "tts_text": "按压可以，继续保持 100 到 120 次每分钟。",
+        "total_ms": 1,
+        "elapsed_ms": 2,
+        "timings": {
+          "stt_ms": 0,
+          "intent_resolution_ms": 0,
+          "agent_pipeline_ms": 1,
+          "tts_ms": 0,
+          "total_ms": 1
+        }
+      }
+    },
+    {
+      "round": 2,
+      "id": "template_no_breaths",
+      "kind": "template",
+      "ok": true,
+      "checks": [
+        {
+          "name": "prepared_s7",
+          "ok": true,
+          "expected": "S7_CPR_LOOP",
+          "actual": "S7_CPR_LOOP"
+        },
+        {
+          "name": "stage_stays_live",
+          "ok": true,
+          "expected": "S7/S8",
+          "actual": "S7_CPR_LOOP"
+        },
+        {
+          "name": "open_question",
+          "ok": true,
+          "expected": "true",
+          "actual": "true"
+        },
+        {
+          "name": "answer_source",
+          "ok": true,
+          "expected": "open_question_template",
+          "actual": "open_question_template"
+        },
+        {
+          "name": "answer_wait",
+          "ok": true,
+          "expected": "<=5ms",
+          "actual": "0ms"
+        }
+      ],
+      "actual": {
+        "ready": {
+          "ok": true,
+          "stage": "S7_CPR_LOOP",
+          "intent": "start_cpr_loop"
+        },
+        "text": "为什么不能人工呼吸",
+        "stage": "S7_CPR_LOOP",
+        "intent": null,
+        "guidance_intent": "answer_current_cpr_question",
+        "guidance_source": "open_question_ack",
+        "response_type": "open_question_ack",
+        "open_question": true,
+        "answer_source": "open_question_template",
+        "answer_ok": true,
+        "answer_fallback": false,
+        "answer_reason": "template_hands_only_cpr",
+        "answer_wait_ms": 0,
+        "tts_text": "我在，按住别停，听我说。",
+        "total_ms": 3,
+        "elapsed_ms": 2,
+        "timings": {
+          "stt_ms": 0,
+          "intent_resolution_ms": 1,
+          "agent_pipeline_ms": 1,
+          "tts_ms": 0,
+          "total_ms": 3
+        }
+      }
+    },
+    {
+      "round": 2,
+      "id": "gemma_text_stream",
+      "kind": "gemma",
+      "ok": true,
+      "checks": [
+        {
+          "name": "prepared_s7",
+          "ok": true,
+          "expected": "S7_CPR_LOOP",
+          "actual": "S7_CPR_LOOP"
+        },
+        {
+          "name": "stage_stays_live",
+          "ok": true,
+          "expected": "S7/S8",
+          "actual": "S7_CPR_LOOP"
+        },
+        {
+          "name": "open_question",
+          "ok": true,
+          "expected": "true",
+          "actual": "true"
+        },
+        {
+          "name": "answer_source",
+          "ok": true,
+          "expected": "gemma_open_question_text_stream | gemma_open_question_text",
+          "actual": "gemma_open_question_text_stream"
+        }
+      ],
+      "actual": {
+        "ready": {
+          "ok": true,
+          "stage": "S7_CPR_LOOP",
+          "intent": "start_cpr_loop"
+        },
+        "text": "为什么他的鞋子湿了",
+        "stage": "S7_CPR_LOOP",
+        "intent": null,
+        "guidance_intent": "answer_current_cpr_question",
+        "guidance_source": "open_question_ack",
+        "response_type": "open_question_ack",
+        "open_question": true,
+        "answer_source": "gemma_open_question_text_stream",
+        "answer_ok": true,
+        "answer_fallback": false,
+        "answer_reason": "open_question_text_stream_answered",
+        "answer_wait_ms": 33,
+        "tts_text": "我在，按住别停，听我说。",
+        "total_ms": 35,
+        "elapsed_ms": 36,
+        "timings": {
+          "stt_ms": 0,
+          "intent_resolution_ms": 0,
+          "agent_pipeline_ms": 2,
+          "tts_ms": 1,
+          "total_ms": 35
+        }
+      }
+    },
+    {
+      "round": 3,
+      "id": "closed_quality_mishear",
+      "kind": "closed_set",
+      "ok": true,
+      "checks": [
+        {
+          "name": "prepared_s7",
+          "ok": true,
+          "expected": "S7_CPR_LOOP",
+          "actual": "S7_CPR_LOOP"
+        },
+        {
+          "name": "stage_stays_live",
+          "ok": true,
+          "expected": "S7/S8",
+          "actual": "S7_CPR_LOOP"
+        },
+        {
+          "name": "open_question",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "intent",
+          "ok": true,
+          "expected": "ask_cpr_quality",
+          "actual": "ask_cpr_quality"
+        },
+        {
+          "name": "guidance_source",
+          "ok": true,
+          "expected": "rule_fast_path",
+          "actual": "rule_fast_path"
+        },
+        {
+          "name": "response_type",
+          "ok": true,
+          "expected": "question_answer",
+          "actual": "question_answer"
+        }
+      ],
+      "actual": {
+        "ready": {
+          "ok": true,
+          "stage": "S7_CPR_LOOP",
+          "intent": "start_cpr_loop"
+        },
+        "text": "我爱的对吗",
+        "stage": "S7_CPR_LOOP",
+        "intent": "ask_cpr_quality",
+        "guidance_intent": "answer_current_cpr_question",
+        "guidance_source": "rule_fast_path",
+        "response_type": "question_answer",
+        "open_question": false,
+        "answer_source": null,
+        "answer_ok": false,
+        "answer_fallback": false,
+        "answer_reason": null,
+        "answer_wait_ms": null,
+        "tts_text": "按压可以，继续保持 100 到 120 次每分钟。",
+        "total_ms": 1,
+        "elapsed_ms": 1,
+        "timings": {
+          "stt_ms": 0,
+          "intent_resolution_ms": 0,
+          "agent_pipeline_ms": 1,
+          "tts_ms": 0,
+          "total_ms": 1
+        }
+      }
+    },
+    {
+      "round": 3,
+      "id": "template_no_breaths",
+      "kind": "template",
+      "ok": true,
+      "checks": [
+        {
+          "name": "prepared_s7",
+          "ok": true,
+          "expected": "S7_CPR_LOOP",
+          "actual": "S7_CPR_LOOP"
+        },
+        {
+          "name": "stage_stays_live",
+          "ok": true,
+          "expected": "S7/S8",
+          "actual": "S7_CPR_LOOP"
+        },
+        {
+          "name": "open_question",
+          "ok": true,
+          "expected": "true",
+          "actual": "true"
+        },
+        {
+          "name": "answer_source",
+          "ok": true,
+          "expected": "open_question_template",
+          "actual": "open_question_template"
+        },
+        {
+          "name": "answer_wait",
+          "ok": true,
+          "expected": "<=5ms",
+          "actual": "0ms"
+        }
+      ],
+      "actual": {
+        "ready": {
+          "ok": true,
+          "stage": "S7_CPR_LOOP",
+          "intent": "start_cpr_loop"
+        },
+        "text": "为什么不能人工呼吸",
+        "stage": "S7_CPR_LOOP",
+        "intent": null,
+        "guidance_intent": "answer_current_cpr_question",
+        "guidance_source": "open_question_ack",
+        "response_type": "open_question_ack",
+        "open_question": true,
+        "answer_source": "open_question_template",
+        "answer_ok": true,
+        "answer_fallback": false,
+        "answer_reason": "template_hands_only_cpr",
+        "answer_wait_ms": 0,
+        "tts_text": "我在，按住别停，听我说。",
+        "total_ms": 2,
+        "elapsed_ms": 2,
+        "timings": {
+          "stt_ms": 0,
+          "intent_resolution_ms": 0,
+          "agent_pipeline_ms": 2,
+          "tts_ms": 0,
+          "total_ms": 2
+        }
+      }
+    },
+    {
+      "round": 3,
+      "id": "gemma_text_stream",
+      "kind": "gemma",
+      "ok": true,
+      "checks": [
+        {
+          "name": "prepared_s7",
+          "ok": true,
+          "expected": "S7_CPR_LOOP",
+          "actual": "S7_CPR_LOOP"
+        },
+        {
+          "name": "stage_stays_live",
+          "ok": true,
+          "expected": "S7/S8",
+          "actual": "S7_CPR_LOOP"
+        },
+        {
+          "name": "open_question",
+          "ok": true,
+          "expected": "true",
+          "actual": "true"
+        },
+        {
+          "name": "answer_source",
+          "ok": true,
+          "expected": "gemma_open_question_text_stream | gemma_open_question_text",
+          "actual": "gemma_open_question_text_stream"
+        }
+      ],
+      "actual": {
+        "ready": {
+          "ok": true,
+          "stage": "S7_CPR_LOOP",
+          "intent": "start_cpr_loop"
+        },
+        "text": "为什么他的鞋子湿了",
+        "stage": "S7_CPR_LOOP",
+        "intent": null,
+        "guidance_intent": "answer_current_cpr_question",
+        "guidance_source": "open_question_ack",
+        "response_type": "open_question_ack",
+        "open_question": true,
+        "answer_source": "gemma_open_question_text_stream",
+        "answer_ok": true,
+        "answer_fallback": false,
+        "answer_reason": "open_question_text_stream_answered",
+        "answer_wait_ms": 34,
+        "tts_text": "我在，按住别停，听我说。",
+        "total_ms": 37,
+        "elapsed_ms": 37,
+        "timings": {
+          "stt_ms": 0,
+          "intent_resolution_ms": 0,
+          "agent_pipeline_ms": 2,
+          "tts_ms": 0,
+          "total_ms": 37
+        }
+      }
+    }
+  ]
+}

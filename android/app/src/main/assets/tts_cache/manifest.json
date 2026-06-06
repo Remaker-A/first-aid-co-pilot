@@ -1,10 +1,10 @@
 {
   "schema_version": "tts_cache.v1",
   "knowledge_version": "adult_cpr_mvp_2026_05_30",
-  "generated_at": "2026-06-05T14:55:04.681Z",
+  "generated_at": "2026-06-05T17:21:11.636Z",
   "sample_rate_hint": 22050,
   "max_clause_chars": 34,
-  "audio_rendered": false,
+  "audio_rendered": true,
   "counts": {
     "total": 139,
     "phrases": 48,

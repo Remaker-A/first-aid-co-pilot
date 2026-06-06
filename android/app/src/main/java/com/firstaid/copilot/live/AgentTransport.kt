@@ -6,11 +6,11 @@ import kotlinx.coroutines.flow.Flow
 /**
  * The D3 transport abstraction seam between the Live ViewModel and the agent.
  *
- * The ViewModel only ever talks to this interface, so the current
- * [HttpAgentTransport] (thin client posting to the Node `/api/turn` server) can
- * later be swapped for an on-device `InProcessAgentTransport` without any
- * UI/ViewModel changes. Implementations must be safe to call from a coroutine;
- * they own their own threading (e.g. [kotlinx.coroutines.Dispatchers.IO]).
+ * The ViewModel only ever talks to this interface. The default Android live flow
+ * now uses [LocalAgentTransport] on device; [HttpAgentTransport] remains the
+ * optional thin-client transport for Node `/api/turn` demos. Implementations must
+ * be safe to call from a coroutine; they own their own threading (e.g.
+ * [kotlinx.coroutines.Dispatchers.IO]).
  *
  * Contract notes for any implementation:
  *  - [turn] must not throw for ordinary connectivity failures; it returns
@@ -68,9 +68,14 @@ sealed interface LiveAgentEvent {
         val turnSeq: Int? = null,
         val guidanceSource: String? = null,
         val responseType: String? = null,
+        val suppressLocalTts: Boolean = false,
+        val autoAdvanceBridge: Boolean = false,
+        val openQuestionAnswer: Boolean = false,
     ) : LiveAgentEvent
 
     data class State(val currentStage: String?) : LiveAgentEvent
+
+    data class Metrics(val metrics: LiveTurnMetrics) : LiveAgentEvent
 
     data class AudioBegin(
         val actionId: String?,

@@ -1,6 +1,7 @@
 package com.firstaid.copilot.live.edge
 
 import android.app.Activity
+import android.content.Context
 import android.media.MediaPlayer
 import android.os.Bundle
 import android.util.Log
@@ -38,7 +39,11 @@ class EdgeModelSmokeActivity : Activity() {
                         .put("ok", false)
                         .put("error", error.stackTraceToString())
                 }
-            writeCheckpoint(result, "finished")
+            if (result.optString("mode") == GEMMA_SUITE_MODE) {
+                writeGemmaSuiteCheckpoint(result, "finished")
+            } else {
+                writeCheckpoint(result, "finished")
+            }
             Log.i(TAG, "Edge model smoke result: $result")
         }
     }
@@ -52,7 +57,7 @@ class EdgeModelSmokeActivity : Activity() {
         val appContext = applicationContext
         val mode = intent.getStringExtra("mode")
             ?.lowercase()
-            ?.takeIf { it in setOf("all", "gemma", "tts", "asr") }
+            ?.takeIf { it in setOf("all", "gemma", "tts", "asr", GEMMA_SUITE_MODE) }
             ?: "all"
         val runs = intent.getIntExtra("runs", 1).coerceIn(1, 20)
         val threads = intent.getIntExtra("threads", 2).coerceIn(1, 8)
@@ -61,12 +66,47 @@ class EdgeModelSmokeActivity : Activity() {
         val asrMaxMs = intent.getIntExtra("asrMaxMs", 0).coerceAtLeast(0)
         val gemmaPrompt = intent.getStringExtra("gemmaPrompt")?.takeIf { it.isNotBlank() }
             ?: GEMMA_BENCH_DEFAULT_PROMPT
+        val gemmaBackendPreference = parseGemmaBackendPreference(intent.getStringExtra("gemmaBackend"))
+        val gemmaSpeculative = intent.getStringExtra("gemmaSpeculative")
+            ?.trim()
+            ?.lowercase()
+            ?.let { it !in setOf("0", "false", "off", "no") }
+            ?: true
+        val gemmaCpuThreads = intent.getIntExtra("gemmaCpuThreads", OnDeviceGemmaDriver.DEFAULT_CPU_THREADS)
+            .coerceIn(0, 8)
+        val gemmaMaxNumTokens = intent.getIntExtra(
+            "gemmaMaxNumTokens",
+            OnDeviceGemmaDriver.DEFAULT_MAX_NUM_TOKENS,
+        ).coerceIn(512, 8192)
+        val gemmaSamplerName = intent.getStringExtra("gemmaSampler")
+            ?.trim()
+            ?.lowercase()
+            ?.takeIf { it.isNotBlank() }
+            ?: "default"
+        val gemmaSamplerSettings = parseGemmaSamplerSettings(gemmaSamplerName)
         val gemmaGateMs = intent.getIntExtra("gemmaGateMs", GEMMA_NEAR_REALTIME_GATE_MS.toInt())
             .coerceIn(1, 60_000).toLong()
         val gemmaBudgetMs = intent.getIntExtra("gemmaBudgetMs", GEMMA_GENERATE_BUDGET_MS.toInt())
             .coerceIn(1, 60_000).toLong()
         val gemmaTimeoutMs = intent.getIntExtra("gemmaTimeoutMs", GEMMA_BENCH_TIMEOUT_MS.toInt())
             .coerceIn(1_000, 60_000).toLong()
+        if (mode == GEMMA_SUITE_MODE) {
+            // Isolated branch: never touches the speech engine or the smoke report.
+            val suiteRuns = intent.getIntExtra("runs", 3).coerceIn(1, 20)
+            return runGemmaSuite(
+                appContext,
+                suiteRuns,
+                gemmaTimeoutMs,
+                gemmaGateMs,
+                gemmaBudgetMs,
+                gemmaBackendPreference,
+                gemmaSpeculative,
+                gemmaCpuThreads,
+                gemmaMaxNumTokens,
+                gemmaSamplerName,
+                gemmaSamplerSettings,
+            )
+        }
         fun shouldRun(target: String): Boolean = mode == "all" || mode == target
         sherpaTraceFile().delete()
         val files = EdgeModelPathResolver(defaultEdgeModelRoots(appContext)).resolve()
@@ -83,6 +123,11 @@ class EdgeModelSmokeActivity : Activity() {
                 .put("mode", mode)
                 .put("runs", runs)
                 .put("threads", threads)
+                .put("gemmaBackendPreference", gemmaBackendPreference.name)
+                .put("gemmaSpeculative", gemmaSpeculative)
+                .put("gemmaCpuThreads", gemmaCpuThreads)
+                .put("gemmaMaxNumTokens", gemmaMaxNumTokens)
+                .put("gemmaSampler", gemmaSamplerName)
                 .put("modelRoot", report.root)
                 .put("summary", report.summaryLine())
                 .put("gemmaReady", report.gemmaReady)
@@ -92,7 +137,15 @@ class EdgeModelSmokeActivity : Activity() {
 
             val gemmaPath = report.status(EdgeModelKind.Gemma).path
             if (shouldRun("gemma") && gemmaPath != null) {
-                val gemma = OnDeviceGemmaDriver(appContext, File(gemmaPath))
+                val gemma = OnDeviceGemmaDriver(
+                    appContext,
+                    File(gemmaPath),
+                    backendPreference = gemmaBackendPreference,
+                    enableGpuSpeculativeDecoding = gemmaSpeculative,
+                    cpuThreads = gemmaCpuThreads,
+                    maxNumTokens = gemmaMaxNumTokens,
+                    samplerSettings = gemmaSamplerSettings,
+                )
                 try {
                     writeCheckpoint(result, "gemma_prewarm_start")
                     val warm = withTimeout(60_000L) { gemma.prewarm(55_000L) }
@@ -346,6 +399,115 @@ class EdgeModelSmokeActivity : Activity() {
         }
     }
 
+    private suspend fun runGemmaSuite(
+        appContext: Context,
+        runs: Int,
+        gemmaTimeoutMs: Long,
+        gemmaGateMs: Long,
+        gemmaBudgetMs: Long,
+        gemmaBackendPreference: GemmaBackendPreference,
+        gemmaSpeculative: Boolean,
+        gemmaCpuThreads: Int,
+        gemmaMaxNumTokens: Int,
+        gemmaSamplerName: String,
+        gemmaSamplerSettings: GemmaSamplerSettings?,
+    ): JSONObject {
+        val report = JSONObject()
+            .put("ok", false)
+            .put("mode", GEMMA_SUITE_MODE)
+            .put("runs", runs)
+            .put("backendPreference", gemmaBackendPreference.name)
+            .put("gemmaSpeculative", gemmaSpeculative)
+            .put("gemmaCpuThreads", gemmaCpuThreads)
+            .put("gemmaMaxNumTokens", gemmaMaxNumTokens)
+            .put("gemmaSampler", gemmaSamplerName)
+            .put("backend", JSONObject.NULL)
+            .put("prewarmOk", false)
+            .put("prewarmLatencyMs", 0L)
+            .put("functions", JSONObject())
+
+        val gemmaPath = EdgeModelPathResolver(defaultEdgeModelRoots(appContext)).resolve().gemma?.absolutePath
+        if (gemmaPath == null) {
+            report.put("ok", false).put("error", "Gemma LiteRT-LM model missing")
+            writeGemmaSuiteCheckpoint(report, "finished")
+            return report
+        }
+
+        writeGemmaSuiteCheckpoint(report, "gemma_prewarm_start")
+        val gemma = OnDeviceGemmaDriver(
+            appContext,
+            File(gemmaPath),
+            backendPreference = gemmaBackendPreference,
+            enableGpuSpeculativeDecoding = gemmaSpeculative,
+            cpuThreads = gemmaCpuThreads,
+            maxNumTokens = gemmaMaxNumTokens,
+            samplerSettings = gemmaSamplerSettings,
+        )
+        try {
+            val warm = withTimeout(60_000L) { gemma.prewarm(55_000L) }
+            val backendValue: Any = warm.text.ifBlank { null } ?: JSONObject.NULL
+            report.put("backend", backendValue)
+                .put("prewarmOk", warm.ok)
+                .put("prewarmLatencyMs", warm.latencyMs)
+            writeGemmaSuiteCheckpoint(report, "gemma_prewarm_done")
+            if (!warm.ok) {
+                report.put("ok", false).put("error", warm.error ?: "Gemma prewarm failed")
+                writeGemmaSuiteCheckpoint(report, "finished")
+                return report
+            }
+
+            val checkpoint: (JSONObject) -> Unit = { progress ->
+                progress.put("backend", backendValue)
+                    .put("backendPreference", gemmaBackendPreference.name)
+                    .put("gemmaSpeculative", gemmaSpeculative)
+                    .put("gemmaCpuThreads", gemmaCpuThreads)
+                    .put("gemmaMaxNumTokens", gemmaMaxNumTokens)
+                    .put("gemmaSampler", gemmaSamplerName)
+                    .put("prewarmOk", warm.ok)
+                    .put("prewarmLatencyMs", warm.latencyMs)
+                writeGemmaSuiteCheckpoint(progress, progress.optString("phase").ifBlank { "running" })
+            }
+            val suiteReport = GemmaFunctionSuite(
+                appContext,
+                intent.getStringExtra("suiteDir")?.takeIf { it.isNotBlank() } ?: "gemma_suite",
+            ).run(
+                driver = gemma,
+                defaultRuns = runs,
+                timeoutMs = gemmaTimeoutMs,
+                gateMs = gemmaGateMs,
+                budgetMs = gemmaBudgetMs,
+                checkpoint = checkpoint,
+            )
+            suiteReport.put("backend", backendValue)
+                .put("backendPreference", gemmaBackendPreference.name)
+                .put("gemmaSpeculative", gemmaSpeculative)
+                .put("gemmaCpuThreads", gemmaCpuThreads)
+                .put("gemmaMaxNumTokens", gemmaMaxNumTokens)
+                .put("gemmaSampler", gemmaSamplerName)
+                .put("prewarmOk", warm.ok)
+                .put("prewarmLatencyMs", warm.latencyMs)
+            writeGemmaSuiteCheckpoint(suiteReport, "finished")
+            return suiteReport
+        } finally {
+            gemma.close()
+        }
+    }
+
+    private fun gemmaSuiteOutputFile(): File =
+        smokeOutputFile().parentFile?.resolve("gemma-suite.json")
+            ?: File(filesDir, "smoke/gemma-suite.json")
+
+    private fun writeGemmaSuiteCheckpoint(report: JSONObject, phase: String) {
+        report.put("phase", phase)
+        report.put("updatedAtMs", System.currentTimeMillis())
+        val rendered = report.toString(2)
+        val output = gemmaSuiteOutputFile()
+        output.parentFile?.mkdirs()
+        output.writeText(rendered)
+        statusView.text = rendered
+        Log.i(TAG, "Gemma suite phase=$phase")
+    }
+
     private fun smokeOutputFile(): File {
         val media = externalMediaDirs.firstOrNull()
         return (media ?: filesDir).resolve("smoke/edge-model-smoke.json")
@@ -429,6 +591,7 @@ class EdgeModelSmokeActivity : Activity() {
 
     private companion object {
         const val TAG = "EdgeModelSmoke"
+        const val GEMMA_SUITE_MODE = "gemma-suite"
         const val DEFAULT_TTS_TEXT = "\u7ee7\u7eed\u6309\u538b"
         const val ASR_SAMPLE_RATE = 16_000
         const val BYTES_PER_SAMPLE = 2

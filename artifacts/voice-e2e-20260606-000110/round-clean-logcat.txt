@@ -1,0 +1,965 @@
+--------- beginning of system
+06-06 00:43:25.937 I/BatteryStatsImpl( 2497): ********** CLEARING HISTORY!
+--------- beginning of main
+06-06 00:43:26.919 I/d.copilot.debug(29365): Late-enabling -Xcheck:jni
+06-06 00:43:26.981 V/ActivityThread(29365): updateVmProcessStateForGc sceneId =1 state=197376
+06-06 00:43:26.981 I/d.copilot.debug(29365): Open vivo delay for GC JIT .
+06-06 00:43:26.984 D/CompatibilityChangeReporter(29365): Compat change id reported: 171979766; UID 10299; state: ENABLED
+06-06 00:43:27.013 V/GraphicsEnvironment(29365): ANGLE Developer option for 'com.firstaid.copilot.debug' set to: 'default'
+06-06 00:43:27.014 V/GraphicsEnvironment(29365): ANGLE GameManagerService for com.firstaid.copilot.debug: false
+06-06 00:43:27.014 V/GraphicsEnvironment(29365): App is not on the allowlist for updatable production driver.
+06-06 00:43:27.019 D/NetworkSecurityConfig(29365): Using Network Security Config from resource network_security_config debugBuild: true
+06-06 00:43:27.020 D/NetworkSecurityConfig(29365): Using Network Security Config from resource network_security_config debugBuild: true
+06-06 00:43:27.030 W/libc    (29365): Access denied finding property "ro.vendor.perf.scroll_opt.heavy_app"
+06-06 00:43:27.041 I/MSYNC3-VariableRefreshRate(29365): Variable refreshrate is disabled
+06-06 00:43:27.042 I/PowerHalWrapper(29365): PowerHalWrapper.getInstance 
+06-06 00:43:27.048 D/VivoConfigStore(29365): init begin
+06-06 00:43:27.055 D/VivoConfigStore(29365): key:vivo.software.nightmode isCached is true and value is true
+06-06 00:43:27.072 D/VivoConfigStore(29365): key:vivo.software.multilandscape isCached is true and value is true
+06-06 00:43:27.074 D/VivoConfigStore(29365): key:vivo.software.ml.freedrag isCached is false and normal value is false
+06-06 00:43:27.075 D/VivoConfigStore(29365): key:vivo.software.virtualmultilands isCached is true and value is true
+06-06 00:43:27.076 D/VivoConfigStore(29365): key:vivo.software.multiwindowresidentbar isCached is false and normal value is false
+06-06 00:43:27.077 D/VivoConfigStore(29365): key:vivo.software.hovermode isCached is false and normal value is false
+06-06 00:43:27.090 D/VivoConfigStore(29365): key:vivo.software.multiwindow isCached is true and value is true
+06-06 00:43:27.090 D/VivoConfigStore(29365): key:vivo.software.freeform isCached is true and value is true
+06-06 00:43:27.146 D/VivoConfigStore(29365): key:vivo.software.immersive isCached is false and normal value is false
+06-06 00:43:27.146 D/VivoConfigStore(29365): key:vivo.software.multiwindow isCached is true and value is true
+06-06 00:43:27.310 I/TextToSpeech(29365): Connected to TTS engine
+06-06 00:43:27.313 I/TextToSpeech(29365): Setting up the connection to TTS engine...
+06-06 00:43:27.325 W/d.copilot.debug(29365): Method boolean androidx.compose.runtime.snapshots.SnapshotStateList.conditionalUpdate(boolean, kotlin.jvm.functions.Function1) failed lock verification and will run slower.
+06-06 00:43:27.325 W/d.copilot.debug(29365): Common causes for lock verification issues are non-optimized dex code
+06-06 00:43:27.325 W/d.copilot.debug(29365): and incorrect proguard optimizations.
+06-06 00:43:27.325 W/d.copilot.debug(29365): Method boolean androidx.compose.runtime.snapshots.SnapshotStateList.conditionalUpdate$default(androidx.compose.runtime.snapshots.SnapshotStateList, boolean, kotlin.jvm.functions.Function1, int, java.lang.Object) failed lock verification and will run slower.
+06-06 00:43:27.325 W/d.copilot.debug(29365): Method java.lang.Object androidx.compose.runtime.snapshots.SnapshotStateList.mutate(kotlin.jvm.functions.Function1) failed lock verification and will run slower.
+06-06 00:43:27.326 W/d.copilot.debug(29365): Method void androidx.compose.runtime.snapshots.SnapshotStateList.update(boolean, kotlin.jvm.functions.Function1) failed lock verification and will run slower.
+06-06 00:43:27.326 W/d.copilot.debug(29365): Method void androidx.compose.runtime.snapshots.SnapshotStateList.update$default(androidx.compose.runtime.snapshots.SnapshotStateList, boolean, kotlin.jvm.functions.Function1, int, java.lang.Object) failed lock verification and will run slower.
+06-06 00:43:27.329 I/EdgeTextToSpeech(29365): Bundled TTS cache ready: 0/48 phrases (Asset)
+06-06 00:43:27.393 D/BufferQueueConsumer(29365): [](id:72b500000000,api:0,p:-1,c:29365) connect: controlledByApp=false
+06-06 00:43:27.395 E/FBI     (29365): Can't load library: dlopen failed: library "libmagtsync.so" not found
+06-06 00:43:27.409 D/skia    (29365): GrGLMakeAssembledInterface verStr OpenGL ES 3.2 v1.r32p1-01eac0.0a0b917d9265b4c01be9925306306139
+06-06 00:43:27.409 D/skia    (29365): GrGLMakeAssembledGLESInterface verStr OpenGL ES 3.2 v1.r32p1-01eac0.0a0b917d9265b4c01be9925306306139
+06-06 00:43:27.409 D/skia    (29365): extensions init verString=OpenGL ES 3.2 v1.r32p1-01eac0.0a0b917d9265b4c01be9925306306139
+06-06 00:43:27.418 I/BLASTBufferQueue(29365): QoSAllocBuff Successful. Ret 0 
+06-06 00:43:27.448 D/BLASTBufferQueue(29365): [VRI[MainActivity]#0](f:0,a:1) acquireNextBufferLocked size=720x1612 mFrameNumber=1 applyTransaction=true mTimestamp=52441381363433(auto) mPendingTransactions.size=0 graphicBufferId=126121714647045 transform=0
+06-06 00:43:27.450 W/Parcel  (29365): Expecting binder but got null!
+06-06 00:43:27.466 I/ActivityTaskManager( 1553): Displayed com.firstaid.copilot.debug/com.firstaid.copilot.MainActivity: +615ms
+06-06 00:43:27.470 I/WebSocketAgentChannel(29365): Connecting live WebSocket url=ws://127.0.0.1:8787/ws/live session=android_live_548ddc3f mode=demo_assisted
+06-06 00:43:27.476 D/TrafficStats(29365): tagSocket(140) with statsTag=0xffffffff, statsUid=-1
+06-06 00:43:27.476 D/TrafficStats(29365): tagSocket(141) with statsTag=0xffffffff, statsUid=-1
+06-06 00:43:27.476 D/Linux   (29365): [Posix_connect Debug]Process com.firstaid.copilot.debug :8787 
+06-06 00:43:27.476 D/Linux   (29365): [Posix_connect Debug]Process com.firstaid.copilot.debug :8787 
+06-06 00:43:27.477 W/libc    (29365): Access denied finding property "ro.hardware.chipname"
+06-06 00:43:27.487 I/WebSocketAgentChannel(29365): Live WebSocket opened code=101
+06-06 00:43:27.488 I/WebSocketAgentChannel(29365): Sent live JSON type=start ok=true payloadKeys=
+06-06 00:43:27.489 I/WebSocketAgentChannel(29365): Received live text {"type":"state","session_id":"voice_live_mq15l9t3_0084_e5969ee7d6e6","live":true,"status":"connected","stt_mode":"pending"}
+06-06 00:43:27.491 I/WebSocketAgentChannel(29365): Received live text {"type":"state","session_id":"android_live_548ddc3f","live":true,"status":"connected","stt_mode":"pending"}
+06-06 00:43:27.537 I/SherpaSpeechEngine(29365): ASR create start modelDir=/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models/speech/stt-stream/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20
+06-06 00:43:27.552 V/ImeFocusController(29365): onWindowFocus: DecorView@3974861[MainActivity] softInputMode=STATE_UNSPECIFIED|ADJUST_PAN|IS_FORWARD_NAVIGATION
+06-06 00:43:27.552 V/ImeFocusController(29365): Restarting due to isRestartOnNextWindowFocus as true
+06-06 00:43:27.552 D/ImeFocusController(29365): onViewFocusChanged, view=DecorView@3974861[MainActivity], mServedView=null
+06-06 00:43:27.552 V/ImeFocusController(29365): checkFocus: view=null next=DecorView@3974861[MainActivity] immDelegate=delegate{5f12faf displayId=0} force=true package=<none>
+06-06 00:43:27.594 V/ActivityThread(29365): updateVmProcessStateForGc sceneId =1 state=196608
+06-06 00:43:27.594 I/d.copilot.debug(29365): Close vivo delay for GC JIT .
+06-06 00:43:27.633 I/FontLog ( 3989): (REDACTED) Received query %s, URI %s
+06-06 00:43:27.633 I/FontLog ( 3989): (REDACTED) Query [%s] resolved to %s
+06-06 00:43:27.635 I/FontLog ( 3989): (REDACTED) Fetch %s end status %s
+06-06 00:43:27.640 I/FontLog ( 3989): (REDACTED) Pulling font file for id = %d, cache size = %d
+06-06 00:43:27.645 I/FontLog ( 3989): (REDACTED) Pulling font file for id = %d, cache size = %d
+06-06 00:43:28.259 I/d.copilot.debug(29365): Compiler allocated 5703KB to compile void android.view.ViewRootImpl.performTraversals()
+06-06 00:43:29.664 I/SherpaSpeechEngine(29365): ASR create done
+06-06 00:43:29.667 I/SherpaSpeechEngine(29365): ASR accept waveform samples=3200
+06-06 00:43:29.668 I/SherpaSpeechEngine(29365): ASR decode done iterations=0
+06-06 00:43:29.702 I/SherpaSpeechEngine(29365): ASR create start modelDir=/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models/speech/stt-stream/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20
+06-06 00:43:31.552 I/SherpaSpeechEngine(29365): ASR create done
+06-06 00:43:31.560 I/SherpaSpeechEngine(29365): TTS create start model=/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models/speech/tts/model.int8.onnx
+06-06 00:43:31.566 W/sherpa-onnx(29365): /home/runner/work/sherpa-onnx/sherpa-onnx/sherpa-onnx/jni/offline-tts.cc:operator():481
+06-06 00:43:31.566 W/sherpa-onnx(29365): config:
+06-06 00:43:31.566 W/sherpa-onnx(29365): OfflineTtsConfig(model=OfflineTtsModelConfig(vits=OfflineTtsVitsModelConfig(model="/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models/speech/tts/model.int8.onnx", lexicon="/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models/speech/tts/lexicon.txt", tokens="/storage/emulated/0/Android/media/com.firstaid.copilot.debug/models/speech/tts/tokens.txt", data_dir="", noise_scale=0.667, noise_scale_w=0.8, length_scale=1), matcha=OfflineTtsMatchaModelConfig(acoustic_model="", vocoder="", lexicon="", tokens="", data_dir="", noise_scale=1, length_scale=1), kokoro=OfflineTtsKokoroModelConfig(model="", voices="", tokens="", lexicon="", data_dir="", length_scale=1, lang=""), zipvoice=OfflineTtsZipvoiceModelConfig(tokens="", encoder="", decoder="", vocoder="", data_dir="", lexicon="", feat_scale=0.1, t_shift=0.5, target_rms=0.1, guidance_scale=1), kitten=OfflineTtsKittenModelConfig(model="", voices="", tokens="", data_dir="", length_scale=1), pocket=OfflineTtsPocketModelConfig(lm_flo
+06-06 00:43:33.097 D/ProfileInstaller(29365): Installing profile for com.firstaid.copilot.debug
+06-06 00:43:33.980 I/LiveAudioPlayer(29365): Live audio cancel with no active stream reason=new_turn
+06-06 00:43:33.981 I/WebSocketAgentChannel(29365): Sent live JSON type=turn ok=true payloadKeys=["sessionId","eventSource","eventType","deviceState","metadata"]
+06-06 00:43:33.982 I/WebSocketAgentChannel(29365): Sent live JSON type=context ok=true payloadKeys=["sessionId"]
+06-06 00:43:33.988 I/WebSocketAgentChannel(29365): Received live text {"type":"thinking","session_id":"android_live_548ddc3f","turn_seq":1}
+06-06 00:43:33.990 I/WebSocketAgentChannel(29365): Received live text {"type":"final","session_id":"android_live_548ddc3f","turn_seq":1,"text":"","intent":null}
+06-06 00:43:33.990 I/WebSocketAgentChannel(29365): Received live text {"type":"guidance","session_id":"android_live_548ddc3f","turn_seq":1,"action":{"action_id":"act_mq15letn_0089_9a848ae58ed8","session_id":"android_live_548ddc3f","timestamp":"2026-06-05T16:43:34.091Z","stage":"S1_SCENE_SAFE","intent":"ensure_scene_safe","priority":"normal","source":"state_machine","r
+06-06 00:43:33.992 V/VivoAudioPolicyProxyNative(29365): VivoAudioPolicyProxy getInstanceInter: binding to vivoaudiopolicy service success!
+06-06 00:43:33.992 D/AudioRecord(29365): set(): 0xb4000076609c6620, inputSource 6, sampleRate 16000, format 0x1, channelMask 0x10, frameCount 2560, notificationFrames 0, sessionId 0, transferType 0, flags 0, attributionSource AttributionSourceState{pid: -1, uid: 10299, packageName: com.firstaid.copilot.debug, attributionTag: (null), token: , renouncedPermissions: [], next: []} uid -1, pid -1, latency 200
+06-06 00:43:33.993 D/AudioSystem(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:43:33.994 I/WebSocketAgentChannel(29365): Received live text {"type":"state","session_id":"android_live_548ddc3f","turn_seq":1,"current_stage":"S1_SCENE_SAFE","state":{"schema_version":"session_state.v0.1","session_id":"android_live_548ddc3f","mode":"demo_assisted","current_stage":"S1_SCENE_SAFE","previous_stage":"S1_SCENE_SAFE","started_at":"2026-06-05T16:43
+06-06 00:43:33.995 I/AudioRecord(29365): set(): getPolicyInputSourceForVoip mAttributes input source= 6,flags:0
+06-06 00:43:33.995 D/AudioRecord(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:43:33.995 D/AudioRecord(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:43:33.995 D/AudioRecord(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:43:34.017 D/AudioRecord(29365): openRecord_l: 0xb4000076609c6620, mCblk = 0x780e4ce000
+06-06 00:43:34.031 I/AudioEffect(29365): queryNumberEffects(): *numEffects = 25, ret = 0
+06-06 00:43:34.041 I/AudioEffect(29365): set 0xb400007630a82a70 uuid: 0x74b989a510 timeLow 7b491460
+06-06 00:43:34.047 I/AudioEffect(29365): set() 0xb400007630a82a70 OK effect: Acoustic Echo Canceler id: 411 status 0 enabled 0 pid 29365
+06-06 00:43:34.048 I/AudioEffect(29365): enable 0xb400007630a82a70
+06-06 00:43:34.050 I/AudioEffect(29365): queryNumberEffects(): *numEffects = 25, ret = 0
+06-06 00:43:34.057 I/EdgeTextToSpeech(29365): Android TTS fast path for '开始录制，先确认周围安全；安全后'
+06-06 00:43:34.061 I/AudioEffect(29365): set 0xb400007630a35790 uuid: 0x74b989a510 timeLow 58b4b260
+06-06 00:43:34.067 I/AudioEffect(29365): set() 0xb400007630a35790 OK effect: Noise Suppression id: 419 status 0 enabled 0 pid 29365
+06-06 00:43:34.068 I/AudioEffect(29365): enable 0xb400007630a35790
+06-06 00:43:34.072 D/AudioRecord(29365): start(271): 0xb4000076609c6620, sync event 0 trigger session 0
+06-06 00:43:34.072 D/AudioRecord(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:43:34.094 D/AudioRecord(29365): start(271): return status 0
+06-06 00:43:34.148 I/AndroidTextToSpeech(29365): Android TTS onStart latency=4ms
+06-06 00:43:34.265 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:43:34.266 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:43:34.300 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:43:34.301 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:43:34.598 I/d.copilot.debug(29365): Compiler allocated 4546KB to compile void com.firstaid.copilot.live.ui.LiveCprCoachScreenKt.LiveCprCoachScreen(com.firstaid.copilot.live.LiveSessionViewModel, kotlin.jvm.functions.Function0, androidx.compose.runtime.Composer, int, int)
+06-06 00:43:36.647 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_begin","session_id":"android_live_548ddc3f","turn_seq":1,"action_id":"act_mq15letn_0089_9a848ae58ed8","format":"pcm16","sample_rate":44100,"channels":1,"bits_per_sample":16}
+06-06 00:43:36.695 I/WebSocketAgentChannel(29365): Received live audio bytes=73728
+06-06 00:43:37.010 I/WebSocketAgentChannel(29365): Received live audio bytes=105472
+06-06 00:43:37.191 I/SherpaSpeechEngine(29365): TTS create done
+06-06 00:43:37.191 I/SherpaSpeechEngine(29365): TTS generate start chars=4
+06-06 00:43:37.768 I/WebSocketAgentChannel(29365): Received live audio bytes=138240
+06-06 00:43:37.769 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_end","session_id":"android_live_548ddc3f","turn_seq":1,"action_id":"act_mq15letn_0089_9a848ae58ed8"}
+06-06 00:43:39.045 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:43:39.046 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:43:39.046 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:43:39.046 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:43:40.984 I/SherpaSpeechEngine(29365): TTS generate done
+06-06 00:43:40.989 I/SherpaSpeechEngine(29365): TTS save done bytes=71724
+06-06 00:43:41.000 I/EdgeTextToSpeech(29365): Sherpa TTS cached '继续按压' in 9431ms
+06-06 00:43:41.002 I/SherpaSpeechEngine(29365): TTS generate start chars=21
+06-06 00:43:41.005 W/sherpa-onnx(29365): /home/runner/work/sherpa-onnx/sherpa-onnx/sherpa-onnx/csrc/melo-tts-lexicon.cc:ConvertTextToTokenIds:120
+06-06 00:43:41.005 W/sherpa-onnx(29365): Ignore OOV '；'
+06-06 00:43:41.816 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:43:42.063 I/CodexTest(29469): CLEAN_ROUND_READY_FOR_SCENE_SAFE
+06-06 00:43:42.257 W/ProcessState(29473): Extra binder thread started, but 0 threads requested. Do not use *startThreadPool when zero threads are requested.
+06-06 00:43:42.298 I/DMABUFHEAPS(29473): Using DMA-BUF heap named: mtk_mm
+06-06 00:43:42.298 I/DMABUFHEAPS(29473): Using DMA-BUF heap named: mtk_mm-uncached
+06-06 00:43:42.298 I/DMABUFHEAPS(29473): Using DMA-BUF heap named: mtk_svp_region-aligned
+06-06 00:43:42.298 I/DMABUFHEAPS(29473): Using DMA-BUF heap named: mtk_prot_region
+06-06 00:43:42.298 I/DMABUFHEAPS(29473): Using DMA-BUF heap named: mtk_2d_fr_region
+06-06 00:43:42.298 I/DMABUFHEAPS(29473): Using DMA-BUF heap named: mtk_wfd_region-aligned
+06-06 00:43:42.298 D/OpenGLRenderer(29473): Bitmap::compress format:Png w:720 h:1612 quality:100 app_apk:screencap 
+06-06 00:43:42.299 W/libc    (29473): Access denied finding property "vendor.vivo.imageencoder.dump"
+06-06 00:43:42.461 W/RefBase (29473): RefBase: Explicit destruction, weak count = 0 (in 0x7bc2be1468). Use sp<> to manage this object.
+06-06 00:43:42.466 D/RefBase (29473): #00 pc 000000000010cc18  /apex/com.android.runtime/lib64/bionic/libc.so (__cxa_finalize+280)
+06-06 00:43:42.466 D/RefBase (29473): #01 pc 00000000000fee08  /apex/com.android.runtime/lib64/bionic/libc.so (exit+24)
+06-06 00:43:42.466 D/RefBase (29473): #02 pc 00000000000927f4  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+100)
+06-06 00:43:42.633 E/appproc (29476): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath failed , error(Permission denied)
+06-06 00:43:42.633 E/appproc (29476): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:43:42.634 E/appproc (29476): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath2 failed , error(Permission denied)
+06-06 00:43:42.634 E/appproc (29476): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:43:42.634 E/appproc (29476): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath3 failed , error(Permission denied)
+06-06 00:43:42.634 E/appproc (29476): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:43:42.635 E/appproc (29476): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath4 failed , error(Permission denied)
+06-06 00:43:42.635 E/appproc (29476): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:43:42.635 D/AndroidRuntime(29476): >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-06 00:43:42.639 I/AndroidRuntime(29476): Using default boot image
+06-06 00:43:42.639 I/AndroidRuntime(29476): Leaving lock profiling enabled
+06-06 00:43:42.642 W/app_process(29476): ART APEX data files are untrusted.
+06-06 00:43:42.829 D/app_process(29476): Time zone APEX ICU file found: /apex/com.android.tzdata/etc/icu/icu_tzdata.dat
+06-06 00:43:42.830 D/app_process(29476): I18n APEX ICU file found: /apex/com.android.i18n/etc/icu/icudt70l.dat
+06-06 00:43:42.845 E/app_process(29476): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:43:42.845 E/app_process(29476): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:43:42.845 E/System  (29476): openDexFile load detect error
+06-06 00:43:42.846 E/System  (29476): java.lang.reflect.InvocationTargetException
+06-06 00:43:42.846 E/System  (29476): 	at java.lang.reflect.Method.invoke(Native Method)
+06-06 00:43:42.846 E/System  (29476): 	at dalvik.system.DexFile.openDexFile(DexFile.java:387)
+06-06 00:43:42.846 E/System  (29476): 	at dalvik.system.DexFile.<init>(DexFile.java:118)
+06-06 00:43:42.846 E/System  (29476): 	at dalvik.system.DexFile.<init>(DexFile.java:91)
+06-06 00:43:42.846 E/System  (29476): 	at dalvik.system.DexPathList.loadDexFile(DexPathList.java:438)
+06-06 00:43:42.846 E/System  (29476): 	at dalvik.system.DexPathList.makeDexElements(DexPathList.java:397)
+06-06 00:43:42.846 E/System  (29476): 	at dalvik.system.DexPathList.<init>(DexPathList.java:166)
+06-06 00:43:42.846 E/System  (29476): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:160)
+06-06 00:43:42.846 E/System  (29476): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:105)
+06-06 00:43:42.846 E/System  (29476): 	at dalvik.system.PathClassLoader.<init>(PathClassLoader.java:71)
+06-06 00:43:42.846 E/System  (29476): 	at java.lang.ClassLoader.createSystemClassLoader(ClassLoader.java:224)
+06-06 00:43:42.846 E/System  (29476): 	at java.lang.ClassLoader.-$$Nest$smcreateSystemClassLoader(Unknown Source:0)
+06-06 00:43:42.846 E/System  (29476): 	at java.lang.ClassLoader$SystemClassLoader.<clinit>(ClassLoader.java:183)
+06-06 00:43:42.846 E/System  (29476): 	at java.lang.ClassLoader.getSystemClassLoader(ClassLoader.java:1098)
+06-06 00:43:42.846 E/System  (29476): Caused by: java.lang.UnsatisfiedLinkError: No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:43:42.846 E/System  (29476): 	at android.os.Trace.nativeGetEnabledTags(Native Method)
+06-06 00:43:42.846 E/System  (29476): 	at android.os.Trace.isTagEnabled(Trace.java:163)
+06-06 00:43:42.846 E/System  (29476): 	at android.os.Trace.endSection(Trace.java:398)
+06-06 00:43:42.846 E/System  (29476): 	at com.vivo.framework.securitydetect.DynamicLoadDetectManager.reportDexLoaded(DynamicLoadDetectManager.java:156)
+06-06 00:43:42.846 E/System  (29476): 	... 14 more
+06-06 00:43:42.850 E/app_process(29476): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:43:42.850 E/app_process(29476): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:43:42.850 E/System  (29476): openDexFile load detect error
+06-06 00:43:42.851 E/System  (29476): java.lang.reflect.InvocationTargetException
+06-06 00:43:42.851 E/System  (29476): 	at java.lang.reflect.Method.invoke(Native Method)
+06-06 00:43:42.851 E/System  (29476): 	at dalvik.system.DexFile.openDexFile(DexFile.java:387)
+06-06 00:43:42.851 E/System  (29476): 	at dalvik.system.DexFile.<init>(DexFile.java:118)
+06-06 00:43:42.851 E/System  (29476): 	at dalvik.system.DexFile.<init>(DexFile.java:91)
+06-06 00:43:42.851 E/System  (29476): 	at dalvik.system.DexPathList.loadDexFile(DexPathList.java:438)
+06-06 00:43:42.851 E/System  (29476): 	at dalvik.system.DexPathList.makeDexElements(DexPathList.java:397)
+06-06 00:43:42.851 E/System  (29476): 	at dalvik.system.DexPathList.<init>(DexPathList.java:166)
+06-06 00:43:42.851 E/System  (29476): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:160)
+06-06 00:43:42.851 E/System  (29476): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:105)
+06-06 00:43:42.851 E/System  (29476): 	at dalvik.system.PathClassLoader.<init>(PathClassLoader.java:71)
+06-06 00:43:42.851 E/System  (29476): 	at java.lang.ClassLoader.createSystemClassLoader(ClassLoader.java:224)
+06-06 00:43:42.851 E/System  (29476): 	at java.lang.ClassLoader.-$$Nest$smcreateSystemClassLoader(Unknown Source:0)
+06-06 00:43:42.851 E/System  (29476): 	at java.lang.ClassLoader$SystemClassLoader.<clinit>(ClassLoader.java:183)
+06-06 00:43:42.851 E/System  (29476): 	at java.lang.ClassLoader.getSystemClassLoader(ClassLoader.java:1098)
+06-06 00:43:42.851 E/System  (29476): Caused by: java.lang.UnsatisfiedLinkError: No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:43:42.851 E/System  (29476): 	at android.os.Trace.nativeGetEnabledTags(Native Method)
+06-06 00:43:42.851 E/System  (29476): 	at android.os.Trace.isTagEnabled(Trace.java:163)
+06-06 00:43:42.851 E/System  (29476): 	at android.os.Trace.endSection(Trace.java:398)
+06-06 00:43:42.851 E/System  (29476): 	at com.vivo.framework.securitydetect.DynamicLoadDetectManager.reportDexLoaded(DynamicLoadDetectManager.java:156)
+06-06 00:43:42.851 E/System  (29476): 	... 14 more
+06-06 00:43:42.852 W/app_process(29476): ClassLoaderContext classpath size mismatch. expected=0, found=1 (PCL[] | PCL[/system/framework/android.test.runner.jar*2259575933])
+06-06 00:43:42.856 I/VivoSystemFrameworkFactory(29476): Instance implClass com.vivo.VivoSystemFrameworkFactoryImpl
+06-06 00:43:42.877 D/AndroidRuntime(29476): Calling main entry com.android.commands.uiautomator.Launcher
+06-06 00:43:42.881 W/ziparchive(29476): Unable to open '/system/framework/mediatek-framework.dm': No such file or directory
+06-06 00:43:42.881 W/ziparchive(29476): Unable to open '/system/framework/mediatek-framework.dm': No such file or directory
+06-06 00:43:42.890 W/uiautomator(29476): type=1400 audit(0.0:3428401): avc: denied { read } for name="user_cpu_freq" dev="sysfs" ino=49317 scontext=u:r:shell:s0 tcontext=u:object_r:sysfs_user_cpu_freq:s0 tclass=file permissive=0
+06-06 00:43:43.910 W/uiautomator(29476): type=1400 audit(0.0:3428402): avc: denied { read } for name="u:object_r:qemu_sf_lcd_density_prop:s0" dev="tmpfs" ino=280 scontext=u:r:shell:s0 tcontext=u:object_r:qemu_sf_lcd_density_prop:s0 tclass=file permissive=0
+06-06 00:43:43.910 W/uiautomator(29476): type=1400 audit(0.0:3428403): avc: denied { read } for name="u:object_r:qemu_sf_lcd_density_prop:s0" dev="tmpfs" ino=280 scontext=u:r:shell:s0 tcontext=u:object_r:qemu_sf_lcd_density_prop:s0 tclass=file permissive=0
+06-06 00:43:43.914 W/libc    (29476): Access denied finding property "qemu.sf.lcd_density"
+06-06 00:43:43.914 W/libc    (29476): Access denied finding property "qemu.sf.lcd_density"
+06-06 00:43:43.950 W/AccessibilityNodeInfoDumper(29476): Fetch time: 31ms
+06-06 00:43:44.008 D/AndroidRuntime(29476): Shutting down VM
+06-06 00:43:44.349 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:43:44.834 W/RefBase (29476): RefBase: Explicit destruction, weak count = 0 (in 0x7409fea468). Use sp<> to manage this object.
+06-06 00:43:44.839 D/RefBase (29476): #00 pc 000000000010cc18  /apex/com.android.runtime/lib64/bionic/libc.so (__cxa_finalize+280)
+06-06 00:43:44.839 D/RefBase (29476): #01 pc 00000000000fee08  /apex/com.android.runtime/lib64/bionic/libc.so (exit+24)
+06-06 00:43:44.839 D/RefBase (29476): #02 pc 00000000000927f4  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+100)
+06-06 00:43:46.898 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:43:49.476 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:43:52.001 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:43:54.559 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:43:54.626 I/SherpaSpeechEngine(29365): TTS generate done
+06-06 00:43:54.631 I/SherpaSpeechEngine(29365): TTS save done bytes=307244
+06-06 00:43:54.640 I/EdgeTextToSpeech(29365): Sherpa TTS background cached '开始录制，先确认周围安全；安全后' in 13629ms
+06-06 00:43:57.101 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:43:59.683 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:44:02.239 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:44:02.964 D/TrafficStats( 3989): tagSocket(89) with statsTag=0x34000609, statsUid=10163
+06-06 00:44:02.966 D/Linux   ( 3989): [Posix_connect Debug]Process com.google.android.gms.persistent :443 
+06-06 00:44:04.788 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:44:07.340 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:44:09.905 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:44:12.479 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:44:14.577 I/LiveAudioCapture(29365): Local utterance committed bytes=32000 voicedMs=320
+06-06 00:44:14.577 I/LiveCprCoachScreen(29365): Utterance callback bytes=32000 streaming=true whole=false
+06-06 00:44:14.579 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:44:14.579 I/LiveCprCoachScreen(29365): Streaming ASR produced no final text; running whole-utterance fallback
+06-06 00:44:14.589 I/SherpaSpeechEngine(29365): ASR accept waveform samples=16000
+06-06 00:44:14.727 I/SherpaSpeechEngine(29365): ASR decode done iterations=2
+06-06 00:44:14.729 I/LiveCprCoachScreen(29365): Whole-utterance ASR fallback ok=true text='' latency=143ms
+06-06 00:44:16.898 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:44:17.141 I/LiveAudioCapture(29365): Local utterance committed bytes=32000 voicedMs=320
+06-06 00:44:17.141 I/LiveCprCoachScreen(29365): Utterance callback bytes=32000 streaming=true whole=false
+06-06 00:44:17.143 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:44:17.144 I/LiveCprCoachScreen(29365): Streaming ASR produced no final text; running whole-utterance fallback
+06-06 00:44:17.152 I/SherpaSpeechEngine(29365): ASR accept waveform samples=16000
+06-06 00:44:17.274 I/SherpaSpeechEngine(29365): ASR decode done iterations=2
+06-06 00:44:17.275 I/LiveCprCoachScreen(29365): Whole-utterance ASR fallback ok=true text='' latency=125ms
+06-06 00:44:18.501 I/LiveCprCoachScreen(29365): ASR partial='现场'
+06-06 00:44:18.820 I/LiveCprCoachScreen(29365): ASR partial='现场安全'
+06-06 00:44:19.175 I/LiveCprCoachScreen(29365): ASR partial='现场安全了'
+06-06 00:44:19.465 I/LiveCprCoachScreen(29365): ASR partial='现场安全了我'
+06-06 00:44:19.685 I/CodexTest(29515): CLEAN_R1_SCENE_SAFE_USER_SPEAK_START
+06-06 00:44:19.807 I/LiveCprCoachScreen(29365): ASR partial='现场安全了我在'
+06-06 00:44:20.111 I/LiveCprCoachScreen(29365): ASR partial='现场安全了我在患者'
+06-06 00:44:20.437 I/LiveCprCoachScreen(29365): ASR partial='现场安全了我在患者旁'
+06-06 00:44:20.438 I/LiveAudioCapture(29365): Local utterance committed bytes=83200 voicedMs=1160
+06-06 00:44:20.438 I/LiveCprCoachScreen(29365): Utterance callback bytes=83200 streaming=true whole=false
+06-06 00:44:20.438 I/LiveCprCoachScreen(29365): ASR final='现场安全了我在患者旁' intent= confidence=null
+06-06 00:44:20.445 I/LiveAudioPlayer(29365): Live audio cancel with no active stream reason=new_turn
+06-06 00:44:20.447 I/WebSocketAgentChannel(29365): Sent live JSON type=context ok=true payloadKeys=["sessionId"]
+06-06 00:44:20.447 I/WebSocketAgentChannel(29365): Sent live JSON type=commit_text ok=true payloadKeys=
+06-06 00:44:20.449 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:44:20.495 I/WebSocketAgentChannel(29365): Received live text {"type":"thinking","session_id":"android_live_548ddc3f","turn_seq":2}
+06-06 00:44:20.497 I/WebSocketAgentChannel(29365): Received live text {"type":"final","session_id":"android_live_548ddc3f","turn_seq":2,"text":"现场安全了我在患者旁","intent":"scene_safe"}
+06-06 00:44:20.498 I/WebSocketAgentChannel(29365): Received live text {"type":"guidance","session_id":"android_live_548ddc3f","turn_seq":2,"action":{"action_id":"act_mq15mepj_008g_1115d4394799","session_id":"android_live_548ddc3f","timestamp":"2026-06-05T16:44:20.599Z","stage":"S2_CHECK_RESPONSE","intent":"ask_response_check","priority":"normal","source":"state_machin
+06-06 00:44:20.501 I/WebSocketAgentChannel(29365): Received live text {"type":"state","session_id":"android_live_548ddc3f","turn_seq":2,"current_stage":"S2_CHECK_RESPONSE","state":{"schema_version":"session_state.v0.1","session_id":"android_live_548ddc3f","mode":"demo_assisted","current_stage":"S2_CHECK_RESPONSE","previous_stage":"S1_SCENE_SAFE","started_at":"2026-06-
+06-06 00:44:20.536 I/EdgeTextToSpeech(29365): Android TTS fast path for '请大声叫他，并轻拍双肩。'
+06-06 00:44:20.605 I/AndroidTextToSpeech(29365): Android TTS onStart latency=3ms
+06-06 00:44:20.605 I/SherpaSpeechEngine(29365): TTS generate start chars=12
+06-06 00:44:20.715 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:44:20.716 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:44:20.748 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:44:20.755 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:44:21.032 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_begin","session_id":"android_live_548ddc3f","turn_seq":2,"action_id":"act_mq15mepj_008g_1115d4394799","format":"pcm16","sample_rate":44100,"channels":1,"bits_per_sample":16}
+06-06 00:44:21.040 I/WebSocketAgentChannel(29365): Received live audio bytes=93184
+06-06 00:44:21.480 I/WebSocketAgentChannel(29365): Received live audio bytes=94208
+06-06 00:44:21.480 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_end","session_id":"android_live_548ddc3f","turn_seq":2,"action_id":"act_mq15mepj_008g_1115d4394799"}
+06-06 00:44:23.584 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:44:23.586 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:44:23.586 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:44:23.586 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:44:26.014 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:44:28.562 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:44:29.266 I/SherpaSpeechEngine(29365): TTS generate done
+06-06 00:44:29.267 I/SherpaSpeechEngine(29365): TTS save done bytes=192556
+06-06 00:44:29.277 I/EdgeTextToSpeech(29365): Sherpa TTS background cached '请大声叫他，并轻拍双肩。' in 8663ms
+06-06 00:44:29.589 D/TrafficStats( 3989): tagSocket(92) with statsTag=0x34000609, statsUid=10163
+06-06 00:44:29.593 D/Linux   ( 3989): [Posix_connect Debug]Process com.google.android.gms.persistent :443 
+06-06 00:44:31.076 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:44:33.506 I/WebSocketAgentChannel(29365): Received live text {"type":"thinking","session_id":"android_live_548ddc3f","turn_seq":3}
+06-06 00:44:33.508 I/WebSocketAgentChannel(29365): Received live text {"type":"final","session_id":"android_live_548ddc3f","turn_seq":3,"text":"","intent":null}
+06-06 00:44:33.510 I/WebSocketAgentChannel(29365): Received live text {"type":"guidance","session_id":"android_live_548ddc3f","turn_seq":3,"action":{"action_id":"act_mq15moqw_008p_de7e614f1762","session_id":"android_live_548ddc3f","timestamp":"2026-06-05T16:44:33.608Z","stage":"S3_CHECK_BREATHING","intent":"ask_breathing_check","priority":"high","source":"state_machin
+06-06 00:44:33.514 I/WebSocketAgentChannel(29365): Received live text {"type":"state","session_id":"android_live_548ddc3f","turn_seq":3,"current_stage":"S3_CHECK_BREATHING","state":{"schema_version":"session_state.v0.1","session_id":"android_live_548ddc3f","mode":"demo_assisted","current_stage":"S3_CHECK_BREATHING","previous_stage":"S2_CHECK_RESPONSE","started_at":"20
+06-06 00:44:33.551 I/EdgeTextToSpeech(29365): Android TTS fast path for '看他的胸口。只是偶尔大口喘，或者'
+06-06 00:44:33.597 I/AndroidTextToSpeech(29365): Android TTS onStart latency=2ms
+06-06 00:44:33.648 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:44:33.650 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:44:33.673 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:44:33.675 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:44:33.676 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:44:33.980 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_begin","session_id":"android_live_548ddc3f","turn_seq":3,"action_id":"act_mq15moqw_008p_de7e614f1762","format":"pcm16","sample_rate":44100,"channels":1,"bits_per_sample":16}
+06-06 00:44:33.989 I/WebSocketAgentChannel(29365): Received live audio bytes=91136
+06-06 00:44:34.441 I/WebSocketAgentChannel(29365): Received live audio bytes=113664
+06-06 00:44:34.832 W/ProcessState(29530): Extra binder thread started, but 0 threads requested. Do not use *startThreadPool when zero threads are requested.
+06-06 00:44:34.866 I/DMABUFHEAPS(29530): Using DMA-BUF heap named: mtk_mm
+06-06 00:44:34.866 I/DMABUFHEAPS(29530): Using DMA-BUF heap named: mtk_mm-uncached
+06-06 00:44:34.866 I/DMABUFHEAPS(29530): Using DMA-BUF heap named: mtk_svp_region-aligned
+06-06 00:44:34.866 I/DMABUFHEAPS(29530): Using DMA-BUF heap named: mtk_prot_region
+06-06 00:44:34.866 I/DMABUFHEAPS(29530): Using DMA-BUF heap named: mtk_2d_fr_region
+06-06 00:44:34.866 I/DMABUFHEAPS(29530): Using DMA-BUF heap named: mtk_wfd_region-aligned
+06-06 00:44:34.867 D/OpenGLRenderer(29530): Bitmap::compress format:Png w:720 h:1612 quality:100 app_apk:screencap 
+06-06 00:44:34.867 W/libc    (29530): Access denied finding property "vendor.vivo.imageencoder.dump"
+06-06 00:44:34.926 I/WebSocketAgentChannel(29365): Received live audio bytes=102400
+06-06 00:44:34.969 W/RefBase (29530): RefBase: Explicit destruction, weak count = 0 (in 0x7f213e6468). Use sp<> to manage this object.
+06-06 00:44:34.974 D/RefBase (29530): #00 pc 000000000010cc18  /apex/com.android.runtime/lib64/bionic/libc.so (__cxa_finalize+280)
+06-06 00:44:34.974 D/RefBase (29530): #01 pc 00000000000fee08  /apex/com.android.runtime/lib64/bionic/libc.so (exit+24)
+06-06 00:44:34.974 D/RefBase (29530): #02 pc 00000000000927f4  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+100)
+06-06 00:44:35.109 E/appproc (29533): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath failed , error(Permission denied)
+06-06 00:44:35.109 E/appproc (29533): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:44:35.109 E/appproc (29533): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath2 failed , error(Permission denied)
+06-06 00:44:35.109 E/appproc (29533): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:44:35.109 E/appproc (29533): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath3 failed , error(Permission denied)
+06-06 00:44:35.109 E/appproc (29533): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:44:35.109 E/appproc (29533): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath4 failed , error(Permission denied)
+06-06 00:44:35.109 E/appproc (29533): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:44:35.109 D/AndroidRuntime(29533): >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-06 00:44:35.114 I/AndroidRuntime(29533): Using default boot image
+06-06 00:44:35.114 I/AndroidRuntime(29533): Leaving lock profiling enabled
+06-06 00:44:35.116 W/app_process(29533): ART APEX data files are untrusted.
+06-06 00:44:35.228 D/app_process(29533): Time zone APEX ICU file found: /apex/com.android.tzdata/etc/icu/icu_tzdata.dat
+06-06 00:44:35.228 D/app_process(29533): I18n APEX ICU file found: /apex/com.android.i18n/etc/icu/icudt70l.dat
+06-06 00:44:35.237 E/app_process(29533): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:44:35.238 E/app_process(29533): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:44:35.238 E/System  (29533): openDexFile load detect error
+06-06 00:44:35.238 E/System  (29533): java.lang.reflect.InvocationTargetException
+06-06 00:44:35.238 E/System  (29533): 	at java.lang.reflect.Method.invoke(Native Method)
+06-06 00:44:35.238 E/System  (29533): 	at dalvik.system.DexFile.openDexFile(DexFile.java:387)
+06-06 00:44:35.238 E/System  (29533): 	at dalvik.system.DexFile.<init>(DexFile.java:118)
+06-06 00:44:35.238 E/System  (29533): 	at dalvik.system.DexFile.<init>(DexFile.java:91)
+06-06 00:44:35.238 E/System  (29533): 	at dalvik.system.DexPathList.loadDexFile(DexPathList.java:438)
+06-06 00:44:35.238 E/System  (29533): 	at dalvik.system.DexPathList.makeDexElements(DexPathList.java:397)
+06-06 00:44:35.238 E/System  (29533): 	at dalvik.system.DexPathList.<init>(DexPathList.java:166)
+06-06 00:44:35.238 E/System  (29533): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:160)
+06-06 00:44:35.238 E/System  (29533): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:105)
+06-06 00:44:35.238 E/System  (29533): 	at dalvik.system.PathClassLoader.<init>(PathClassLoader.java:71)
+06-06 00:44:35.238 E/System  (29533): 	at java.lang.ClassLoader.createSystemClassLoader(ClassLoader.java:224)
+06-06 00:44:35.238 E/System  (29533): 	at java.lang.ClassLoader.-$$Nest$smcreateSystemClassLoader(Unknown Source:0)
+06-06 00:44:35.238 E/System  (29533): 	at java.lang.ClassLoader$SystemClassLoader.<clinit>(ClassLoader.java:183)
+06-06 00:44:35.238 E/System  (29533): 	at java.lang.ClassLoader.getSystemClassLoader(ClassLoader.java:1098)
+06-06 00:44:35.238 E/System  (29533): Caused by: java.lang.UnsatisfiedLinkError: No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:44:35.238 E/System  (29533): 	at android.os.Trace.nativeGetEnabledTags(Native Method)
+06-06 00:44:35.238 E/System  (29533): 	at android.os.Trace.isTagEnabled(Trace.java:163)
+06-06 00:44:35.238 E/System  (29533): 	at android.os.Trace.endSection(Trace.java:398)
+06-06 00:44:35.238 E/System  (29533): 	at com.vivo.framework.securitydetect.DynamicLoadDetectManager.reportDexLoaded(DynamicLoadDetectManager.java:156)
+06-06 00:44:35.238 E/System  (29533): 	... 14 more
+06-06 00:44:35.239 E/app_process(29533): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:44:35.240 E/app_process(29533): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:44:35.240 E/System  (29533): openDexFile load detect error
+06-06 00:44:35.240 E/System  (29533): java.lang.reflect.InvocationTargetException
+06-06 00:44:35.240 E/System  (29533): 	at java.lang.reflect.Method.invoke(Native Method)
+06-06 00:44:35.240 E/System  (29533): 	at dalvik.system.DexFile.openDexFile(DexFile.java:387)
+06-06 00:44:35.240 E/System  (29533): 	at dalvik.system.DexFile.<init>(DexFile.java:118)
+06-06 00:44:35.240 E/System  (29533): 	at dalvik.system.DexFile.<init>(DexFile.java:91)
+06-06 00:44:35.240 E/System  (29533): 	at dalvik.system.DexPathList.loadDexFile(DexPathList.java:438)
+06-06 00:44:35.240 E/System  (29533): 	at dalvik.system.DexPathList.makeDexElements(DexPathList.java:397)
+06-06 00:44:35.240 E/System  (29533): 	at dalvik.system.DexPathList.<init>(DexPathList.java:166)
+06-06 00:44:35.240 E/System  (29533): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:160)
+06-06 00:44:35.240 E/System  (29533): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:105)
+06-06 00:44:35.240 E/System  (29533): 	at dalvik.system.PathClassLoader.<init>(PathClassLoader.java:71)
+06-06 00:44:35.240 E/System  (29533): 	at java.lang.ClassLoader.createSystemClassLoader(ClassLoader.java:224)
+06-06 00:44:35.240 E/System  (29533): 	at java.lang.ClassLoader.-$$Nest$smcreateSystemClassLoader(Unknown Source:0)
+06-06 00:44:35.240 E/System  (29533): 	at java.lang.ClassLoader$SystemClassLoader.<clinit>(ClassLoader.java:183)
+06-06 00:44:35.240 E/System  (29533): 	at java.lang.ClassLoader.getSystemClassLoader(ClassLoader.java:1098)
+06-06 00:44:35.240 E/System  (29533): Caused by: java.lang.UnsatisfiedLinkError: No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:44:35.240 E/System  (29533): 	at android.os.Trace.nativeGetEnabledTags(Native Method)
+06-06 00:44:35.240 E/System  (29533): 	at android.os.Trace.isTagEnabled(Trace.java:163)
+06-06 00:44:35.240 E/System  (29533): 	at android.os.Trace.endSection(Trace.java:398)
+06-06 00:44:35.240 E/System  (29533): 	at com.vivo.framework.securitydetect.DynamicLoadDetectManager.reportDexLoaded(DynamicLoadDetectManager.java:156)
+06-06 00:44:35.240 E/System  (29533): 	... 14 more
+06-06 00:44:35.241 W/app_process(29533): ClassLoaderContext classpath size mismatch. expected=0, found=1 (PCL[] | PCL[/system/framework/android.test.runner.jar*2259575933])
+06-06 00:44:35.245 I/VivoSystemFrameworkFactory(29533): Instance implClass com.vivo.VivoSystemFrameworkFactoryImpl
+06-06 00:44:35.266 D/AndroidRuntime(29533): Calling main entry com.android.commands.uiautomator.Launcher
+06-06 00:44:35.270 W/ziparchive(29533): Unable to open '/system/framework/mediatek-framework.dm': No such file or directory
+06-06 00:44:35.270 W/ziparchive(29533): Unable to open '/system/framework/mediatek-framework.dm': No such file or directory
+06-06 00:44:35.278 W/uiautomator(29533): type=1400 audit(0.0:3428429): avc: denied { read } for name="user_cpu_freq" dev="sysfs" ino=49317 scontext=u:r:shell:s0 tcontext=u:object_r:sysfs_user_cpu_freq:s0 tclass=file permissive=0
+06-06 00:44:35.416 I/WebSocketAgentChannel(29365): Received live audio bytes=108544
+06-06 00:44:35.417 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_end","session_id":"android_live_548ddc3f","turn_seq":3,"action_id":"act_mq15moqw_008p_de7e614f1762"}
+06-06 00:44:36.307 W/libc    (29533): Access denied finding property "qemu.sf.lcd_density"
+06-06 00:44:36.307 W/libc    (29533): Access denied finding property "qemu.sf.lcd_density"
+06-06 00:44:36.306 W/uiautomator(29533): type=1400 audit(0.0:3428430): avc: denied { read } for name="u:object_r:qemu_sf_lcd_density_prop:s0" dev="tmpfs" ino=280 scontext=u:r:shell:s0 tcontext=u:object_r:qemu_sf_lcd_density_prop:s0 tclass=file permissive=0
+06-06 00:44:36.306 W/uiautomator(29533): type=1400 audit(0.0:3428431): avc: denied { read } for name="u:object_r:qemu_sf_lcd_density_prop:s0" dev="tmpfs" ino=280 scontext=u:r:shell:s0 tcontext=u:object_r:qemu_sf_lcd_density_prop:s0 tclass=file permissive=0
+06-06 00:44:36.328 W/AccessibilityNodeInfoDumper(29533): Fetch time: 18ms
+06-06 00:44:36.368 D/AndroidRuntime(29533): Shutting down VM
+06-06 00:44:37.200 W/RefBase (29533): RefBase: Explicit destruction, weak count = 0 (in 0x76625f8468). Use sp<> to manage this object.
+06-06 00:44:37.204 D/RefBase (29533): #00 pc 000000000010cc18  /apex/com.android.runtime/lib64/bionic/libc.so (__cxa_finalize+280)
+06-06 00:44:37.205 D/RefBase (29533): #01 pc 00000000000fee08  /apex/com.android.runtime/lib64/bionic/libc.so (exit+24)
+06-06 00:44:37.205 D/RefBase (29533): #02 pc 00000000000927f4  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+100)
+06-06 00:44:37.305 I/CodexTest(29552): CLEAN_R1_SCENE_SAFE_CAPTURE_DONE
+06-06 00:44:39.568 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:44:39.568 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:44:39.568 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:44:39.569 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:44:40.552 I/LiveCprCoachScreen(29365): ASR partial='边'
+06-06 00:44:42.139 I/LiveCprCoachScreen(29365): ASR final='边' intent= confidence=null
+06-06 00:44:42.140 I/LiveAudioPlayer(29365): Live audio cancel with no active stream reason=new_turn
+06-06 00:44:42.141 I/WebSocketAgentChannel(29365): Sent live JSON type=context ok=true payloadKeys=["sessionId"]
+06-06 00:44:42.141 I/WebSocketAgentChannel(29365): Sent live JSON type=commit_text ok=true payloadKeys=
+06-06 00:44:42.142 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:44:42.193 I/WebSocketAgentChannel(29365): Received live text {"type":"thinking","session_id":"android_live_548ddc3f","turn_seq":4}
+06-06 00:44:42.195 I/WebSocketAgentChannel(29365): Received live text {"type":"final","session_id":"android_live_548ddc3f","turn_seq":4,"text":"边","intent":null}
+06-06 00:44:42.196 I/WebSocketAgentChannel(29365): Received live text {"type":"guidance","session_id":"android_live_548ddc3f","turn_seq":4,"action":{"action_id":"act_mq15mvg8_0090_de801a06a365","session_id":"android_live_548ddc3f","timestamp":"2026-06-05T16:44:42.296Z","stage":"S3_CHECK_BREATHING","intent":"ask_breathing_check","priority":"high","source":"state_machin
+06-06 00:44:42.198 I/WebSocketAgentChannel(29365): Received live text {"type":"state","session_id":"android_live_548ddc3f","turn_seq":4,"current_stage":"S3_CHECK_BREATHING","state":{"schema_version":"session_state.v0.1","session_id":"android_live_548ddc3f","mode":"demo_assisted","current_stage":"S3_CHECK_BREATHING","previous_stage":"S3_CHECK_BREATHING","started_at":"2
+06-06 00:44:42.220 I/EdgeTextToSpeech(29365): Android TTS fast path for '看他的胸口。只是偶尔大口喘，或者'
+06-06 00:44:42.304 I/AndroidTextToSpeech(29365): Android TTS onStart latency=3ms
+06-06 00:44:42.355 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:44:42.356 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:44:42.373 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:44:42.373 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:44:42.542 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_begin","session_id":"android_live_548ddc3f","turn_seq":4,"action_id":"act_mq15mvg8_0090_de801a06a365","format":"pcm16","sample_rate":44100,"channels":1,"bits_per_sample":16}
+06-06 00:44:42.544 I/WebSocketAgentChannel(29365): Received live audio bytes=91136
+06-06 00:44:43.025 I/WebSocketAgentChannel(29365): Received live audio bytes=113664
+06-06 00:44:43.551 I/WebSocketAgentChannel(29365): Received live audio bytes=102400
+06-06 00:44:44.128 I/WebSocketAgentChannel(29365): Received live audio bytes=108544
+06-06 00:44:44.130 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_end","session_id":"android_live_548ddc3f","turn_seq":4,"action_id":"act_mq15mvg8_0090_de801a06a365"}
+06-06 00:44:48.118 I/WebSocketAgentChannel(29365): Received live text {"type":"thinking","session_id":"android_live_548ddc3f","turn_seq":5}
+06-06 00:44:48.120 I/WebSocketAgentChannel(29365): Received live text {"type":"final","session_id":"android_live_548ddc3f","turn_seq":5,"text":"","intent":null}
+06-06 00:44:48.122 I/WebSocketAgentChannel(29365): Received live text {"type":"guidance","session_id":"android_live_548ddc3f","turn_seq":5,"action":{"action_id":"act_mq15n00u_009d_4f9ded2630f9","session_id":"android_live_548ddc3f","timestamp":"2026-06-05T16:44:48.222Z","stage":"S4_SUSPECTED_ARREST","intent":"state_suspected_arrest_handling","priority":"critical","sour
+06-06 00:44:48.128 I/WebSocketAgentChannel(29365): Received live text {"type":"state","session_id":"android_live_548ddc3f","turn_seq":5,"current_stage":"S4_SUSPECTED_ARREST","state":{"schema_version":"session_state.v0.1","session_id":"android_live_548ddc3f","mode":"demo_assisted","current_stage":"S4_SUSPECTED_ARREST","previous_stage":"S3_CHECK_BREATHING","started_at":
+06-06 00:44:48.173 I/EdgeTextToSpeech(29365): Android TTS fast path for '请按疑似心脏骤停处理。现在准备胸'
+06-06 00:44:48.238 I/SherpaSpeechEngine(29365): TTS generate start chars=20
+06-06 00:44:48.272 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:44:48.272 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:44:48.276 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:44:48.277 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:44:48.283 I/AndroidTextToSpeech(29365): Android TTS onStart latency=48ms
+06-06 00:44:48.360 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:44:48.365 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:44:48.397 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:44:48.398 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:44:48.790 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_begin","session_id":"android_live_548ddc3f","turn_seq":5,"action_id":"act_mq15n00u_009d_4f9ded2630f9","format":"pcm16","sample_rate":44100,"channels":1,"bits_per_sample":16}
+06-06 00:44:48.800 I/WebSocketAgentChannel(29365): Received live audio bytes=140702
+06-06 00:44:49.498 I/WebSocketAgentChannel(29365): Received live audio bytes=131072
+06-06 00:44:49.500 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_end","session_id":"android_live_548ddc3f","turn_seq":5,"action_id":"act_mq15n00u_009d_4f9ded2630f9"}
+06-06 00:44:49.501 I/WebSocketAgentChannel(29365): Received live text {"type":"thinking","session_id":"android_live_548ddc3f","turn_seq":5}
+06-06 00:44:49.501 I/WebSocketAgentChannel(29365): Received live text {"type":"final","session_id":"android_live_548ddc3f","turn_seq":5,"text":"","intent":null}
+06-06 00:44:49.501 I/WebSocketAgentChannel(29365): Received live text {"type":"guidance","session_id":"android_live_548ddc3f","turn_seq":5,"action":{"action_id":"act_mq15n12x_009s_270a7c244d5b","session_id":"android_live_548ddc3f","timestamp":"2026-06-05T16:44:49.592Z","stage":"S5_CALL_EMERGENCY","intent":"start_emergency_call_and_cpr","priority":"critical","source":"
+06-06 00:44:49.504 I/WebSocketAgentChannel(29365): Received live text {"type":"state","session_id":"android_live_548ddc3f","turn_seq":5,"current_stage":"S5_CALL_EMERGENCY","state":{"schema_version":"session_state.v0.1","session_id":"android_live_548ddc3f","mode":"demo_assisted","current_stage":"S5_CALL_EMERGENCY","previous_stage":"S4_SUSPECTED_ARREST","started_at":"20
+06-06 00:44:49.538 I/EdgeTextToSpeech(29365): Android TTS fast path for '我将为你拨打 120，请保持手机'
+06-06 00:44:50.171 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_begin","session_id":"android_live_548ddc3f","turn_seq":5,"action_id":"act_mq15n12x_009s_270a7c244d5b","format":"pcm16","sample_rate":44100,"channels":1,"bits_per_sample":16}
+06-06 00:44:50.178 I/WebSocketAgentChannel(29365): Received live audio bytes=126976
+06-06 00:44:50.818 I/WebSocketAgentChannel(29365): Received live audio bytes=112430
+06-06 00:44:51.519 I/WebSocketAgentChannel(29365): Received live audio bytes=131072
+06-06 00:44:51.520 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_end","session_id":"android_live_548ddc3f","turn_seq":5,"action_id":"act_mq15n12x_009s_270a7c244d5b"}
+06-06 00:44:51.521 I/WebSocketAgentChannel(29365): Received live text {"type":"thinking","session_id":"android_live_548ddc3f","turn_seq":5}
+06-06 00:44:51.521 I/WebSocketAgentChannel(29365): Received live text {"type":"final","session_id":"android_live_548ddc3f","turn_seq":5,"text":"","intent":null}
+06-06 00:44:51.522 I/WebSocketAgentChannel(29365): Received live text {"type":"guidance","session_id":"android_live_548ddc3f","turn_seq":5,"action":{"action_id":"act_mq15n2n2_00a9_cb0ae0e3a26c","session_id":"android_live_548ddc3f","timestamp":"2026-06-05T16:44:51.613Z","stage":"S6_CPR_READY","intent":"guide_cpr_position","priority":"critical","source":"state_machine",
+06-06 00:44:51.524 I/WebSocketAgentChannel(29365): Received live text {"type":"state","session_id":"android_live_548ddc3f","turn_seq":5,"current_stage":"S6_CPR_READY","state":{"schema_version":"session_state.v0.1","session_id":"android_live_548ddc3f","mode":"demo_assisted","current_stage":"S6_CPR_READY","previous_stage":"S5_CALL_EMERGENCY","started_at":"2026-06-05T16:
+06-06 00:44:51.575 I/mali    (29365): [DebugProp] GPU Debug-Mechanism Disable !
+06-06 00:44:51.602 I/EdgeTextToSpeech(29365): Android TTS fast path for '双手叠在他胸口中央，胳膊伸直。准'
+06-06 00:44:52.233 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_begin","session_id":"android_live_548ddc3f","turn_seq":5,"action_id":"act_mq15n2n2_00a9_cb0ae0e3a26c","format":"pcm16","sample_rate":44100,"channels":1,"bits_per_sample":16}
+06-06 00:44:52.244 I/WebSocketAgentChannel(29365): Received live audio bytes=145408
+06-06 00:44:52.386 I/CodexTest(29574): CLEAN_R1_BREATHING_USER_SPEAK_START
+06-06 00:44:52.773 I/WebSocketAgentChannel(29365): Received live audio bytes=83968
+06-06 00:44:52.843 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:44:52.844 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:44:52.844 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:44:52.844 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:44:52.847 I/AndroidTextToSpeech(29365): Android TTS onStart latency=3230ms
+06-06 00:44:52.876 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:44:52.877 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:44:52.923 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:44:52.924 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:44:53.301 I/WebSocketAgentChannel(29365): Received live audio bytes=123904
+06-06 00:44:53.756 I/WebSocketAgentChannel(29365): Received live audio bytes=114688
+06-06 00:44:53.756 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_end","session_id":"android_live_548ddc3f","turn_seq":5,"action_id":"act_mq15n2n2_00a9_cb0ae0e3a26c"}
+06-06 00:44:58.784 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:44:58.785 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:44:58.785 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:44:58.785 I/AndroidTextToSpeech(29365): Android TTS onStart latency=7131ms
+06-06 00:44:58.785 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:44:58.815 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:44:58.816 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:44:58.849 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:44:58.850 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:00.369 I/SherpaSpeechEngine(29365): TTS generate done
+06-06 00:45:00.375 I/SherpaSpeechEngine(29365): TTS save done bytes=283692
+06-06 00:45:00.376 I/EdgeTextToSpeech(29365): Sherpa TTS background cached '请按疑似心脏骤停处理。现在准备胸' in 12137ms
+06-06 00:45:05.514 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:05.515 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:05.516 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:05.516 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:07.541 W/ProcessState(29584): Extra binder thread started, but 0 threads requested. Do not use *startThreadPool when zero threads are requested.
+06-06 00:45:07.564 I/DMABUFHEAPS(29584): Using DMA-BUF heap named: mtk_mm
+06-06 00:45:07.564 I/DMABUFHEAPS(29584): Using DMA-BUF heap named: mtk_mm-uncached
+06-06 00:45:07.564 I/DMABUFHEAPS(29584): Using DMA-BUF heap named: mtk_svp_region-aligned
+06-06 00:45:07.564 I/DMABUFHEAPS(29584): Using DMA-BUF heap named: mtk_prot_region
+06-06 00:45:07.564 I/DMABUFHEAPS(29584): Using DMA-BUF heap named: mtk_2d_fr_region
+06-06 00:45:07.564 I/DMABUFHEAPS(29584): Using DMA-BUF heap named: mtk_wfd_region-aligned
+06-06 00:45:07.564 D/OpenGLRenderer(29584): Bitmap::compress format:Png w:720 h:1612 quality:100 app_apk:screencap 
+06-06 00:45:07.564 W/libc    (29584): Access denied finding property "vendor.vivo.imageencoder.dump"
+06-06 00:45:07.628 I/LiveCprCoachScreen(29365): ASR partial='好'
+06-06 00:45:07.680 W/RefBase (29584): RefBase: Explicit destruction, weak count = 0 (in 0x7ee2591468). Use sp<> to manage this object.
+06-06 00:45:07.685 D/RefBase (29584): #00 pc 000000000010cc18  /apex/com.android.runtime/lib64/bionic/libc.so (__cxa_finalize+280)
+06-06 00:45:07.685 D/RefBase (29584): #01 pc 00000000000fee08  /apex/com.android.runtime/lib64/bionic/libc.so (exit+24)
+06-06 00:45:07.685 D/RefBase (29584): #02 pc 00000000000927f4  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+100)
+06-06 00:45:07.831 E/appproc (29587): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath failed , error(Permission denied)
+06-06 00:45:07.831 E/appproc (29587): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:45:07.831 E/appproc (29587): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath2 failed , error(Permission denied)
+06-06 00:45:07.831 E/appproc (29587): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:45:07.831 E/appproc (29587): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath3 failed , error(Permission denied)
+06-06 00:45:07.831 E/appproc (29587): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:45:07.831 E/appproc (29587): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath4 failed , error(Permission denied)
+06-06 00:45:07.831 E/appproc (29587): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:45:07.831 D/AndroidRuntime(29587): >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-06 00:45:07.836 I/AndroidRuntime(29587): Using default boot image
+06-06 00:45:07.836 I/AndroidRuntime(29587): Leaving lock profiling enabled
+06-06 00:45:07.838 W/app_process(29587): ART APEX data files are untrusted.
+06-06 00:45:07.939 I/LiveCprCoachScreen(29365): ASR partial='好了'
+06-06 00:45:07.968 D/app_process(29587): Time zone APEX ICU file found: /apex/com.android.tzdata/etc/icu/icu_tzdata.dat
+06-06 00:45:07.968 D/app_process(29587): I18n APEX ICU file found: /apex/com.android.i18n/etc/icu/icudt70l.dat
+06-06 00:45:07.977 E/app_process(29587): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:45:07.977 E/app_process(29587): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:45:07.977 E/System  (29587): openDexFile load detect error
+06-06 00:45:07.977 E/System  (29587): java.lang.reflect.InvocationTargetException
+06-06 00:45:07.977 E/System  (29587): 	at java.lang.reflect.Method.invoke(Native Method)
+06-06 00:45:07.977 E/System  (29587): 	at dalvik.system.DexFile.openDexFile(DexFile.java:387)
+06-06 00:45:07.977 E/System  (29587): 	at dalvik.system.DexFile.<init>(DexFile.java:118)
+06-06 00:45:07.977 E/System  (29587): 	at dalvik.system.DexFile.<init>(DexFile.java:91)
+06-06 00:45:07.977 E/System  (29587): 	at dalvik.system.DexPathList.loadDexFile(DexPathList.java:438)
+06-06 00:45:07.977 E/System  (29587): 	at dalvik.system.DexPathList.makeDexElements(DexPathList.java:397)
+06-06 00:45:07.977 E/System  (29587): 	at dalvik.system.DexPathList.<init>(DexPathList.java:166)
+06-06 00:45:07.977 E/System  (29587): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:160)
+06-06 00:45:07.977 E/System  (29587): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:105)
+06-06 00:45:07.977 E/System  (29587): 	at dalvik.system.PathClassLoader.<init>(PathClassLoader.java:71)
+06-06 00:45:07.977 E/System  (29587): 	at java.lang.ClassLoader.createSystemClassLoader(ClassLoader.java:224)
+06-06 00:45:07.977 E/System  (29587): 	at java.lang.ClassLoader.-$$Nest$smcreateSystemClassLoader(Unknown Source:0)
+06-06 00:45:07.977 E/System  (29587): 	at java.lang.ClassLoader$SystemClassLoader.<clinit>(ClassLoader.java:183)
+06-06 00:45:07.977 E/System  (29587): 	at java.lang.ClassLoader.getSystemClassLoader(ClassLoader.java:1098)
+06-06 00:45:07.977 E/System  (29587): Caused by: java.lang.UnsatisfiedLinkError: No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:45:07.977 E/System  (29587): 	at android.os.Trace.nativeGetEnabledTags(Native Method)
+06-06 00:45:07.977 E/System  (29587): 	at android.os.Trace.isTagEnabled(Trace.java:163)
+06-06 00:45:07.977 E/System  (29587): 	at android.os.Trace.endSection(Trace.java:398)
+06-06 00:45:07.977 E/System  (29587): 	at com.vivo.framework.securitydetect.DynamicLoadDetectManager.reportDexLoaded(DynamicLoadDetectManager.java:156)
+06-06 00:45:07.977 E/System  (29587): 	... 14 more
+06-06 00:45:07.979 E/app_process(29587): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:45:07.979 E/app_process(29587): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:45:07.979 E/System  (29587): openDexFile load detect error
+06-06 00:45:07.979 E/System  (29587): java.lang.reflect.InvocationTargetException
+06-06 00:45:07.979 E/System  (29587): 	at java.lang.reflect.Method.invoke(Native Method)
+06-06 00:45:07.979 E/System  (29587): 	at dalvik.system.DexFile.openDexFile(DexFile.java:387)
+06-06 00:45:07.979 E/System  (29587): 	at dalvik.system.DexFile.<init>(DexFile.java:118)
+06-06 00:45:07.979 E/System  (29587): 	at dalvik.system.DexFile.<init>(DexFile.java:91)
+06-06 00:45:07.979 E/System  (29587): 	at dalvik.system.DexPathList.loadDexFile(DexPathList.java:438)
+06-06 00:45:07.979 E/System  (29587): 	at dalvik.system.DexPathList.makeDexElements(DexPathList.java:397)
+06-06 00:45:07.979 E/System  (29587): 	at dalvik.system.DexPathList.<init>(DexPathList.java:166)
+06-06 00:45:07.979 E/System  (29587): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:160)
+06-06 00:45:07.979 E/System  (29587): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:105)
+06-06 00:45:07.979 E/System  (29587): 	at dalvik.system.PathClassLoader.<init>(PathClassLoader.java:71)
+06-06 00:45:07.979 E/System  (29587): 	at java.lang.ClassLoader.createSystemClassLoader(ClassLoader.java:224)
+06-06 00:45:07.979 E/System  (29587): 	at java.lang.ClassLoader.-$$Nest$smcreateSystemClassLoader(Unknown Source:0)
+06-06 00:45:07.979 E/System  (29587): 	at java.lang.ClassLoader$SystemClassLoader.<clinit>(ClassLoader.java:183)
+06-06 00:45:07.979 E/System  (29587): 	at java.lang.ClassLoader.getSystemClassLoader(ClassLoader.java:1098)
+06-06 00:45:07.979 E/System  (29587): Caused by: java.lang.UnsatisfiedLinkError: No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:45:07.979 E/System  (29587): 	at android.os.Trace.nativeGetEnabledTags(Native Method)
+06-06 00:45:07.979 E/System  (29587): 	at android.os.Trace.isTagEnabled(Trace.java:163)
+06-06 00:45:07.979 E/System  (29587): 	at android.os.Trace.endSection(Trace.java:398)
+06-06 00:45:07.979 E/System  (29587): 	at com.vivo.framework.securitydetect.DynamicLoadDetectManager.reportDexLoaded(DynamicLoadDetectManager.java:156)
+06-06 00:45:07.979 E/System  (29587): 	... 14 more
+06-06 00:45:07.980 W/app_process(29587): ClassLoaderContext classpath size mismatch. expected=0, found=1 (PCL[] | PCL[/system/framework/android.test.runner.jar*2259575933])
+06-06 00:45:07.985 I/VivoSystemFrameworkFactory(29587): Instance implClass com.vivo.VivoSystemFrameworkFactoryImpl
+06-06 00:45:08.006 D/AndroidRuntime(29587): Calling main entry com.android.commands.uiautomator.Launcher
+06-06 00:45:08.010 W/ziparchive(29587): Unable to open '/system/framework/mediatek-framework.dm': No such file or directory
+06-06 00:45:08.010 W/ziparchive(29587): Unable to open '/system/framework/mediatek-framework.dm': No such file or directory
+06-06 00:45:08.018 W/uiautomator(29587): type=1400 audit(0.0:3428434): avc: denied { read } for name="user_cpu_freq" dev="sysfs" ino=49317 scontext=u:r:shell:s0 tcontext=u:object_r:sysfs_user_cpu_freq:s0 tclass=file permissive=0
+06-06 00:45:08.238 I/LiveCprCoachScreen(29365): ASR partial='好了开'
+06-06 00:45:08.542 I/LiveCprCoachScreen(29365): ASR partial='好了开始'
+06-06 00:45:08.781 I/LiveAudioCapture(29365): Local utterance committed bytes=60160 voicedMs=840
+06-06 00:45:08.781 I/LiveCprCoachScreen(29365): Utterance callback bytes=60160 streaming=true whole=false
+06-06 00:45:08.788 I/LiveCprCoachScreen(29365): ASR final='好了开始' intent= confidence=null
+06-06 00:45:08.790 I/LiveAudioPlayer(29365): Live audio cancel with no active stream reason=new_turn
+06-06 00:45:08.791 I/WebSocketAgentChannel(29365): Sent live JSON type=context ok=true payloadKeys=["sessionId"]
+06-06 00:45:08.792 I/WebSocketAgentChannel(29365): Sent live JSON type=commit_text ok=true payloadKeys=
+06-06 00:45:08.792 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:45:08.837 I/WebSocketAgentChannel(29365): Received live text {"type":"thinking","session_id":"android_live_548ddc3f","turn_seq":6}
+06-06 00:45:08.840 I/WebSocketAgentChannel(29365): Received live text {"type":"final","session_id":"android_live_548ddc3f","turn_seq":6,"text":"好了开始","intent":"step_done"}
+06-06 00:45:08.841 I/WebSocketAgentChannel(29365): Received live text {"type":"guidance","session_id":"android_live_548ddc3f","turn_seq":6,"action":{"action_id":"act_mq15ng0e_00as_bf4c4463ccca","session_id":"android_live_548ddc3f","timestamp":"2026-06-05T16:45:08.941Z","stage":"S6_CPR_READY","intent":"guide_cpr_position","priority":"critical","source":"state_machine",
+06-06 00:45:08.843 I/WebSocketAgentChannel(29365): Received live text {"type":"state","session_id":"android_live_548ddc3f","turn_seq":6,"current_stage":"S6_CPR_READY","state":{"schema_version":"session_state.v0.1","session_id":"android_live_548ddc3f","mode":"demo_assisted","current_stage":"S6_CPR_READY","previous_stage":"S6_CPR_READY","started_at":"2026-06-05T16:45:08
+06-06 00:45:08.859 I/EdgeTextToSpeech(29365): Android TTS fast path for '双手叠在他胸口中央，胳膊伸直。准'
+06-06 00:45:08.929 I/AndroidTextToSpeech(29365): Android TTS onStart latency=3ms
+06-06 00:45:08.970 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:08.970 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:08.995 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:08.996 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:09.270 W/uiautomator(29587): type=1400 audit(0.0:3428437): avc: denied { read } for name="u:object_r:qemu_sf_lcd_density_prop:s0" dev="tmpfs" ino=280 scontext=u:r:shell:s0 tcontext=u:object_r:qemu_sf_lcd_density_prop:s0 tclass=file permissive=0
+06-06 00:45:09.271 W/libc    (29587): Access denied finding property "qemu.sf.lcd_density"
+06-06 00:45:09.271 W/libc    (29587): Access denied finding property "qemu.sf.lcd_density"
+06-06 00:45:09.270 W/uiautomator(29587): type=1400 audit(0.0:3428438): avc: denied { read } for name="u:object_r:qemu_sf_lcd_density_prop:s0" dev="tmpfs" ino=280 scontext=u:r:shell:s0 tcontext=u:object_r:qemu_sf_lcd_density_prop:s0 tclass=file permissive=0
+06-06 00:45:09.299 W/AccessibilityNodeInfoDumper(29587): Fetch time: 23ms
+06-06 00:45:09.355 D/AndroidRuntime(29587): Shutting down VM
+06-06 00:45:09.486 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_begin","session_id":"android_live_548ddc3f","turn_seq":6,"action_id":"act_mq15ng0e_00as_bf4c4463ccca","format":"pcm16","sample_rate":44100,"channels":1,"bits_per_sample":16}
+06-06 00:45:09.498 I/WebSocketAgentChannel(29365): Received live audio bytes=145408
+06-06 00:45:09.884 I/WebSocketAgentChannel(29365): Received live audio bytes=83968
+06-06 00:45:10.188 W/RefBase (29587): RefBase: Explicit destruction, weak count = 0 (in 0x745b1f0468). Use sp<> to manage this object.
+06-06 00:45:10.193 D/RefBase (29587): #00 pc 000000000010cc18  /apex/com.android.runtime/lib64/bionic/libc.so (__cxa_finalize+280)
+06-06 00:45:10.193 D/RefBase (29587): #01 pc 00000000000fee08  /apex/com.android.runtime/lib64/bionic/libc.so (exit+24)
+06-06 00:45:10.193 D/RefBase (29587): #02 pc 00000000000927f4  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+100)
+06-06 00:45:10.292 I/CodexTest(29613): CLEAN_R1_BREATHING_CAPTURE_DONE
+06-06 00:45:10.487 I/WebSocketAgentChannel(29365): Received live audio bytes=123904
+06-06 00:45:11.108 I/WebSocketAgentChannel(29365): Received live audio bytes=114688
+06-06 00:45:11.109 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_end","session_id":"android_live_548ddc3f","turn_seq":6,"action_id":"act_mq15ng0e_00as_bf4c4463ccca"}
+06-06 00:45:15.667 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:15.667 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:15.669 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:15.669 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:17.534 I/LiveCprCoachScreen(29365): ASR partial='准'
+06-06 00:45:17.836 I/LiveCprCoachScreen(29365): ASR partial='准备好'
+06-06 00:45:18.160 I/LiveCprCoachScreen(29365): ASR partial='准备好了'
+06-06 00:45:18.798 I/LiveCprCoachScreen(29365): ASR partial='准备好了开始'
+06-06 00:45:19.217 I/LiveAudioCapture(29365): Local utterance committed bytes=67840 voicedMs=1120
+06-06 00:45:19.217 I/LiveCprCoachScreen(29365): Utterance callback bytes=67840 streaming=true whole=false
+06-06 00:45:19.219 I/LiveCprCoachScreen(29365): ASR final='准备好了开始' intent= confidence=null
+06-06 00:45:19.219 I/LiveAudioPlayer(29365): Live audio cancel with no active stream reason=new_turn
+06-06 00:45:19.220 I/WebSocketAgentChannel(29365): Sent live JSON type=context ok=true payloadKeys=["sessionId"]
+06-06 00:45:19.221 I/WebSocketAgentChannel(29365): Sent live JSON type=commit_text ok=true payloadKeys=
+06-06 00:45:19.222 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:45:19.279 I/WebSocketAgentChannel(29365): Received live text {"type":"thinking","session_id":"android_live_548ddc3f","turn_seq":7}
+06-06 00:45:19.280 I/WebSocketAgentChannel(29365): Received live text {"type":"final","session_id":"android_live_548ddc3f","turn_seq":7,"text":"准备好了开始","intent":"continue_cpr"}
+06-06 00:45:19.282 I/WebSocketAgentChannel(29365): Received live text {"type":"guidance","session_id":"android_live_548ddc3f","turn_seq":7,"action":{"action_id":"act_mq15no2e_00bd_27cba2bc2b54","session_id":"android_live_548ddc3f","timestamp":"2026-06-05T16:45:19.381Z","stage":"S7_CPR_LOOP","intent":"start_cpr_loop","priority":"critical","source":"state_machine","reas
+06-06 00:45:19.285 I/WebSocketAgentChannel(29365): Received live text {"type":"state","session_id":"android_live_548ddc3f","turn_seq":7,"current_stage":"S7_CPR_LOOP","state":{"schema_version":"session_state.v0.1","session_id":"android_live_548ddc3f","mode":"demo_assisted","current_stage":"S7_CPR_LOOP","previous_stage":"S6_CPR_READY","started_at":"2026-06-05T16:45:19.3
+06-06 00:45:19.336 D/AudioTrack(29365): INSP: type=audio,case=1,set=0xb4000076609ea980,stream_type=-1,sample_rate=44100,format=0x1,channel_mask=0x1,frame_count=3528,flags=0x0,notification_frames=0,session_id=0,transfer_type=3,uid=-1,pid=-1
+06-06 00:45:19.336 D/AudioTrack(29365): INSP: type=audio,case=1,attributes=1,content_type=4,usage=1,source=-1,flags=0x800
+06-06 00:45:19.337 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:19.339 D/AudioSystem(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:19.339 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:19.339 D/AudioTrack(29365): set(): Building AudioTrack with attributes: usage=1 content=4 flags=0x800 tags=[]
+06-06 00:45:19.339 D/AudioSystem(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:19.340 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:19.340 D/AudioSystem(29365): +setParameters(): PlaybackCaptureProtectSupport=com.firstaid.copilot.debug 
+06-06 00:45:19.340 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:19.340 D/AudioTrack(29365): set(): Building AudioTrack with attributes: usage = 1, content = 4, flags = 0x800, tags = []
+06-06 00:45:19.340 D/AudioTrack(29365): want to change usage for game mode
+06-06 00:45:19.340 D/AudioTrack(29365): get APPSharePck NULL
+06-06 00:45:19.340 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:19.340 D/AudioTrack(29365): set(): 0xb4000076609ea980, Create AudioTrackThread, tid = 29616
+06-06 00:45:19.350 D/AudioTrack(29365): createTrack_l(281): 0xb4000076609ea980, mCblk = 0x78063e1980, mLatency = 170, mAfLatency = 85, frameCount = 3770, mSampleRate = 44100, mFlags = 0x8, mReqFrameCount = 3770, mNotificationFramesAct = 1256
+06-06 00:45:19.350 D/AudioTrack(29365): setVolumeLR:  track set volome = (-536813568)
+06-06 00:45:19.350 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:19.354 D/AudioTrack(29365): setVolume(281): 0xb4000076609ea980, left = 1.000000, right = 1.000000
+06-06 00:45:19.354 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:19.354 D/AudioTrack(29365): setVolumeLR:  track set volome = (-536813568)
+06-06 00:45:19.355 D/AudioTrack(29365): start(281): 0xb4000076609ea980, prior state:STATE_STOPPED
+06-06 00:45:19.355 D/AudioTrack(29365): start(portId:281, sessionId:1929): prior state:STATE_STOPPED
+06-06 00:45:19.355 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:19.357 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:19.358 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:19.366 D/AudioTrack(29365): setVolume(281): 0xb4000076609ea980, left = 1.000000, right = 1.000000
+06-06 00:45:19.366 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:19.366 D/AudioTrack(29365): setVolumeLR:  track set volome = (-536813568)
+06-06 00:45:19.373 I/EdgeTextToSpeech(29365): Android TTS fast path for '现在开始按压，跟着节拍，用力快压'
+06-06 00:45:19.379 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:19.379 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:19.417 D/AudioTrack(29365): setVolume(281): 0xb4000076609ea980, left = 0.300000, right = 0.300000
+06-06 00:45:19.418 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:19.418 D/AudioTrack(29365): setVolumeLR:  track set volome = (-1503222170)
+06-06 00:45:19.421 I/AndroidTextToSpeech(29365): Android TTS onStart latency=4ms
+06-06 00:45:19.422 I/SherpaSpeechEngine(29365): TTS generate start chars=17
+06-06 00:45:19.511 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:19.516 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:19.559 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:19.559 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:19.655 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_begin","session_id":"android_live_548ddc3f","turn_seq":7,"action_id":"act_mq15no2e_00bd_27cba2bc2b54","format":"pcm16","sample_rate":44100,"channels":1,"bits_per_sample":16}
+06-06 00:45:19.663 I/WebSocketAgentChannel(29365): Received live audio bytes=100352
+06-06 00:45:19.992 I/WebSocketAgentChannel(29365): Received live audio bytes=75776
+06-06 00:45:20.456 W/AudioTrack(29365): restartIfDisabled(281): releaseBuffer() track 0xb4000076609ea980 disabled due to previous underrun, restarting
+06-06 00:45:20.465 I/WebSocketAgentChannel(29365): Received live audio bytes=79872
+06-06 00:45:20.466 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_end","session_id":"android_live_548ddc3f","turn_seq":7,"action_id":"act_mq15no2e_00bd_27cba2bc2b54"}
+06-06 00:45:23.225 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:23.226 D/AudioTrack(29365): setVolume(281): 0xb4000076609ea980, left = 1.000000, right = 1.000000
+06-06 00:45:23.226 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:23.226 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:23.226 D/AudioTrack(29365): setVolumeLR:  track set volome = (-536813568)
+06-06 00:45:23.226 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:23.227 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:24.460 I/WebSocketAgentChannel(29365): Received live text {"type":"thinking","session_id":"android_live_548ddc3f","turn_seq":8}
+06-06 00:45:24.463 I/WebSocketAgentChannel(29365): Received live text {"type":"final","session_id":"android_live_548ddc3f","turn_seq":8,"text":"","intent":null}
+06-06 00:45:24.464 I/WebSocketAgentChannel(29365): Received live text {"type":"guidance","session_id":"android_live_548ddc3f","turn_seq":8,"action":{"action_id":"act_mq15ns2c_00c0_7c793e5cd85a","session_id":"android_live_548ddc3f","timestamp":"2026-06-05T16:45:24.563Z","stage":"S7_CPR_LOOP","intent":"encourage_rescuer","priority":"normal","source":"rule_feedback","rea
+06-06 00:45:24.467 I/WebSocketAgentChannel(29365): Received live text {"type":"state","session_id":"android_live_548ddc3f","turn_seq":8,"current_stage":"S7_CPR_LOOP","state":{"schema_version":"session_state.v0.1","session_id":"android_live_548ddc3f","mode":"demo_assisted","current_stage":"S7_CPR_LOOP","previous_stage":"S7_CPR_LOOP","started_at":"2026-06-05T16:45:24.56
+06-06 00:45:24.505 D/AudioTrack(29365): pause(281): 0xb4000076609ea980, prior state:STATE_ACTIVE
+06-06 00:45:24.506 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:24.507 D/AudioTrackShared(29365): this(0xb400007600e583b0), mCblk(0x78063e1980), front(17640), mIsOut 1, interrupt() FUTEX_WAKE
+06-06 00:45:24.534 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:24.534 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:24.535 D/AudioTrack(29365): flush(281): 0xb4000076609ea980, prior state:STATE_PAUSED
+06-06 00:45:24.535 D/AudioTrack(29365): stop(portId:281, sessionId:1929): prior state:STATE_FLUSHED
+06-06 00:45:24.537 D/AudioTrack(29365): stop(portId:281, sessionId:1929): prior state:STATE_FLUSHED
+06-06 00:45:24.538 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:24.538 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:24.540 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:24.541 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:24.541 D/AudioTrack(29365): ~AudioTrack(281): 0xb4000076609ea980
+06-06 00:45:24.542 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:24.542 D/AudioTrack(29365): stop(portId:281, sessionId:1929): prior state:STATE_FLUSHED
+06-06 00:45:24.542 D/AudioTrack(29365): requestExitAndWait start
+06-06 00:45:24.542 D/AudioTrack(29365): requestExitAndWait end
+06-06 00:45:24.543 D/AudioTrack(29365): stopAndJoinCallbacks(281) done
+06-06 00:45:24.552 I/EdgeTextToSpeech(29365): Android TTS fast path for '你做得很好，跟着节拍继续。'
+06-06 00:45:24.598 I/AndroidTextToSpeech(29365): Android TTS onStart latency=2ms
+06-06 00:45:24.675 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:24.675 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:24.717 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:24.718 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:24.832 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_begin","session_id":"android_live_548ddc3f","turn_seq":8,"action_id":"act_mq15ns2c_00c0_7c793e5cd85a","format":"pcm16","sample_rate":44100,"channels":1,"bits_per_sample":16}
+06-06 00:45:24.840 I/WebSocketAgentChannel(29365): Received live audio bytes=79872
+06-06 00:45:25.333 I/WebSocketAgentChannel(29365): Received live audio bytes=106496
+06-06 00:45:25.335 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_end","session_id":"android_live_548ddc3f","turn_seq":8,"action_id":"act_mq15ns2c_00c0_7c793e5cd85a"}
+06-06 00:45:26.842 I/CodexTest(29628): CLEAN_R1_START_CPR_USER_SPEAK_START
+06-06 00:45:27.580 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:27.580 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:27.580 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:27.583 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:28.539 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:45:31.047 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:45:31.716 I/SherpaSpeechEngine(29365): TTS generate done
+06-06 00:45:31.719 I/SherpaSpeechEngine(29365): TTS save done bytes=259116
+06-06 00:45:31.723 I/EdgeTextToSpeech(29365): Sherpa TTS background cached '现在开始按压，跟着节拍，用力快压' in 12297ms
+06-06 00:45:31.725 I/SherpaSpeechEngine(29365): TTS generate start chars=13
+06-06 00:45:33.643 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:45:36.198 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:45:37.001 W/ProcessState(29637): Extra binder thread started, but 0 threads requested. Do not use *startThreadPool when zero threads are requested.
+06-06 00:45:37.035 I/DMABUFHEAPS(29637): Using DMA-BUF heap named: mtk_mm
+06-06 00:45:37.035 I/DMABUFHEAPS(29637): Using DMA-BUF heap named: mtk_mm-uncached
+06-06 00:45:37.035 I/DMABUFHEAPS(29637): Using DMA-BUF heap named: mtk_svp_region-aligned
+06-06 00:45:37.035 I/DMABUFHEAPS(29637): Using DMA-BUF heap named: mtk_prot_region
+06-06 00:45:37.035 I/DMABUFHEAPS(29637): Using DMA-BUF heap named: mtk_2d_fr_region
+06-06 00:45:37.035 I/DMABUFHEAPS(29637): Using DMA-BUF heap named: mtk_wfd_region-aligned
+06-06 00:45:37.035 D/OpenGLRenderer(29637): Bitmap::compress format:Png w:720 h:1612 quality:100 app_apk:screencap 
+06-06 00:45:37.035 W/libc    (29637): Access denied finding property "vendor.vivo.imageencoder.dump"
+06-06 00:45:37.187 W/RefBase (29637): RefBase: Explicit destruction, weak count = 0 (in 0x7950dec468). Use sp<> to manage this object.
+06-06 00:45:37.199 D/RefBase (29637): #00 pc 000000000010cc18  /apex/com.android.runtime/lib64/bionic/libc.so (__cxa_finalize+280)
+06-06 00:45:37.199 D/RefBase (29637): #01 pc 00000000000fee08  /apex/com.android.runtime/lib64/bionic/libc.so (exit+24)
+06-06 00:45:37.199 D/RefBase (29637): #02 pc 00000000000927f4  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+100)
+06-06 00:45:37.373 E/appproc (29640): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath failed , error(Permission denied)
+06-06 00:45:37.373 E/appproc (29640): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:45:37.373 E/appproc (29640): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath2 failed , error(Permission denied)
+06-06 00:45:37.373 E/appproc (29640): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:45:37.373 E/appproc (29640): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath3 failed , error(Permission denied)
+06-06 00:45:37.373 E/appproc (29640): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:45:37.373 E/appproc (29640): checkAndSetEnv get_baksize open file /data/dalvik-cache/classpath4 failed , error(Permission denied)
+06-06 00:45:37.373 E/appproc (29640): checkAndSetEnv write_classpathbak open file failed:Permission denied
+06-06 00:45:37.373 D/AndroidRuntime(29640): >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-06 00:45:37.387 I/AndroidRuntime(29640): Using default boot image
+06-06 00:45:37.387 I/AndroidRuntime(29640): Leaving lock profiling enabled
+06-06 00:45:37.390 W/app_process(29640): ART APEX data files are untrusted.
+06-06 00:45:37.530 D/app_process(29640): Time zone APEX ICU file found: /apex/com.android.tzdata/etc/icu/icu_tzdata.dat
+06-06 00:45:37.530 D/app_process(29640): I18n APEX ICU file found: /apex/com.android.i18n/etc/icu/icudt70l.dat
+06-06 00:45:37.545 E/app_process(29640): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:45:37.545 E/app_process(29640): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:45:37.545 E/System  (29640): openDexFile load detect error
+06-06 00:45:37.546 E/System  (29640): java.lang.reflect.InvocationTargetException
+06-06 00:45:37.546 E/System  (29640): 	at java.lang.reflect.Method.invoke(Native Method)
+06-06 00:45:37.546 E/System  (29640): 	at dalvik.system.DexFile.openDexFile(DexFile.java:387)
+06-06 00:45:37.546 E/System  (29640): 	at dalvik.system.DexFile.<init>(DexFile.java:118)
+06-06 00:45:37.546 E/System  (29640): 	at dalvik.system.DexFile.<init>(DexFile.java:91)
+06-06 00:45:37.546 E/System  (29640): 	at dalvik.system.DexPathList.loadDexFile(DexPathList.java:438)
+06-06 00:45:37.546 E/System  (29640): 	at dalvik.system.DexPathList.makeDexElements(DexPathList.java:397)
+06-06 00:45:37.546 E/System  (29640): 	at dalvik.system.DexPathList.<init>(DexPathList.java:166)
+06-06 00:45:37.546 E/System  (29640): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:160)
+06-06 00:45:37.546 E/System  (29640): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:105)
+06-06 00:45:37.546 E/System  (29640): 	at dalvik.system.PathClassLoader.<init>(PathClassLoader.java:71)
+06-06 00:45:37.546 E/System  (29640): 	at java.lang.ClassLoader.createSystemClassLoader(ClassLoader.java:224)
+06-06 00:45:37.546 E/System  (29640): 	at java.lang.ClassLoader.-$$Nest$smcreateSystemClassLoader(Unknown Source:0)
+06-06 00:45:37.546 E/System  (29640): 	at java.lang.ClassLoader$SystemClassLoader.<clinit>(ClassLoader.java:183)
+06-06 00:45:37.546 E/System  (29640): 	at java.lang.ClassLoader.getSystemClassLoader(ClassLoader.java:1098)
+06-06 00:45:37.546 E/System  (29640): Caused by: java.lang.UnsatisfiedLinkError: No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:45:37.546 E/System  (29640): 	at android.os.Trace.nativeGetEnabledTags(Native Method)
+06-06 00:45:37.546 E/System  (29640): 	at android.os.Trace.isTagEnabled(Trace.java:163)
+06-06 00:45:37.546 E/System  (29640): 	at android.os.Trace.endSection(Trace.java:398)
+06-06 00:45:37.546 E/System  (29640): 	at com.vivo.framework.securitydetect.DynamicLoadDetectManager.reportDexLoaded(DynamicLoadDetectManager.java:156)
+06-06 00:45:37.546 E/System  (29640): 	... 14 more
+06-06 00:45:37.547 E/app_process(29640): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:45:37.547 E/app_process(29640): No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:45:37.547 E/System  (29640): openDexFile load detect error
+06-06 00:45:37.548 E/System  (29640): java.lang.reflect.InvocationTargetException
+06-06 00:45:37.548 E/System  (29640): 	at java.lang.reflect.Method.invoke(Native Method)
+06-06 00:45:37.548 E/System  (29640): 	at dalvik.system.DexFile.openDexFile(DexFile.java:387)
+06-06 00:45:37.548 E/System  (29640): 	at dalvik.system.DexFile.<init>(DexFile.java:118)
+06-06 00:45:37.548 E/System  (29640): 	at dalvik.system.DexFile.<init>(DexFile.java:91)
+06-06 00:45:37.548 E/System  (29640): 	at dalvik.system.DexPathList.loadDexFile(DexPathList.java:438)
+06-06 00:45:37.548 E/System  (29640): 	at dalvik.system.DexPathList.makeDexElements(DexPathList.java:397)
+06-06 00:45:37.548 E/System  (29640): 	at dalvik.system.DexPathList.<init>(DexPathList.java:166)
+06-06 00:45:37.548 E/System  (29640): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:160)
+06-06 00:45:37.548 E/System  (29640): 	at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:105)
+06-06 00:45:37.548 E/System  (29640): 	at dalvik.system.PathClassLoader.<init>(PathClassLoader.java:71)
+06-06 00:45:37.548 E/System  (29640): 	at java.lang.ClassLoader.createSystemClassLoader(ClassLoader.java:224)
+06-06 00:45:37.548 E/System  (29640): 	at java.lang.ClassLoader.-$$Nest$smcreateSystemClassLoader(Unknown Source:0)
+06-06 00:45:37.548 E/System  (29640): 	at java.lang.ClassLoader$SystemClassLoader.<clinit>(ClassLoader.java:183)
+06-06 00:45:37.548 E/System  (29640): 	at java.lang.ClassLoader.getSystemClassLoader(ClassLoader.java:1098)
+06-06 00:45:37.548 E/System  (29640): Caused by: java.lang.UnsatisfiedLinkError: No implementation found for long android.os.Trace.nativeGetEnabledTags() (tried Java_android_os_Trace_nativeGetEnabledTags and Java_android_os_Trace_nativeGetEnabledTags__)
+06-06 00:45:37.548 E/System  (29640): 	at android.os.Trace.nativeGetEnabledTags(Native Method)
+06-06 00:45:37.548 E/System  (29640): 	at android.os.Trace.isTagEnabled(Trace.java:163)
+06-06 00:45:37.548 E/System  (29640): 	at android.os.Trace.endSection(Trace.java:398)
+06-06 00:45:37.548 E/System  (29640): 	at com.vivo.framework.securitydetect.DynamicLoadDetectManager.reportDexLoaded(DynamicLoadDetectManager.java:156)
+06-06 00:45:37.548 E/System  (29640): 	... 14 more
+06-06 00:45:37.549 W/app_process(29640): ClassLoaderContext classpath size mismatch. expected=0, found=1 (PCL[] | PCL[/system/framework/android.test.runner.jar*2259575933])
+06-06 00:45:37.553 I/VivoSystemFrameworkFactory(29640): Instance implClass com.vivo.VivoSystemFrameworkFactoryImpl
+06-06 00:45:37.574 D/AndroidRuntime(29640): Calling main entry com.android.commands.uiautomator.Launcher
+06-06 00:45:37.578 W/ziparchive(29640): Unable to open '/system/framework/mediatek-framework.dm': No such file or directory
+06-06 00:45:37.578 W/ziparchive(29640): Unable to open '/system/framework/mediatek-framework.dm': No such file or directory
+06-06 00:45:37.582 W/uiautomator(29640): type=1400 audit(0.0:3428441): avc: denied { read } for name="user_cpu_freq" dev="sysfs" ino=49317 scontext=u:r:shell:s0 tcontext=u:object_r:sysfs_user_cpu_freq:s0 tclass=file permissive=0
+06-06 00:45:38.611 W/libc    (29640): Access denied finding property "qemu.sf.lcd_density"
+06-06 00:45:38.611 W/libc    (29640): Access denied finding property "qemu.sf.lcd_density"
+06-06 00:45:38.610 W/uiautomator(29640): type=1400 audit(0.0:3428442): avc: denied { read } for name="u:object_r:qemu_sf_lcd_density_prop:s0" dev="tmpfs" ino=280 scontext=u:r:shell:s0 tcontext=u:object_r:qemu_sf_lcd_density_prop:s0 tclass=file permissive=0
+06-06 00:45:38.610 W/uiautomator(29640): type=1400 audit(0.0:3428443): avc: denied { read } for name="u:object_r:qemu_sf_lcd_density_prop:s0" dev="tmpfs" ino=280 scontext=u:r:shell:s0 tcontext=u:object_r:qemu_sf_lcd_density_prop:s0 tclass=file permissive=0
+06-06 00:45:38.635 W/AccessibilityNodeInfoDumper(29640): Fetch time: 21ms
+06-06 00:45:38.687 D/AndroidRuntime(29640): Shutting down VM
+06-06 00:45:38.771 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:45:39.525 W/RefBase (29640): RefBase: Explicit destruction, weak count = 0 (in 0x70521e6468). Use sp<> to manage this object.
+06-06 00:45:39.536 D/RefBase (29640): #00 pc 000000000010cc18  /apex/com.android.runtime/lib64/bionic/libc.so (__cxa_finalize+280)
+06-06 00:45:39.536 D/RefBase (29640): #01 pc 00000000000fee08  /apex/com.android.runtime/lib64/bionic/libc.so (exit+24)
+06-06 00:45:39.536 D/RefBase (29640): #02 pc 00000000000927f4  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+100)
+06-06 00:45:39.629 I/CodexTest(29662): CLEAN_R1_START_CPR_CAPTURE_DONE
+06-06 00:45:40.040 I/SherpaSpeechEngine(29365): TTS generate done
+06-06 00:45:40.043 I/SherpaSpeechEngine(29365): TTS save done bytes=181292
+06-06 00:45:40.053 I/EdgeTextToSpeech(29365): Sherpa TTS background cached '你做得很好，跟着节拍继续。' in 8318ms
+06-06 00:45:41.268 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:45:43.846 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:45:45.155 W/SystemServiceRegistry( 3989): No service published for: wifirtt
+06-06 00:45:46.384 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:45:48.313 I/LiveCprCoachScreen(29365): ASR partial='好的'
+06-06 00:45:48.627 I/LiveCprCoachScreen(29365): ASR partial='好的好的'
+06-06 00:45:49.036 I/LiveAudioCapture(29365): Local utterance committed bytes=42240 voicedMs=560
+06-06 00:45:49.036 I/LiveCprCoachScreen(29365): Utterance callback bytes=42240 streaming=true whole=false
+06-06 00:45:49.048 I/LiveCprCoachScreen(29365): ASR final='好的好的' intent= confidence=null
+06-06 00:45:49.049 I/LiveAudioPlayer(29365): Live audio cancel with no active stream reason=new_turn
+06-06 00:45:49.050 I/WebSocketAgentChannel(29365): Sent live JSON type=context ok=true payloadKeys=["sessionId"]
+06-06 00:45:49.051 I/WebSocketAgentChannel(29365): Sent live JSON type=commit_text ok=true payloadKeys=
+06-06 00:45:49.051 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:45:49.100 I/WebSocketAgentChannel(29365): Received live text {"type":"thinking","session_id":"android_live_548ddc3f","turn_seq":9}
+06-06 00:45:49.906 I/LiveCprCoachScreen(29365): ASR partial='还'
+06-06 00:45:50.150 W/AlarmManager( 3989): alarm window unlikely to be respected [CONTEXT service_id=231 ]
+06-06 00:45:50.150 W/AlarmManager( 3989): java.lang.IllegalArgumentException: alarm "NetworkLocationLocator" has short window length
+06-06 00:45:50.150 W/AlarmManager( 3989): 	at bojx.c(:com.google.android.gms@243137038@24.31.37 (190400-662270918):46)
+06-06 00:45:50.150 W/AlarmManager( 3989): 	at bojw.b(:com.google.android.gms@243137038@24.31.37 (190400-662270918):22)
+06-06 00:45:50.150 W/AlarmManager( 3989): 	at eiuh.e(:com.google.android.gms@243137038@24.31.37 (190400-662270918):143)
+06-06 00:45:50.150 W/AlarmManager( 3989): 	at eiqu.r(:com.google.android.gms@243137038@24.31.37 (190400-662270918):104)
+06-06 00:45:50.150 W/AlarmManager( 3989): 	at eiqu.k(:com.google.android.gms@243137038@24.31.37 (190400-662270918):1181)
+06-06 00:45:50.150 W/AlarmManager( 3989): 	at ejct.b(:com.google.android.gms@243137038@24.31.37 (190400-662270918):87)
+06-06 00:45:50.150 W/AlarmManager( 3989): 	at ejbx.b(:com.google.android.gms@243137038@24.31.37 (190400-662270918):22)
+06-06 00:45:50.150 W/AlarmManager( 3989): 	at eiti.b(:com.google.android.gms@243137038@24.31.37 (190400-662270918):26)
+06-06 00:45:50.150 W/AlarmManager( 3989): 	at eiue.run(:com.google.android.gms@243137038@24.31.37 (190400-662270918):9)
+06-06 00:45:50.150 W/AlarmManager( 3989): 	at eitg.handleMessage(:com.google.android.gms@243137038@24.31.37 (190400-662270918):722)
+06-06 00:45:50.150 W/AlarmManager( 3989): 	at android.os.Handler.dispatchMessage(Handler.java:106)
+06-06 00:45:50.150 W/AlarmManager( 3989): 	at bpsq.ma(:com.google.android.gms@243137038@24.31.37 (190400-662270918):1)
+06-06 00:45:50.150 W/AlarmManager( 3989): 	at bpsq.dispatchMessage(:com.google.android.gms@243137038@24.31.37 (190400-662270918):138)
+06-06 00:45:50.150 W/AlarmManager( 3989): 	at android.os.Looper.loopOnce(Looper.java:223)
+06-06 00:45:50.150 W/AlarmManager( 3989): 	at android.os.Looper.loop(Looper.java:324)
+06-06 00:45:50.150 W/AlarmManager( 3989): 	at android.os.HandlerThread.run(HandlerThread.java:67)
+06-06 00:45:50.225 I/LiveCprCoachScreen(29365): ASR partial='还要继'
+06-06 00:45:50.311 I/WebSocketAgentChannel(29365): Received live text {"type":"final","session_id":"android_live_548ddc3f","turn_seq":9,"text":"好的好的","intent":null}
+06-06 00:45:50.316 I/WebSocketAgentChannel(29365): Received live text {"type":"guidance","session_id":"android_live_548ddc3f","turn_seq":9,"action":{"action_id":"act_mq15ob2r_00cp_b54f884c4848","session_id":"android_live_548ddc3f","timestamp":"2026-06-05T16:45:49.201Z","stage":"S7_CPR_LOOP","intent":"continue_cpr_loop","priority":"normal","source":"state_machine","rea
+06-06 00:45:50.320 I/WebSocketAgentChannel(29365): Received live text {"type":"state","session_id":"android_live_548ddc3f","turn_seq":9,"current_stage":"S7_CPR_LOOP","state":{"schema_version":"session_state.v0.1","session_id":"android_live_548ddc3f","mode":"demo_assisted","current_stage":"S7_CPR_LOOP","previous_stage":"S7_CPR_LOOP","started_at":"2026-06-05T16:45:49.20
+06-06 00:45:50.360 D/AudioTrack(29365): INSP: type=audio,case=1,set=0xb4000076609e7600,stream_type=-1,sample_rate=44100,format=0x1,channel_mask=0x1,frame_count=3528,flags=0x0,notification_frames=0,session_id=0,transfer_type=3,uid=-1,pid=-1
+06-06 00:45:50.360 D/AudioTrack(29365): INSP: type=audio,case=1,attributes=1,content_type=4,usage=1,source=-1,flags=0x800
+06-06 00:45:50.360 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:50.360 D/AudioSystem(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:50.360 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:50.360 D/AudioTrack(29365): set(): Building AudioTrack with attributes: usage=1 content=4 flags=0x800 tags=[]
+06-06 00:45:50.360 D/AudioSystem(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:50.361 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:50.361 D/AudioSystem(29365): +setParameters(): PlaybackCaptureProtectSupport=com.firstaid.copilot.debug 
+06-06 00:45:50.361 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:50.361 D/AudioTrack(29365): set(): Building AudioTrack with attributes: usage = 1, content = 4, flags = 0x800, tags = []
+06-06 00:45:50.361 D/AudioTrack(29365): want to change usage for game mode
+06-06 00:45:50.361 D/AudioTrack(29365): get APPSharePck NULL
+06-06 00:45:50.361 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:50.361 D/AudioTrack(29365): set(): 0xb4000076609e7600, Create AudioTrackThread, tid = 29679
+06-06 00:45:50.382 D/AudioTrack(29365): createTrack_l(284): 0xb4000076609e7600, mCblk = 0x78063e1980, mLatency = 170, mAfLatency = 85, frameCount = 3770, mSampleRate = 44100, mFlags = 0x8, mReqFrameCount = 3770, mNotificationFramesAct = 1256
+06-06 00:45:50.382 D/AudioTrack(29365): setVolumeLR:  track set volome = (-536813568)
+06-06 00:45:50.382 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:50.385 D/AudioTrack(29365): setVolume(284): 0xb4000076609e7600, left = 1.000000, right = 1.000000
+06-06 00:45:50.385 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:50.385 D/AudioTrack(29365): setVolumeLR:  track set volome = (-536813568)
+06-06 00:45:50.386 D/AudioTrack(29365): start(284): 0xb4000076609e7600, prior state:STATE_STOPPED
+06-06 00:45:50.386 D/AudioTrack(29365): start(portId:284, sessionId:1953): prior state:STATE_STOPPED
+06-06 00:45:50.386 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:50.389 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:50.389 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:50.396 D/AudioTrack(29365): setVolume(284): 0xb4000076609e7600, left = 1.000000, right = 1.000000
+06-06 00:45:50.396 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:50.396 D/AudioTrack(29365): setVolumeLR:  track set volome = (-536813568)
+06-06 00:45:50.403 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:50.403 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:50.405 I/EdgeTextToSpeech(29365): Android TTS fast path for '继续保持这个节奏。'
+06-06 00:45:50.453 D/AudioTrack(29365): setVolume(284): 0xb4000076609e7600, left = 0.300000, right = 0.300000
+06-06 00:45:50.453 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:50.453 D/AudioTrack(29365): setVolumeLR:  track set volome = (-1503222170)
+06-06 00:45:50.456 I/SherpaSpeechEngine(29365): TTS generate start chars=9
+06-06 00:45:50.457 I/AndroidTextToSpeech(29365): Android TTS onStart latency=5ms
+06-06 00:45:50.540 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:50.540 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:50.569 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:50.570 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:50.967 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_begin","session_id":"android_live_548ddc3f","turn_seq":9,"action_id":"act_mq15ob2r_00cp_b54f884c4848","format":"pcm16","sample_rate":44100,"channels":1,"bits_per_sample":16}
+06-06 00:45:50.978 I/WebSocketAgentChannel(29365): Received live audio bytes=141312
+06-06 00:45:50.979 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_end","session_id":"android_live_548ddc3f","turn_seq":9,"action_id":"act_mq15ob2r_00cp_b54f884c4848"}
+06-06 00:45:51.486 W/AudioTrack(29365): restartIfDisabled(284): releaseBuffer() track 0xb4000076609e7600 disabled due to previous underrun, restarting
+06-06 00:45:52.539 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:52.541 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:52.541 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:52.541 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:52.542 D/AudioTrack(29365): setVolume(284): 0xb4000076609e7600, left = 1.000000, right = 1.000000
+06-06 00:45:52.542 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:52.542 D/AudioTrack(29365): setVolumeLR:  track set volome = (-536813568)
+06-06 00:45:52.702 I/LiveCprCoachScreen(29365): ASR partial='还要继续按'
+06-06 00:45:52.998 I/LiveCprCoachScreen(29365): ASR partial='还要继续按吗'
+06-06 00:45:52.999 I/LiveAudioCapture(29365): Local utterance committed bytes=39680 voicedMs=560
+06-06 00:45:52.999 I/LiveCprCoachScreen(29365): Utterance callback bytes=39680 streaming=true whole=false
+06-06 00:45:53.000 I/LiveCprCoachScreen(29365): ASR final='还要继续按吗' intent= confidence=null
+06-06 00:45:53.000 I/LiveAudioPlayer(29365): Live audio cancel with no active stream reason=new_turn
+06-06 00:45:53.001 I/WebSocketAgentChannel(29365): Sent live JSON type=context ok=true payloadKeys=["sessionId"]
+06-06 00:45:53.001 I/WebSocketAgentChannel(29365): Sent live JSON type=commit_text ok=true payloadKeys=
+06-06 00:45:53.001 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:45:53.046 I/WebSocketAgentChannel(29365): Received live text {"type":"thinking","session_id":"android_live_548ddc3f","turn_seq":10}
+06-06 00:45:54.257 I/WebSocketAgentChannel(29365): Received live text {"type":"final","session_id":"android_live_548ddc3f","turn_seq":10,"text":"还要继续按吗","intent":"continue_cpr"}
+06-06 00:45:54.258 I/WebSocketAgentChannel(29365): Received live text {"type":"guidance","session_id":"android_live_548ddc3f","turn_seq":10,"action":{"action_id":"act_mq15oe4e_00dg_61b0f1275cec","session_id":"android_live_548ddc3f","timestamp":"2026-06-05T16:45:53.148Z","stage":"S7_CPR_LOOP","intent":"continue_cpr_loop","priority":"normal","source":"state_machine","re
+06-06 00:45:54.260 I/WebSocketAgentChannel(29365): Received live text {"type":"state","session_id":"android_live_548ddc3f","turn_seq":10,"current_stage":"S7_CPR_LOOP","state":{"schema_version":"session_state.v0.1","session_id":"android_live_548ddc3f","mode":"demo_assisted","current_stage":"S7_CPR_LOOP","previous_stage":"S7_CPR_LOOP","started_at":"2026-06-05T16:45:53.1
+06-06 00:45:54.279 I/EdgeTextToSpeech(29365): Android TTS fast path for '继续保持这个节奏。'
+06-06 00:45:54.330 D/AudioTrack(29365): setVolume(284): 0xb4000076609e7600, left = 0.300000, right = 0.300000
+06-06 00:45:54.330 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:54.330 D/AudioTrack(29365): setVolumeLR:  track set volome = (-1503222170)
+06-06 00:45:54.333 I/AndroidTextToSpeech(29365): Android TTS onStart latency=4ms
+06-06 00:45:54.409 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:54.409 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:54.436 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:54.437 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:55.065 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_begin","session_id":"android_live_548ddc3f","turn_seq":10,"action_id":"act_mq15oe4e_00dg_61b0f1275cec","format":"pcm16","sample_rate":44100,"channels":1,"bits_per_sample":16}
+06-06 00:45:55.077 I/WebSocketAgentChannel(29365): Received live audio bytes=141312
+06-06 00:45:55.078 I/WebSocketAgentChannel(29365): Received live text {"type":"audio_end","session_id":"android_live_548ddc3f","turn_seq":10,"action_id":"act_mq15oe4e_00dg_61b0f1275cec"}
+06-06 00:45:56.377 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:56.377 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:56.379 D/AudioManager( 9621): dispatching onPlaybackConfigChanged()
+06-06 00:45:56.380 D/AudioManager( 9607): dispatching onPlaybackConfigChanged()
+06-06 00:45:56.383 D/AudioTrack(29365): setVolume(284): 0xb4000076609e7600, left = 1.000000, right = 1.000000
+06-06 00:45:56.383 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:56.384 D/AudioTrack(29365): setVolumeLR:  track set volome = (-536813568)
+06-06 00:45:57.597 I/LiveCprCoachScreen(29365): ASR endpoint
+06-06 00:45:57.667 I/SherpaSpeechEngine(29365): TTS generate done
+06-06 00:45:57.670 I/SherpaSpeechEngine(29365): TTS save done bytes=146476
+06-06 00:45:57.671 I/EdgeTextToSpeech(29365): Sherpa TTS background cached '继续保持这个节奏。' in 7214ms
+06-06 00:45:57.673 I/SherpaSpeechEngine(29365): TTS generate start chars=9
+06-06 00:45:59.070 I/WebSocketAgentChannel(29365): Received live text {"type":"thinking","session_id":"android_live_548ddc3f","turn_seq":11}
+06-06 00:45:59.074 I/WebSocketAgentChannel(29365): Received live text {"type":"final","session_id":"android_live_548ddc3f","turn_seq":11,"text":"","intent":null}
+06-06 00:45:59.075 I/WebSocketAgentChannel(29365): Received live text {"type":"guidance","session_id":"android_live_548ddc3f","turn_seq":11,"action":{"action_id":"act_mq15oirq_00e9_46dc6860487b","session_id":"android_live_548ddc3f","timestamp":"2026-06-05T16:45:59.171Z","stage":"S7_CPR_LOOP","intent":"encourage_rescuer","priority":"normal","source":"rule_feedback","re
+06-06 00:45:59.077 I/WebSocketAgentChannel(29365): Received live text {"type":"state","session_id":"android_live_548ddc3f","turn_seq":11,"current_stage":"S7_CPR_LOOP","state":{"schema_version":"session_state.v0.1","session_id":"android_live_548ddc3f","mode":"demo_assisted","current_stage":"S7_CPR_LOOP","previous_stage":"S7_CPR_LOOP","started_at":"2026-06-05T16:45:59.1
+06-06 00:45:59.121 D/AudioTrack(29365): pause(284): 0xb4000076609e7600, prior state:STATE_ACTIVE
+06-06 00:45:59.121 D/AudioTrack(29365): getpackName client name com.firstaid.copilot.debug(29365)
+06-06 00:45:59.122 D/AudioTrackShared(29365): this(0xb400007600e487b0), mCblk(0x78063e1980), front(28224), mIsOut 1, interrupt() FUTEX_WAKE
+06-06 00:45:59.166 D/AudioTrack(29365): flush(284): 0xb4000076609e7600, prior state:STATE_PAUSED
+06-06 00:45:59.166 D/AudioTrack(29365): stop(portId:284, sessionId:1953): prior state:STATE_FLUSHED

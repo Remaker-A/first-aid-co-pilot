@@ -18,11 +18,12 @@ test("shared phonetic config ships the critical closed-set intents and a pinyin 
     "ask_aed_cpr_alternation",
     "ask_aed_help",
     "ask_can_stop",
+    "ask_cpr_quality",
     "ask_emergency_call",
   ]);
   assert.deepEqual([...config.stages].sort(), ["S6_CPR_READY", "S7_CPR_LOOP", "S8_ASSISTANCE"]);
   // The documented mishearing's characters must be covered by the pinyin table.
-  for (const ch of "出差移除颤仪心脏起搏器交替配合轮换") {
+  for (const ch of "出差移除颤仪心脏起搏器交替配合轮换我爱的得对位置节奏质量样压行数术异") {
     assert.ok(config.pinyin[ch], `pinyin table must cover ${ch}`);
   }
 });
@@ -44,6 +45,7 @@ test("matches further AED homophone variants in any CPR-live stage", () => {
   assert.equal(resolvePhoneticIntent("出柴疑来了怎么办", AgentStage.S7_CPR_LOOP)?.intent, "aed_available");
   // A correctly-heard device word still resolves (the net is a superset).
   assert.equal(resolvePhoneticIntent("除颤仪在哪", AgentStage.S7_CPR_LOOP)?.intent, "ask_aed_help");
+  assert.equal(resolvePhoneticIntent("数差异怎么用", AgentStage.S7_CPR_LOOP)?.intent, "ask_aed_help");
   assert.equal(resolvePhoneticIntent("心脏起搏器来了", AgentStage.S7_CPR_LOOP)?.intent, "aed_available");
 });
 
@@ -53,6 +55,16 @@ test("rescues AED and compression alternation wording as a closed-set question",
     resolvePhoneticIntent("出差移和按压怎么交替", AgentStage.S8_ASSISTANCE)?.intent,
     "ask_aed_cpr_alternation"
   );
+});
+
+test("rescues CPR quality homophone wording as a closed-set question", () => {
+  assert.equal(classifyIntent("我爱的可以吗").intent, null);
+  const match = resolvePhoneticIntent("我爱的可以吗", AgentStage.S7_CPR_LOOP);
+  assert.ok(match, "phonetic matcher must rescue the quality-question mishearing");
+  assert.equal(match.intent, "ask_cpr_quality");
+  assert.equal(match.source, "phonetic_fuzzy");
+  assert.ok(match.score >= 0.7, `score ${match.score} should clear the floor`);
+  assert.equal(resolvePhoneticIntent("我爱你", AgentStage.S7_CPR_LOOP), null);
 });
 
 test("rescues can-stop and emergency-call homophones the regex enumeration misses", () => {

@@ -1,11 +1,22 @@
 package com.firstaid.copilot.live
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.firstaid.copilot.execution.CONFIRMATION_REQUEST_TOOL_TYPES
+import com.firstaid.copilot.execution.CRITICAL_TOOL_TYPES
+import com.firstaid.copilot.execution.DispatchContext
 import com.firstaid.copilot.execution.GuidanceAction
 import com.firstaid.copilot.execution.HAPTIC_TOOL_TYPES
+import com.firstaid.copilot.execution.SHARE_OR_DESTRUCTIVE_TOOL_TYPES
 import com.firstaid.copilot.live.audio.LiveAudioMetadata
 import com.firstaid.copilot.live.audio.LiveAudioPlayer
+import com.firstaid.copilot.live.edge.EdgeGemmaAgent
+import com.firstaid.copilot.live.edge.EdgeOpenQuestionDetector
+import com.firstaid.copilot.live.edge.EdgeOpenQuestionPolicy
+import com.firstaid.copilot.live.edge.OpenQuestionFrame
+import com.firstaid.copilot.live.edge.OpenQuestionOutcome
+import com.firstaid.copilot.live.edge.OpenQuestionResponder
 import com.firstaid.copilot.live.perception.EmaQualityScore
 import com.firstaid.copilot.live.perception.HandPositionHysteresis
 import com.firstaid.copilot.live.perception.PerceptionSignal
@@ -13,13 +24,18 @@ import com.firstaid.copilot.live.perception.smoothInterruptionSeconds
 import com.firstaid.copilot.live.vision.cpr.evaluateVisionReadiness
 import java.util.UUID
 import java.util.concurrent.Executors
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Owns the Live CPR Coach session and exposes a single [StateFlow] of
@@ -32,40 +48,141 @@ import kotlinx.coroutines.withContext
  * retry/local-fallback policy itself is a later phase.
  *
  * [transport] is injectable so tests can supply a fake; the default
- * [HttpAgentTransport] talks to the Node voice server.
+ * [LocalAgentTransport] keeps the live flow on device without requiring an
+ * `adb reverse` tunnel to a Node voice server.
  */
 class LiveSessionViewModel(
-    private val transport: AgentTransport = HttpAgentTransport(),
-    private val liveChannel: LiveAgentChannel = WebSocketAgentChannel(),
+    private val transport: AgentTransport = LocalAgentTransport(),
+    private val liveChannel: LiveAgentChannel = LocalAgentChannel(transport),
     private val liveAudioPlayer: LiveAudioPlayer = LiveAudioPlayer(),
     private val sessionId: String = defaultSessionId(),
+    private val nluCoordinator: LiveNluCoordinator = LiveNluCoordinator(),
+    /**
+     * Phase D: drive the always-on [proactiveMonitor] loop in [init]. Tests set
+     * this false and pump [proactiveTick] manually so cues are deterministic
+     * without virtual time.
+     */
+    private val autoStartProactiveMonitor: Boolean = true,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
         LiveUiState(sessionId = sessionId, connectionState = ConnectionState.Connecting),
     )
     val uiState: StateFlow<LiveUiState> = _uiState.asStateFlow()
+
+    /**
+     * On-device NLU seam (Phase 1 · E). Attached at runtime by the Live screen
+     * once the Gemma driver is prewarmed (wrapped as `EdgeGemmaAgent`); null until
+     * then, so the default behaviour is exactly the prior regex+phonetic-only hot
+     * path.
+     */
+    @Volatile
+    private var nluResolver: LiveNluResolver? = null
     private val visionHandPosition = HandPositionHysteresis()
     private val visionQualityScore = EmaQualityScore()
     private val liveAudioDispatcher = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "live-audio-player").apply { isDaemon = true }
     }.asCoroutineDispatcher()
+    private val liveAsrFinalGate = LiveAsrFinalGate()
     private var ignoredServerAudioActionId: String? = null
     private var lastVisionMetricsEmitMs = 0L
     private var lastVisionInterruptionSeconds: Double? = null
 
+    /**
+     * Phase-0 seam for the端侧 Gemma 增强层. The Live screen wraps the prewarmed
+     * [com.firstaid.copilot.live.edge.OnDeviceGemmaDriver] in an [EdgeGemmaAgent]
+     * and attaches it here; later phases (NLU / open-question / proactive) read it
+     * off the hot path. The agent is inert unless its feature flags are enabled,
+     * so holding a reference changes no current behavior.
+     */
+    @Volatile
+    private var edgeGemmaAgent: EdgeGemmaAgent? = null
+
+    /**
+     * Phase 2 · C seam — the on-device open-question responder. Attached (usually
+     * the [EdgeGemmaAgent] itself) once Gemma is prewarmed and the open-question
+     * flag is on; null keeps the prior server-driven open-question path. The hot
+     * path only ever *augments* an immediate deterministic ack with this answer.
+     */
+    @Volatile
+    private var openQuestionResponder: OpenQuestionResponder? = null
+
+    /**
+     * True while the edge layer owns the in-flight/last open question, so the
+     * server's own `open_question_ack` / `open_question_answer` (and their audio)
+     * are dropped to avoid double-answering ("置标志忽略服务端 open_question_answer").
+     */
+    private var edgeOpenQuestionActive = false
+
+    /** Monotonic token; a superseded async answer (new turn / barge-in) is ignored. */
+    private var openQuestionEpoch = 0
+    private var openQuestionJob: Job? = null
+
+    /** `action_id`s of dropped server open-question guidance whose audio must also be muted. */
+    private val suppressedOpenQuestionActionIds = mutableSetOf<String>()
+
+    /**
+     * Phase D (proactive coaching) seam. The polisher is an *optional* on-device
+     * Gemma touch-up attached at runtime once the driver is prewarmed; null keeps
+     * the deterministic templates ("D 默认走模板"). [proactiveCoach] carries the
+     * cross-tick cooldown/cadence memory; [lastObservedGuidanceActionId] lets the
+     * monitor notice a fresh high/critical guidance and stay quiet around it.
+     */
+    @Volatile
+    private var proactivePolisher: ProactivePolisher? = null
+
+    /**
+     * Explicit proactive-coaching override, default OFF to keep behaviour
+     * unchanged ("全部 flag 可关"). Production normally leaves this false and lets
+     * the attached agent's `proactiveActive` flag drive [proactiveCoachingActive];
+     * tests flip it on to exercise the monitor without constructing an agent.
+     * While inactive the loop keeps ticking but never emits a cue.
+     */
+    @Volatile
+    private var proactiveCoachingEnabled = false
+    private var proactiveCoach = ProactiveCoachState()
+    private var lastObservedGuidanceActionId: String? = null
+
     init {
         viewModelScope.launch {
             liveChannel.events.collect { event ->
-                if (shouldDropServerAudioEvent(event)) {
+                if (shouldDropServerEvent(event)) {
                     return@collect
+                }
+                if (event is LiveAgentEvent.Metrics) {
+                    logLiveMetrics(event.metrics)
                 }
                 if (event.isLiveAudioPlaybackEvent()) {
                     withContext(liveAudioDispatcher) {
                         liveAudioPlayer.consume(event)
                     }
                 }
-                _uiState.update { current -> reduceLiveEvent(current, event) }
+                _uiState.update { current ->
+                    reduceLiveEvent(current, event).withCprStartedAtIfNeeded(
+                        previousStage = current.currentStage,
+                        nowMs = System.currentTimeMillis(),
+                    )
+                }
+            }
+        }
+        if (autoStartProactiveMonitor) {
+            launchProactiveMonitor()
+        }
+    }
+
+    /**
+     * Phase D — always-on proactive coaching loop. Every [PROACTIVE_TICK_MS] it
+     * snapshots [_uiState] and lets the pure [decideProactiveCue] decide whether a
+     * hand-switch / AED / reassurance nudge is due. The first tick is staggered by
+     * one period so a freshly-started session is never interrupted at t=0; the
+     * loop is cancelled automatically when [viewModelScope] is cleared.
+     */
+    private fun launchProactiveMonitor() {
+        viewModelScope.launch {
+            delay(PROACTIVE_TICK_MS)
+            while (isActive) {
+                proactiveTick(System.currentTimeMillis())
+                delay(PROACTIVE_TICK_MS)
             }
         }
     }
@@ -78,7 +195,7 @@ class LiveSessionViewModel(
             val online = transport.health()
             _uiState.update { current ->
                 if (online) {
-                    current
+                    current.copy(connectionState = ConnectionState.Online, lastErrorMessage = null)
                 } else {
                     current.copy(connectionState = ConnectionState.Offline)
                 }
@@ -93,18 +210,22 @@ class LiveSessionViewModel(
      * the entry source only enriches metadata priors, never the medical flow.
      */
     fun startFirstAid(source: EntrySource = EntrySource.OneKeyButton) {
+        liveAsrFinalGate.reset()
+        resetEdgeOpenQuestionState()
         val request = firstAidSessionStartedRequest(sessionId, source)
+        val nowMs = System.currentTimeMillis()
         if (_uiState.value.connectionState == ConnectionState.Online) {
             cancelLiveAudio("new_turn")
             liveChannel.sendTurn(request)
-            _uiState.update {
-                it.copy(
+            _uiState.update { current ->
+                current.withSessionStartedAt(nowMs).copy(
                     isInFlight = true,
                     currentDemoPresetId = null,
                     sourceBadge = SourceBadge.RecordingOnly,
                     isLiveAudioPlaying = false,
                     activeAudioActionId = null,
                     lastErrorMessage = null,
+                    openQuestionPhase = OpenQuestionPhase.Idle,
                 )
             }
         } else {
@@ -113,6 +234,8 @@ class LiveSessionViewModel(
                 presetId = null,
                 sourceBadge = SourceBadge.RecordingOnly,
                 clearDemoPreset = true,
+                startSessionIfNeeded = true,
+                nowMs = nowMs,
             )
         }
     }
@@ -135,6 +258,7 @@ class LiveSessionViewModel(
         audioBase64: String? = null,
         mimeType: String? = null,
         presetId: String? = null,
+        metadata: Map<String, Any?>? = null,
     ) {
         runTurn(
             TurnRequest(
@@ -142,6 +266,7 @@ class LiveSessionViewModel(
                 text = text,
                 audioBase64 = audioBase64,
                 mimeType = mimeType,
+                metadata = metadata,
             ),
             presetId = presetId,
             sourceBadge = if (presetId != null) SourceBadge.DemoData else SourceBadge.RecordingOnly,
@@ -361,33 +486,439 @@ class LiveSessionViewModel(
         liveChannel.sendPcm(pcm16)
     }
 
-    fun submitLiveText(text: String, intent: String? = null) {
+    /**
+     * Attach the on-device Gemma enhancement layer once the driver has prewarmed.
+     * The screen owns the agent's lifecycle (it closes it on dispose); the
+     * ViewModel only holds the reference for later phases to use off the hot path.
+     */
+    fun attachEdgeGemmaAgent(agent: EdgeGemmaAgent) {
+        edgeGemmaAgent = agent
+        // Wire each capability seam from the single agent, gated by its flags, so the
+        // default (all-off) build keeps the exact prior behavior on every path.
+        val flags = agent.flags
+        if (flags.enabled && flags.nluEnabled) nluResolver = agent
+        if (flags.enabled && flags.proactiveEnabled) proactivePolisher = agent
+        if (flags.enabled && flags.openQuestionEnabled) openQuestionResponder = agent
+        Log.i(TAG, "Edge Gemma agent attached (flags=${agent.flags})")
+    }
+
+    /** Drop the reference when the screen is leaving / re-warming the driver. */
+    fun detachEdgeGemmaAgent() {
+        val agent = edgeGemmaAgent
+        edgeGemmaAgent = null
+        if (nluResolver === agent) nluResolver = null
+        if (proactivePolisher === agent) proactivePolisher = null
+        if (openQuestionResponder === agent) openQuestionResponder = null
+    }
+
+    /**
+     * Wire (or clear) the on-device open-question responder (Phase 2 · C). Safe to
+     * call repeatedly; null restores the server-driven open-question path. Tests
+     * inject a fake; production attaches the [EdgeGemmaAgent] via
+     * [attachEdgeGemmaAgent].
+     */
+    fun attachOpenQuestionResponder(responder: OpenQuestionResponder?) {
+        openQuestionResponder = responder
+    }
+
+    /** Accessor for later live phases (NLU / open-question / proactive). */
+    internal fun currentEdgeGemmaAgent(): EdgeGemmaAgent? = edgeGemmaAgent
+
+    /**
+     * Wire (or clear) the on-device NLU resolver. Safe to call repeatedly; passing
+     * null restores the regex+phonetic-only hot path. The medical flow is never
+     * affected — the resolver only refines the *intent hint* sent on a later turn.
+     */
+    fun attachNluResolver(resolver: LiveNluResolver?) {
+        nluResolver = resolver
+    }
+
+    /**
+     * Phase D seam: attach (or clear) an optional on-device Gemma polisher for
+     * proactive cues. Safe to call repeatedly; null keeps the deterministic
+     * templates. The polisher only rewords an already-safe template and its
+     * output must still pass [isProactiveTextSafe] — it can never change the
+     * medical flow, the cue cadence, or the gating.
+     */
+    fun attachProactivePolisher(polisher: ProactivePolisher?) {
+        proactivePolisher = polisher
+    }
+
+    /**
+     * Explicit proactive-coaching override (OR'd with the attached agent's
+     * `proactiveActive` flag in [proactiveCoachingActive]). Mainly a test/seam
+     * hook; production usually relies on the agent flag set via
+     * [attachEdgeGemmaAgent].
+     */
+    fun setProactiveCoachingEnabled(enabled: Boolean) {
+        proactiveCoachingEnabled = enabled
+    }
+
+    fun submitLiveText(
+        text: String,
+        intent: String? = null,
+        fromAsr: Boolean = false,
+        nowMs: Long = System.currentTimeMillis(),
+    ) {
         val clean = text.trim()
         if (clean.isBlank()) return
-        val resolvedIntent = intent ?: inferLiveFastIntent(clean)?.intent
-        if (_uiState.value.connectionState != ConnectionState.Online) {
-            submitTurn(text = clean)
+        // Regex hint first; if it misses, fall back to the phonetic safety net so a
+        // misheard CPR-live question (e.g. "除颤仪" -> "出差移") still carries the right
+        // intent hint. The net is stage-gated and returns null until it is warmed.
+        val explicitMatch = intent
+            ?.takeIf { it.isNotBlank() }
+            ?.let { FastIntentMatch(it, 1.0) }
+        val fastMatch = explicitMatch
+            ?: inferLiveFastIntent(clean)
+            ?: LivePhoneticIntentRouter.infer(clean, _uiState.value.currentStage)
+        // Read side of the async NLU: on a regex + phonetic miss, reuse the most
+        // recent on-device correction cached for this exact transcript so the next
+        // identical turn carries the right hint. Empty until a resolver is attached.
+        val resolvedMatch = fastMatch ?: nluCoordinator.cachedIntent(clean, nowMs)
+        val resolvedIntent = resolvedMatch?.intent
+        val intentMetadata = resolvedIntent
+            ?.takeIf(String::isNotBlank)
+            ?.let { mapOf("intent_hint" to it, "intent_source" to "local_live_submit") }
+        val currentState = _uiState.value
+        val criticalPlaybackBypass = fromAsr &&
+            shouldBypassPlaybackForCriticalAsrFinal(
+                currentState,
+                resolvedMatch?.intent,
+                resolvedMatch?.confidence,
+            )
+        if (
+            fromAsr &&
+            !liveAsrFinalGate.shouldAccept(
+                text = clean,
+                state = currentState,
+                nowMs = nowMs,
+                intent = resolvedMatch?.intent,
+                confidence = resolvedMatch?.confidence,
+            )
+        ) {
             return
         }
-        cancelLiveAudio("new_turn")
+        // Phase 2 · C — open-question detection. A regex + phonetic + NLU-cache miss
+        // that "reads like a question" in an open-question-eligible stage is handled
+        // on-device (immediate ack + async controlled answer) when a responder is
+        // attached. Response-check questions keep their deterministic server path.
+        val isEdgeOpenQuestion = openQuestionResponder != null &&
+            resolvedIntent == null &&
+            EdgeOpenQuestionPolicy.isOpenQuestionStage(currentState.currentStage) &&
+            !isResponseCheckQuestionTranscript(clean) &&
+            EdgeOpenQuestionDetector.looksLikeOpenQuestion(clean)
+
+        // Non-blocking on-device NLU: when both the regex hint and the phonetic net
+        // miss, resolve this transcript in the background and cache the intent so
+        // the *next* identical turn is corrected. The hot path never waits on Gemma
+        // (mirrors the server's GEMMA_NLU_ASYNC=1 contract); throttled by the
+        // coordinator's LRU cache + per-minute budget. Skipped for an edge open
+        // question — that path already spends this turn's single-driver generation.
+        if (fastMatch == null && !isEdgeOpenQuestion) {
+            maybeResolveIntentAsync(clean, nowMs)
+        }
+        if (_uiState.value.connectionState != ConnectionState.Online) {
+            if (isEdgeOpenQuestion) {
+                // Offline: no server to mirror or dedup — answer purely on-device.
+                cancelLiveAudio("new_turn")
+                startEdgeOpenQuestion(clean, commitToServer = false)
+            } else {
+                submitTurn(text = clean, metadata = intentMetadata)
+            }
+            return
+        }
+        if (criticalPlaybackBypass) {
+            cancelLiveAudio("critical_asr_final")
+            liveChannel.sendBargeIn()
+        } else {
+            cancelLiveAudio("new_turn")
+        }
         liveChannel.updateContext(TurnRequest(sessionId = sessionId))
         liveChannel.commitText(clean, resolvedIntent)
+        if (isEdgeOpenQuestion) {
+            // The server still sees the turn (transcript / stage sync), but the edge
+            // owns the answer; its open-question ack/answer is dropped to avoid a
+            // double reply ("置标志忽略服务端 open_question_answer").
+            startEdgeOpenQuestion(clean, commitToServer = true)
+        } else {
+            resetEdgeOpenQuestionState()
+            _uiState.update {
+                it.copy(
+                    partialTranscript = null,
+                    lastUserTranscript = clean,
+                    isInFlight = true,
+                    micState = MicState.Listening,
+                    sourceBadge = SourceBadge.RecordingOnly,
+                    isLiveAudioPlaying = false,
+                    activeAudioActionId = null,
+                    lastErrorMessage = null,
+                    openQuestionPhase = OpenQuestionPhase.Idle,
+                )
+            }
+        }
+    }
+
+    /**
+     * Phase 2 · C — start the on-device open-question turn: publish the immediate
+     * deterministic ack ([OpenQuestionPhase.Ack]) and kick off the async controlled
+     * answer. When [commitToServer] is true the server is also answering in parallel
+     * and its open-question reply is muted (dedup); offline it is purely on-device.
+     */
+    private fun startEdgeOpenQuestion(question: String, commitToServer: Boolean) {
+        resetEdgeOpenQuestionState()
+        val stage = _uiState.value.currentStage
+        val epoch = ++openQuestionEpoch
+        edgeOpenQuestionActive = commitToServer
+        val ackText = EdgeOpenQuestionPolicy.ackText(stage)
         _uiState.update {
             it.copy(
                 partialTranscript = null,
-                lastUserTranscript = clean,
+                lastUserTranscript = question,
                 isInFlight = true,
                 micState = MicState.Listening,
                 sourceBadge = SourceBadge.RecordingOnly,
                 isLiveAudioPlaying = false,
                 activeAudioActionId = null,
                 lastErrorMessage = null,
+                openQuestionPhase = OpenQuestionPhase.Ack,
+                mainText = EdgeOpenQuestionPolicy.ackMainText(stage),
+                secondaryText = EdgeOpenQuestionPolicy.ackSecondaryText(stage),
+                ttsText = ackText,
+                lastAssistantText = ackText,
+                lastActionId = edgeOpenQuestionActionId("ack", epoch),
+                ttsPriority = "normal",
+                ttsInterruptPolicy = "do_not_interrupt_critical",
+                ttsTone = "calm_firm",
+                ttsSpeed = "normal",
+                suppressLocalTts = false,
             )
+        }
+        launchEdgeOpenQuestionAnswer(stage, question, epoch)
+    }
+
+    /** Generate + guard the controlled answer off the hot path, then publish it. */
+    private fun launchEdgeOpenQuestionAnswer(stage: String?, question: String, epoch: Int) {
+        val responder = openQuestionResponder ?: run {
+            applyEdgeOpenQuestionOutcome(stage, OpenQuestionOutcome.Fallback("no_responder"), epoch)
+            return
+        }
+        val frame = buildOpenQuestionFrame(stage, question)
+        openQuestionJob = viewModelScope.launch {
+            val outcome = try {
+                responder.answerOpenQuestion(frame)
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Throwable) {
+                OpenQuestionOutcome.Fallback("exception:${error.message ?: "unknown"}")
+            }
+            if (epoch != openQuestionEpoch) return@launch
+            applyEdgeOpenQuestionOutcome(stage, outcome, epoch)
+        }
+    }
+
+    /**
+     * Publish the controlled answer (or a deterministic fallback) as
+     * [OpenQuestionPhase.Answer]. Guard-rejected / timed-out / budget-exhausted
+     * outcomes still speak a safe template so the rescuer always gets a reply. A
+     * superseded epoch or a no-longer-Ack phase (barge-in / new turn) is ignored.
+     */
+    private fun applyEdgeOpenQuestionOutcome(stage: String?, outcome: OpenQuestionOutcome, epoch: Int) {
+        val answerText: String
+        val mainText: String
+        val secondaryText: String
+        val tone: String
+        when (outcome) {
+            is OpenQuestionOutcome.Answer -> {
+                answerText = outcome.ttsText
+                mainText = outcome.mainText
+                secondaryText = outcome.secondaryText
+                tone = outcome.tone
+            }
+            is OpenQuestionOutcome.Fallback -> {
+                answerText = EdgeOpenQuestionPolicy.fallbackAnswer(stage)
+                mainText = EdgeOpenQuestionPolicy.ackMainText(stage)
+                secondaryText = ""
+                tone = "calm_firm"
+            }
+        }
+        val metrics = edgeOpenQuestionMetrics(stage, outcome)
+        _uiState.update { current ->
+            if (epoch != openQuestionEpoch || current.openQuestionPhase != OpenQuestionPhase.Ack) {
+                return@update current
+            }
+            current.copy(
+                openQuestionPhase = OpenQuestionPhase.Answer,
+                isInFlight = false,
+                mainText = mainText.ifBlank { current.mainText },
+                secondaryText = secondaryText,
+                ttsText = answerText,
+                lastAssistantText = answerText,
+                lastActionId = edgeOpenQuestionActionId("answer", epoch),
+                ttsPriority = "normal",
+                ttsInterruptPolicy = "do_not_interrupt_critical",
+                ttsTone = tone,
+                ttsSpeed = "normal",
+                suppressLocalTts = false,
+                lastOpenQuestionMetrics = metrics,
+            )
+        }
+    }
+
+    private fun buildOpenQuestionFrame(stage: String?, question: String): OpenQuestionFrame {
+        val snapshot = _uiState.value
+        val facts = linkedMapOf<String, Any?>(
+            "adult_likely" to true,
+            "cpr_started" to EdgeOpenQuestionPolicy.isCprLiveStage(stage),
+        )
+        snapshot.qualityScore?.let { facts["quality_score"] = it }
+        return OpenQuestionFrame(
+            stage = stage,
+            userInput = question,
+            allowedIntents = EdgeOpenQuestionPolicy.answerIntents(stage),
+            safetyPhrases = EdgeOpenQuestionPolicy.safetyPhrases(stage),
+            facts = facts,
+            recentTts = listOfNotNull(snapshot.lastAssistantText?.takeIf { it.isNotBlank() }),
+        )
+    }
+
+    private fun edgeOpenQuestionMetrics(stage: String?, outcome: OpenQuestionOutcome): LiveTurnMetrics =
+        LiveTurnMetrics(
+            currentStage = stage,
+            timings = mapOf("gemma_ms" to outcome.latencyMs),
+            gemma = LiveGemmaTurnMetrics(
+                live = outcome is OpenQuestionOutcome.Answer,
+                openQuestion = true,
+            ),
+            openQuestion = LiveOpenQuestionTurnMetrics(
+                segment = "answer",
+                cacheHit = (outcome as? OpenQuestionOutcome.Answer)?.cacheHit,
+                fallback = outcome is OpenQuestionOutcome.Fallback,
+                reason = (outcome as? OpenQuestionOutcome.Fallback)?.reason,
+                waitMs = outcome.latencyMs,
+            ),
+            guidanceSource = "edge_open_question",
+        )
+
+    /**
+     * Supersede any in-flight edge open-question turn and clear its dedup state.
+     * Bumps the epoch so a returning async answer is dropped, cancels the worker,
+     * and stops muting the server's open-question reply.
+     */
+    private fun resetEdgeOpenQuestionState() {
+        openQuestionEpoch++
+        openQuestionJob?.cancel()
+        openQuestionJob = null
+        edgeOpenQuestionActive = false
+        suppressedOpenQuestionActionIds.clear()
+    }
+
+    /**
+     * Resolve [transcript] with the on-device NLU off the hot path and cache the
+     * result for the next identical turn. No-op when no resolver is attached or
+     * the coordinator declines (cache hit, in flight, or per-minute budget hit).
+     */
+    private fun maybeResolveIntentAsync(transcript: String, nowMs: Long) {
+        val resolver = nluResolver ?: return
+        val key = nluCoordinator.beginResolve(transcript, nowMs) ?: return
+        val stage = _uiState.value.currentStage
+        viewModelScope.launch {
+            try {
+                val resolution = resolver.resolveIntent(LiveNluRequest(transcript = transcript, stage = stage))
+                nluCoordinator.completeResolve(key, resolution?.toFastIntentMatch())
+            } catch (cancel: CancellationException) {
+                nluCoordinator.abortResolve(key)
+                throw cancel
+            } catch (error: Throwable) {
+                Log.w(TAG, "On-device NLU resolve failed: ${error.message}")
+                nluCoordinator.abortResolve(key)
+            }
+        }
+    }
+
+    /**
+     * Phase D — one proactive-coaching tick. Pure decision in [decideProactiveCue];
+     * this method only owns the side effects: maintaining the high-priority quiet
+     * window, optionally polishing the chosen template off the hot path, and
+     * publishing the cue into [_uiState] for the screen's dedicated low-priority
+     * TTS effect. `internal` so tests can pump it with a controlled [nowMs].
+     */
+    internal suspend fun proactiveTick(nowMs: Long) {
+        if (!proactiveCoachingActive()) return
+        val snapshot = _uiState.value
+        observeGuidancePriority(snapshot, nowMs)
+        val decision = decideProactiveCue(snapshot, proactiveCoach, nowMs)
+        if (decision !is ProactiveDecision.Emit) return
+        proactiveCoach = decision.state
+        val cprElapsedMs = snapshot.cprStartedAtMs?.let { (nowMs - it).coerceAtLeast(0L) } ?: 0L
+        val resolved = resolveProactiveText(decision.cue, snapshot, cprElapsedMs)
+        // Re-validate the speech gate after any (suspending) polish: never talk
+        // over a critical line, server audio, or a turn that began meanwhile.
+        if (hardSpeechBlockReason(_uiState.value) != null) return
+        val cue = decision.cue.copy(text = resolved.first, polished = resolved.second)
+        _uiState.update { it.copy(proactiveCue = cue, lastAssistantText = cue.text) }
+    }
+
+    /**
+     * Proactive coaching is on when either the explicit switch is set (tests /
+     * direct control) or a proactive polisher has been attached. `attachEdgeGemmaAgent`
+     * already sets [proactivePolisher] exactly when the proactive flag is active,
+     * so reusing that field turns the monitor on for free without coupling to the
+     * agent's flag API — and the deterministic templates still drive the cue even
+     * when the polisher declines a rewrite (template-first).
+     */
+    private fun proactiveCoachingActive(): Boolean =
+        proactiveCoachingEnabled || proactivePolisher != null
+
+    /**
+     * Track when a fresh high/critical guidance arrives (by [LiveUiState.lastActionId]
+     * change) so the monitor stays quiet for [PROACTIVE_POST_HIGH_PRIORITY_QUIET_MS]
+     * afterwards. `ttsPriority` alone is unreliable (it persists across turns), so
+     * we anchor the window to the *arrival* of a new action.
+     */
+    private fun observeGuidancePriority(state: LiveUiState, nowMs: Long) {
+        val actionId = state.lastActionId ?: return
+        if (actionId == lastObservedGuidanceActionId) return
+        lastObservedGuidanceActionId = actionId
+        if (state.ttsPriority == "critical" || state.ttsPriority == "high") {
+            proactiveCoach = proactiveCoach.copy(lastHighPriorityAtMs = nowMs)
+        }
+    }
+
+    /**
+     * Resolve the spoken text for [cue]: deterministic template by default, or an
+     * on-device Gemma polish when a polisher is attached, the rewrite returns in
+     * time, and it passes [isProactiveTextSafe]. Any timeout/blank/unsafe result
+     * silently falls back to the template, so the driver being busy is harmless.
+     * Returns (text, polished?).
+     */
+    private suspend fun resolveProactiveText(
+        cue: ProactiveCue,
+        state: LiveUiState,
+        cprElapsedMs: Long,
+    ): Pair<String, Boolean> {
+        val polisher = proactivePolisher ?: return cue.text to false
+        val polished = withTimeoutOrNull(PROACTIVE_POLISH_TIMEOUT_MS) {
+            polisher.polish(
+                ProactivePolishRequest(
+                    kind = cue.kind,
+                    templateText = cue.text,
+                    stage = state.currentStage,
+                    qualityScore = state.qualityScore,
+                    cprElapsedMs = cprElapsedMs,
+                    tone = cue.tone,
+                ),
+            )
+        }?.trim()
+        return if (polished != null && isProactiveTextSafe(polished)) {
+            polished to true
+        } else {
+            cue.text to false
         }
     }
 
     fun sendLiveBargeIn() {
         cancelLiveAudio("client_barge_in")
+        resetEdgeOpenQuestionState()
         liveChannel.sendBargeIn()
         _uiState.update {
             it.copy(
@@ -396,12 +927,18 @@ class LiveSessionViewModel(
                 isLiveAudioPlaying = false,
                 activeAudioActionId = null,
                 suppressLocalTts = true,
+                openQuestionPhase = if (it.openQuestionPhase.isActiveOpenQuestion()) {
+                    OpenQuestionPhase.Cancelled
+                } else {
+                    it.openQuestionPhase
+                },
             )
         }
     }
 
     fun stopLiveAudio() {
         cancelLiveAudio("client_stop")
+        resetEdgeOpenQuestionState()
         _uiState.update {
             it.copy(
                 micState = MicState.Off,
@@ -409,6 +946,7 @@ class LiveSessionViewModel(
                 isLiveAudioPlaying = false,
                 activeAudioActionId = null,
                 suppressLocalTts = false,
+                openQuestionPhase = OpenQuestionPhase.Idle,
             )
         }
     }
@@ -416,11 +954,32 @@ class LiveSessionViewModel(
     /** Reset the server session and clear local UI state back to a fresh session. */
     fun reset() {
         viewModelScope.launch {
+            liveAsrFinalGate.reset()
+            resetEdgeOpenQuestionState()
             cancelLiveAudio("reset")
             liveChannel.reset()
             transport.reset(sessionId)
             _uiState.value = LiveUiState(sessionId = sessionId, connectionState = ConnectionState.Connecting)
         }
+    }
+
+    /** Dismiss the 120 simulation dialog. Does not touch the medical flow. */
+    fun dismissEmergencyCallDialog() {
+        _uiState.update { it.copy(emergencyCall = it.emergencyCall.copy(requested = false)) }
+    }
+
+    /** User declined a share / send / delete confirmation. */
+    fun dismissConfirmation() {
+        _uiState.update { it.copy(pendingConfirmation = null) }
+    }
+
+    /**
+     * User explicitly confirmed a pending share / send / delete tool. This phase
+     * only clears the prompt; real external send stays gated by the dispatcher
+     * and server contract (mock-only in Demo).
+     */
+    fun confirmPendingTool() {
+        _uiState.update { it.copy(pendingConfirmation = null) }
     }
 
     override fun onCleared() {
@@ -434,6 +993,28 @@ class LiveSessionViewModel(
         liveAudioPlayer.onAudioCancel(reason)
     }
 
+    /**
+     * Top-level server-event filter. While the edge layer owns the open question,
+     * the server's parallel open-question ack/answer guidance, its open-question
+     * metrics, and its streamed audio are all dropped so the rescuer hears a single
+     * (edge) reply. Everything else — real flow guidance, stage/connection updates,
+     * non-open-question audio — passes straight through to the existing audio gate.
+     */
+    private fun shouldDropServerEvent(event: LiveAgentEvent): Boolean {
+        if (edgeOpenQuestionActive) {
+            when (event) {
+                is LiveAgentEvent.Guidance -> if (event.openQuestionPhase() != null) {
+                    // Remember its action_id so the matching server audio is muted too.
+                    event.action.action_id?.let { suppressedOpenQuestionActionIds.add(it) }
+                    return true
+                }
+                is LiveAgentEvent.Metrics -> if (event.metrics.gemma.openQuestion) return true
+                else -> Unit
+            }
+        }
+        return shouldDropServerAudioEvent(event)
+    }
+
     private fun shouldDropServerAudioEvent(event: LiveAgentEvent): Boolean {
         when (event) {
             is LiveAgentEvent.AudioBegin -> {
@@ -441,14 +1022,18 @@ class LiveSessionViewModel(
                 val shouldUseLocal = !current.suppressLocalTts &&
                     event.actionId != null &&
                     event.actionId == current.lastActionId
-                ignoredServerAudioActionId = if (shouldUseLocal) event.actionId else null
-                return shouldUseLocal
+                val suppressedOpenQuestion = event.actionId != null &&
+                    event.actionId in suppressedOpenQuestionActionIds
+                val drop = shouldUseLocal || suppressedOpenQuestion
+                ignoredServerAudioActionId = if (drop) event.actionId else null
+                return drop
             }
             is LiveAgentEvent.AudioChunk -> return ignoredServerAudioActionId != null
             is LiveAgentEvent.AudioEnd -> {
                 val ignored = ignoredServerAudioActionId ?: return false
                 val matchesIgnored = event.actionId == null || event.actionId == ignored
                 if (matchesIgnored) {
+                    suppressedOpenQuestionActionIds.remove(ignored)
                     ignoredServerAudioActionId = null
                 }
                 return matchesIgnored
@@ -462,14 +1047,20 @@ class LiveSessionViewModel(
         }
     }
 
+    private fun edgeOpenQuestionActionId(segment: String, epoch: Int): String =
+        "edge_open_question_${segment}_$epoch"
+
     private fun runTurn(
         request: TurnRequest,
         presetId: String?,
         sourceBadge: SourceBadge,
         clearDemoPreset: Boolean = false,
+        startSessionIfNeeded: Boolean = false,
+        nowMs: Long = System.currentTimeMillis(),
     ) {
         _uiState.update { current ->
-            current.copy(
+            val base = if (startSessionIfNeeded) current.withSessionStartedAt(nowMs) else current
+            base.copy(
                 isInFlight = true,
                 currentDemoPresetId = if (clearDemoPreset) null else presetId ?: current.currentDemoPresetId,
                 sourceBadge = sourceBadge,
@@ -478,7 +1069,12 @@ class LiveSessionViewModel(
         }
         viewModelScope.launch {
             val result = transport.turn(request)
-            _uiState.update { current -> reduceTurnResult(current, result) }
+            _uiState.update { current ->
+                reduceTurnResult(current, result).withCprStartedAtIfNeeded(
+                    previousStage = current.currentStage,
+                    nowMs = System.currentTimeMillis(),
+                )
+            }
         }
     }
 
@@ -495,10 +1091,33 @@ class LiveSessionViewModel(
             )
         }
         val result = transport.turn(request)
-        _uiState.update { current -> reduceTurnResult(current, result) }
+        _uiState.update { current ->
+            reduceTurnResult(current, result).withCprStartedAtIfNeeded(
+                previousStage = current.currentStage,
+                nowMs = System.currentTimeMillis(),
+            )
+        }
+    }
+
+    private fun logLiveMetrics(metrics: LiveTurnMetrics) {
+        Log.i(
+            TAG,
+            "Live metrics turn=${metrics.turnSeq ?: -1} " +
+                "stage=${metrics.currentStage.orEmpty()} " +
+                "source=${metrics.guidanceSource.orEmpty()} " +
+                "intent=${metrics.intent.intent.orEmpty()} " +
+                "intentSource=${metrics.intent.source.orEmpty()} " +
+                "total=${metrics.timings["total_ms"] ?: -1}ms " +
+                "tts=${metrics.timings["tts_ms"] ?: -1}ms " +
+                "audio=${metrics.timings["tts_first_chunk_ms"] ?: -1}ms " +
+                "openSegment=${metrics.openQuestion.segment.orEmpty()} " +
+                "openWait=${metrics.openQuestion.waitMs ?: -1}ms " +
+                "openFallback=${metrics.openQuestion.fallback}",
+        )
     }
 
     companion object {
+        private const val TAG = "LiveSessionViewModel"
         private const val VISION_EMIT_INTERVAL_MS = 1_000L
         private const val VISION_SIGNAL_TTL_MS = 1_500L
 
@@ -678,7 +1297,8 @@ internal fun reduceLiveEvent(current: LiveUiState, event: LiveAgentEvent): LiveU
         )
         is LiveAgentEvent.Guidance -> {
             val response = event.response
-            val useLocalTts = event.action.shouldUseLocalLiveTts()
+            val useLocalTts = !event.suppressLocalTts && event.action.shouldUseLocalLiveTts()
+            val openQuestionPhase = event.openQuestionPhase()
             val base = current.copy(
                 connectionState = ConnectionState.Online,
                 currentStage = response?.currentStage ?: current.currentStage,
@@ -693,10 +1313,12 @@ internal fun reduceLiveEvent(current: LiveUiState, event: LiveAgentEvent): LiveU
                 lastErrorMessage = null,
                 isInFlight = false,
                 micState = if (current.micState == MicState.Capturing) MicState.Listening else current.micState,
+                openQuestionPhase = openQuestionPhase ?: OpenQuestionPhase.Idle,
             )
             base.applyGuidance(event.action)
         }
         is LiveAgentEvent.State -> current.copy(currentStage = event.currentStage ?: current.currentStage)
+        is LiveAgentEvent.Metrics -> current.applyLiveMetrics(event.metrics)
         is LiveAgentEvent.AudioBegin -> current.copy(
             isLiveAudioPlaying = true,
             activeAudioActionId = event.actionId,
@@ -716,6 +1338,11 @@ internal fun reduceLiveEvent(current: LiveUiState, event: LiveAgentEvent): LiveU
             isLiveAudioPlaying = false,
             activeAudioActionId = null,
             micState = if (current.micState == MicState.Speaking) MicState.Listening else current.micState,
+            openQuestionPhase = if (current.openQuestionPhase.isActiveOpenQuestion()) {
+                OpenQuestionPhase.Cancelled
+            } else {
+                current.openQuestionPhase
+            },
             lastErrorMessage = event.reason
                 ?.takeIf { it.isNotBlank() && !it.isExpectedAudioCancelReason() }
                 ?.let { "Audio cancelled: $it" },
@@ -728,6 +1355,7 @@ internal fun reduceLiveEvent(current: LiveUiState, event: LiveAgentEvent): LiveU
                 isLiveAudioPlaying = false,
                 activeAudioActionId = null,
                 suppressLocalTts = false,
+                openQuestionPhase = current.openQuestionPhase,
                 lastErrorMessage = if (alreadyUsingLocalTts) {
                     current.lastErrorMessage
                 } else {
@@ -741,6 +1369,28 @@ internal fun reduceLiveEvent(current: LiveUiState, event: LiveAgentEvent): LiveU
             isInFlight = false,
         )
     }
+
+private fun LiveAgentEvent.Guidance.openQuestionPhase(): OpenQuestionPhase? =
+    when {
+        openQuestionAnswer || responseType == "open_question_answer" -> OpenQuestionPhase.Answer
+        guidanceSource == "open_question_ack" || responseType == "open_question_ack" -> OpenQuestionPhase.Ack
+        else -> null
+    }
+
+private fun OpenQuestionPhase.isActiveOpenQuestion(): Boolean =
+    this == OpenQuestionPhase.Ack || this == OpenQuestionPhase.Answer
+
+private fun LiveUiState.applyLiveMetrics(metrics: LiveTurnMetrics): LiveUiState =
+    copy(
+        currentStage = metrics.currentStage ?: currentStage,
+        lastLiveTurnSeq = metrics.turnSeq ?: lastLiveTurnSeq,
+        lastOpenQuestionMetrics = if (metrics.gemma.openQuestion) metrics else lastOpenQuestionMetrics,
+        openQuestionPhase = if (metrics.gemma.openQuestion && openQuestionPhase == OpenQuestionPhase.Idle) {
+            OpenQuestionPhase.Ack
+        } else {
+            openQuestionPhase
+        },
+    )
 
 private fun LiveAudioPlayer.consume(event: LiveAgentEvent) {
     when (event) {
@@ -781,23 +1431,8 @@ private fun String.isExpectedAudioCancelReason(): Boolean =
 
 private fun GuidanceAction.shouldUseLocalLiveTts(): Boolean {
     val text = tts.text.trim()
-    if (text.isBlank()) return false
-    return text.length <= LOCAL_LIVE_TTS_MAX_CHARS ||
-        priority == "critical" ||
-        priority == "high" ||
-        tts.tone == "urgent" ||
-        text in LOCAL_LIVE_TTS_TEXTS
+    return text.isNotBlank()
 }
-
-private const val LOCAL_LIVE_TTS_MAX_CHARS = 24
-
-private val LOCAL_LIVE_TTS_TEXTS = setOf(
-    "\u7ee7\u7eed\u6309\u538b",
-    "\u4e0d\u8981\u505c",
-    "\u7528\u529b\u6309\u538b",
-    "\u6253\u5f00 AED",
-    "\u547c\u53eb 120",
-)
 
 private fun reduceSuccess(current: LiveUiState, response: TurnResponse): LiveUiState {
     if (!response.ok) {
@@ -865,6 +1500,7 @@ private fun reduceFailure(current: LiveUiState, error: TransportError): LiveUiSt
 
 private fun LiveUiState.applyGuidance(action: GuidanceAction): LiveUiState {
     val overlay = action.visual_overlay
+    val nextHaptic = resolveNextHaptic(action)
     return copy(
         // Keep the last non-blank headline so the EyesOff big text never blanks out.
         mainText = action.ui.main_text.ifBlank { mainText },
@@ -879,13 +1515,85 @@ private fun LiveUiState.applyGuidance(action: GuidanceAction): LiveUiState {
         ttsTone = action.tts.tone,
         ttsSpeed = action.tts.speed,
         lastActionId = action.action_id,
-        haptic = HapticState(
-            enabled = action.haptic.enabled,
-            bpm = action.haptic.bpm
-                ?: action.tool_actions.firstOrNull { it.type in HAPTIC_TOOL_TYPES }?.bpm,
-        ),
+        haptic = nextHaptic,
+        primaryButton = action.ui.primary_button.toPrimaryButtonState() ?: primaryButton,
+        emergencyCall = resolveEmergencyCall(action),
+        pendingConfirmation = resolvePendingConfirmation(action),
     )
+}
+
+private fun Map<String, Any?>?.toPrimaryButtonState(): PrimaryButtonState? {
+    val map = this ?: return null
+    val label = (map["label"] as? String)?.takeIf { it.isNotBlank() } ?: return null
+    return PrimaryButtonState(
+        label = label,
+        intent = (map["intent"] as? String) ?: (map["action"] as? String),
+        style = map["style"] as? String,
+    )
+}
+
+private fun LiveUiState.resolveEmergencyCall(action: GuidanceAction): EmergencyCallState {
+    val callTool = action.tool_actions.firstOrNull { it.type in CRITICAL_TOOL_TYPES }
+        ?: return emergencyCall
+    // Android has no real dialing capability in this demo; the 120 dialog is
+    // always a simulation by safety policy, regardless of the server tool type.
+    return EmergencyCallState(requested = true, mock = true)
+}
+
+private fun LiveUiState.resolvePendingConfirmation(action: GuidanceAction): ToolConfirmationState? {
+    val ctx = DispatchContext()
+    val tool = action.tool_actions.firstOrNull { it.type in CONFIRMATION_REQUEST_TOOL_TYPES }
+        ?: action.tool_actions.firstOrNull {
+            it.type in SHARE_OR_DESTRUCTIVE_TOOL_TYPES && !it.isConfirmed(ctx)
+        }
+        ?: return pendingConfirmation
+    return ToolConfirmationState(
+        toolType = tool.type,
+        title = confirmationTitleFor(tool.type),
+        message = tool.confirmation["message"] as? String,
+    )
+}
+
+private fun confirmationTitleFor(toolType: String): String =
+    when (toolType) {
+        "request_share_report", "share_report", "send_report" -> "分享交接报告？"
+        "request_share_video", "share_video", "send_video" -> "分享急救视频？"
+        "delete_video" -> "删除本地视频？"
+        else -> "需要确认"
+    }
+
+private fun LiveUiState.resolveNextHaptic(action: GuidanceAction): HapticState {
+    val hapticTools = action.tool_actions.filter { it.type in HAPTIC_TOOL_TYPES }
+    val lastHapticTool = hapticTools.lastOrNull()
+
+    if (lastHapticTool?.type == "stop_haptic_metronome") {
+        return HapticState(enabled = false)
+    }
+
+    if (action.haptic.enabled || lastHapticTool?.type in START_OR_UPDATE_HAPTIC_TOOL_TYPES) {
+        return HapticState(
+            enabled = true,
+            bpm = action.haptic.bpm ?: lastHapticTool?.bpm ?: haptic.bpm ?: 110,
+        )
+    }
+
+    // In the CPR loop, haptic=false usually means "this guidance has no new
+    // haptic command"; keep the locally running beat alive unless an explicit
+    // stop command or a stage exit says otherwise.
+    return if (haptic.enabled && currentStage.isMetronomeContinuityStage()) {
+        haptic
+    } else {
+        HapticState(enabled = false)
+    }
 }
 
 private fun String?.isOfflineCprFallbackStage(): Boolean =
     this?.startsWith("S7") == true || this?.startsWith("S8") == true
+
+private fun String?.isMetronomeContinuityStage(): Boolean =
+    this?.startsWith("S7") == true || this?.startsWith("S8") == true
+
+private val START_OR_UPDATE_HAPTIC_TOOL_TYPES = setOf(
+    "start_haptic_metronome",
+    "update_haptic_metronome",
+)

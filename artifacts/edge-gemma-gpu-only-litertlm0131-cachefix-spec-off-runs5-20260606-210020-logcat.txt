@@ -1,0 +1,5 @@
+﻿--------- beginning of main
+06-06 21:01:20.864  9621  9953 I mars::stn: [longlink_connect_monitor.cc:536, OnHeartbeatAlarmReceived]:longlink_progress on_heartbeat_alarm, time: 133966901, is_noop_timeout:false
+06-06 21:01:20.934  9621  5508 I mars::stn: [longlink_connect_monitor.cc:530, OnHeartbeatAlarmSet]:longlink_progress on_heartbeat_set, time: 133966971, time interval:580000
+06-06 21:01:20.941  9621  5508 I mars::stn: [longlink_connect_monitor.cc:530, OnHeartbeatAlarmSet]:longlink_progress on_heartbeat_set, time: 133966978, time interval:580000
+

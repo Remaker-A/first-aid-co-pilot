@@ -22,6 +22,9 @@ const RECOMMENDED_STT_MODEL = "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-1
 const RECOMMENDED_STT_URL =
   "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2";
 
+const RESPONSE_CHECK_QUESTION_PATTERN =
+  /(有没有反应|是否有反应|有反应吗|有反应么|有反应嘛|有反应没有|还有没有反应|没(?:有)?反应[吗么嘛]|无反应[吗么嘛])/i;
+
 const INTENT_RULES = [
   {
     intent: "scene_unsafe",
@@ -31,11 +34,11 @@ const INTENT_RULES = [
   {
     intent: "scene_safe",
     pattern:
-      /(scene\s+safe|safe now|现场.*安全|周围.*安全|环境.*安全|已.*确认.*安全|已经.*确认.*安全|确认.*安全|安全了|可以.*(?:靠近|接近)|能够.*(?:靠近|接近)|能.*(?:靠近|接近)|(?:没有|无).*危险|靠近患者|接近患者|在患者身边|到患者身边)/i,
+      /(scene\s+safe|safe now|现场.*安全|周围.*安全|环境.*安全|已.*确认.*安全|已经.*确认.*安全|确认.*安全|安全了|可以.*(?:靠近|接近)|能够.*(?:靠近|接近)|能.*(?:靠近|接近)|(?:没有|无).*危险|靠近患者|接近患者|在患者(?:身边|身旁|旁边)|到患者(?:身边|身旁|旁边))/i,
   },
   {
     intent: "patient_unresponsive",
-    pattern: /(unresponsive|no response|not responding|没反应|没有反应|叫不醒|无反应)/i,
+    pattern: /(unresponsive|no response|not responding|没反应|没有反应|没有回应|没回应|叫不醒|喊不醒|拍不醒|无反应|不醒)/i,
   },
   {
     intent: "patient_responsive",
@@ -43,11 +46,11 @@ const INTENT_RULES = [
   },
   {
     intent: "agonal_breathing",
-    pattern: /(gasping|agonal|喘息|濒死呼吸|喘一下|偶尔喘|只是?喘|只有.*喘|一阵一阵喘)/i,
+    pattern: /(gasping|agonal|喘息|濒死呼吸|喘一下|偶尔喘|只是?喘|只有.*喘|一阵一阵喘|点头样呼吸|点头一样呼吸|偶尔点头)/i,
   },
   {
     intent: "no_normal_breathing",
-    pattern: /(not breathing|no breathing|abnormal breathing|没有正常呼吸|没有呼吸|没呼吸|无呼吸|呼吸不正常|不正常呼吸)/i,
+    pattern: /(not breathing|no breathing|abnormal breathing|没有正常呼吸|没有呼吸|没呼吸|无呼吸|没气|没有气|没喘气|胸口(?:没|没有|不)(?:动|起伏)|看不到(?:胸口)?起伏|呼吸不正常|不正常呼吸)/i,
   },
   {
     intent: "normal_breathing",
@@ -67,7 +70,7 @@ const INTENT_RULES = [
   },
   {
     intent: "ask_cpr_quality",
-    pattern: /(按得对|按的对|这样.*(可以|对吗|行吗)|我.*按.*(对吗|可以吗|行吗)|我爱你的对吗|位置.*对吗|节奏.*对吗|质量.*怎么样)/i,
+    pattern: /(按得对|按的对|这样.*(可以|对吗|行吗)|我.*按.*(对吗|可以吗|行吗)|我爱的对吗|我爱你的对吗|位置.*对吗|节奏.*对吗|质量.*怎么样)/i,
   },
   {
     intent: "ask_can_stop",
@@ -95,11 +98,11 @@ const INTENT_RULES = [
   },
   {
     intent: "emergency_called",
-    pattern: /(called|call connected|120.*(已打|打了|拨打|已拨|接通|多打)|(?:已|已经)?(?:拨打|拨通|打了?|呼叫|多打)120|急救电话.*(通|打))/i,
+    pattern: /(called|call connected|(?:120|幺二零|一二零).*(已打|打了|拨打|已拨|接通|多打)|(?:已|已经)?(?:拨打|拨通|打了?|呼叫|多打)\s*(?:120|幺二零|一二零)|急救电话.*(通|打))/i,
   },
   {
     intent: "continue_cpr",
-    pattern: /(continue cpr|start cpr|start pressing|keep pressing|开始按|开始 CPR|开始心肺复苏|继续按|继续 CPR|继续心肺复苏)/i,
+    pattern: /(continue cpr|start cpr|start pressing|keep pressing|准备好了?|开始吧|开始按|开始胸外按压|开始 CPR|开始心肺复苏|继续按|继续胸外按压|继续 CPR|继续心肺复苏|怎么按压|如何按压|按压怎么做|怎么开始按压|我来按压|我现在按压)/i,
   },
   {
     intent: "paramedics_arrived",
@@ -205,6 +208,13 @@ export function classifyIntent(transcript = "") {
       candidates: []
     };
   }
+  if (isResponseCheckQuestion(text)) {
+    return {
+      intent: null,
+      score: 0,
+      candidates: []
+    };
+  }
 
   const candidates = [];
   for (const [index, rule] of INTENT_RULES.entries()) {
@@ -235,6 +245,10 @@ export function classifyIntent(transcript = "") {
 
 export function inferIntent(transcript = "") {
   return classifyIntent(transcript).intent;
+}
+
+export function isResponseCheckQuestion(transcript = "") {
+  return RESPONSE_CHECK_QUESTION_PATTERN.test(normalizeText(transcript));
 }
 
 // Resolve how to invoke the real STT engine. An explicit command (set by an

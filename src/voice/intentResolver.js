@@ -2,7 +2,7 @@ import { AgentStage } from "../domain/stages.js";
 import { createNluFrame as createDecisionNluFrame } from "../gemma/decisionFrame.js";
 import { nluCacheKey } from "../gemma/nluCache.js";
 import { getNluConfidenceFloors, getNluStageConfig } from "../knowledge/knowledgeBase.js";
-import { classifyIntent } from "./stt.js";
+import { classifyIntent, isResponseCheckQuestion } from "./stt.js";
 import { resolvePhoneticIntent } from "./phoneticIntent.js";
 
 const DEFAULT_REGEX_CONFIDENCE_FLOOR = 0.85;
@@ -48,13 +48,37 @@ function isUncertainBreathingClaim(text, intent) {
 // Only consulted when the regex finds no intent, so the step_done coach words
 // (放好了/做好了/明白了) keep their existing per-step coaching behavior.
 const S6_READY_START_PATTERN =
-  /(准备\s*(好|就绪|ok|完毕)|准备好(了|啦)?|我?(已经)?准备好|可以开始|开始吧|这就开始|马上开始|开始按|开始\s*cpr|开始心肺复苏|ready|let'?s\s*start|start\s*cpr)/i;
+  /((?:^|[\s，。,.])(?:开始|继续)(?:吧|啊|了)?(?:$|[\s，。,.])|准备\s*(好|就绪|ok|完毕)|准备好(了|啦)?|我?(已经)?准备好|可以开始|开始吧|继续吧|这就开始|马上开始|开始按|开始胸外按压|继续按|继续胸外按压|开始\s*cpr|继续\s*cpr|开始心肺复苏|继续心肺复苏|怎么按压|如何按压|按压怎么做|怎么开始按压|ready|let'?s\s*start|start\s*cpr|continue\s*cpr)/i;
+const S5_S6_SHORT_ACK_PATTERN = /^(好|好的|好啊|好了|行|行了|可以)$/;
+const CPR_CONTROL_STAGES = new Set([
+  AgentStage.S5_CALL_EMERGENCY,
+  AgentStage.S6_CPR_READY,
+  AgentStage.S7_CPR_LOOP,
+  AgentStage.S8_ASSISTANCE,
+  AgentStage.MONITOR_RESPONSE,
+  AgentStage.MONITOR_BREATHING,
+]);
 
 function resolveFlowProgressIntent(text, stage) {
-  if (stage === AgentStage.S6_CPR_READY && S6_READY_START_PATTERN.test(text)) {
+  if (!CPR_CONTROL_STAGES.has(stage)) {
+    return null;
+  }
+  if (S6_READY_START_PATTERN.test(text)) {
+    return "continue_cpr";
+  }
+  if (
+    (stage === AgentStage.S5_CALL_EMERGENCY || stage === AgentStage.S6_CPR_READY) &&
+    S5_S6_SHORT_ACK_PATTERN.test(normalizeReadinessText(text))
+  ) {
     return "continue_cpr";
   }
   return null;
+}
+
+function normalizeReadinessText(value) {
+  return typeof value === "string"
+    ? value.trim().replace(/[。！？!,.，、\s]+$/g, "")
+    : "";
 }
 
 function resolveNluInferenceMode(options = {}) {
@@ -69,8 +93,15 @@ export async function resolveUserIntent({
   options = {}
 } = {}) {
   const text = normalizeText(transcript);
-  const classification = normalizeClassification(options.classification || classifyIntent(text));
-  const flowIntent = !classification.intent ? resolveFlowProgressIntent(text, stage) : null;
+  const classification = normalizeClassification(
+    isResponseCheckQuestion(text)
+      ? { intent: null, score: 0, candidates: [] }
+      : (options.classification || classifyIntent(text))
+  );
+  const flowIntent =
+    !classification.intent || classification.intent === "continue_cpr"
+      ? resolveFlowProgressIntent(text, stage)
+      : null;
   // 音近安全网：仅当正则 miss 且无流程快路径时，对 CPR-live(S6-S8) 的少数关键闭集
   // 提问（除颤仪/能否停/呼叫120）做音近模糊匹配，把被听岔（如"除颤仪"→"出差移"）的
   // 提问拉回 liveDriver 的固定安全答句，而非滑入开放问答 ack。绝不覆盖已确信的正则
@@ -230,6 +261,11 @@ export function shouldEscalateToNlu({
   classification = classifyIntent(transcript),
   options = {}
 } = {}) {
+  const text = normalizeText(transcript);
+  if (isResponseCheckQuestion(text)) {
+    return { escalate: false, reason: "response_check_question" };
+  }
+
   const normalized = normalizeClassification(classification);
 
   if (!isIntentNluEnabled(options)) {
@@ -240,7 +276,6 @@ export function shouldEscalateToNlu({
     return { escalate: false, reason: "stage_fast_path" };
   }
 
-  const text = normalizeText(transcript);
   if (!text) {
     return { escalate: false, reason: "empty_transcript" };
   }
@@ -479,6 +514,9 @@ function isAmbiguousClassification(classification) {
 }
 
 function isClearNegatedObservation(text, intent) {
+  if (isResponseCheckQuestion(text)) {
+    return false;
+  }
   if (intent === "patient_unresponsive") {
     return /(没有反应|没反应|无反应|叫不醒|no response|not responding|unresponsive)/i.test(text);
   }

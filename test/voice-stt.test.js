@@ -23,6 +23,8 @@ const STT_ENV_KEYS = [
 
 test("inferIntent recognizes common zh-CN emergency call confirmations", () => {
   assert.equal(inferIntent("我已经拨打120了"), "emergency_called");
+  assert.equal(inferIntent("我已经拨打 120 了"), "emergency_called");
+  assert.equal(inferIntent("已经拨打幺二零"), "emergency_called");
   assert.equal(inferIntent("120已经接通了"), "emergency_called");
   assert.equal(inferIntent("120已经多打。"), "emergency_called");
   assert.equal(inferIntent("急救电话打通了"), "emergency_called");
@@ -40,6 +42,7 @@ test("inferIntent recognizes common zh-CN handover arrival phrases", () => {
 
 test("inferIntent recognizes CPR live question intents", () => {
   assert.equal(inferIntent("我按得对吗"), "ask_cpr_quality");
+  assert.equal(inferIntent("我爱的对吗"), "ask_cpr_quality");
   assert.equal(inferIntent("我爱你的对吗？"), "ask_cpr_quality");
   assert.equal(inferIntent("我能不能停"), "ask_can_stop");
   assert.equal(inferIntent("我能不能听？"), "ask_can_stop");
@@ -49,6 +52,11 @@ test("inferIntent recognizes CPR live question intents", () => {
   assert.equal(inferIntent("AED 怎么用"), "ask_aed_help");
   assert.equal(inferIntent("AED 和按压怎么交替？"), "ask_aed_cpr_alternation");
   assert.equal(inferIntent("按压和 AED 怎么配合？"), "ask_aed_cpr_alternation");
+  assert.equal(inferIntent("准备好了"), "continue_cpr");
+  assert.equal(inferIntent("开始吧"), "continue_cpr");
+  assert.equal(inferIntent("开始胸外按压"), "continue_cpr");
+  assert.equal(inferIntent("怎么按压"), "continue_cpr");
+  assert.equal(inferIntent("按压怎么做"), "continue_cpr");
   assert.equal(inferIntent("AED 来了怎么办"), "aed_available");
   assert.equal(inferIntent("除颤仪到了"), "aed_available");
   assert.equal(inferIntent("说颤姨来了"), "aed_available");
@@ -59,10 +67,23 @@ test("inferIntent recognizes CPR live question intents", () => {
   assert.equal(inferIntent("要不要打120"), "ask_emergency_call");
 });
 
+test("inferIntent treats no-response statements as facts but not response-check questions", () => {
+  assert.equal(inferIntent("他没有反应"), "patient_unresponsive");
+  assert.equal(inferIntent("没反应"), "patient_unresponsive");
+  assert.equal(inferIntent("还没有反应"), "patient_unresponsive");
+
+  for (const text of ["患者有没有反应", "有没有反应", "是否有反应", "有反应吗"]) {
+    const result = classifyIntent(text);
+    assert.equal(result.intent, null, `${text} must not create a responsive fact`);
+    assert.deepEqual(result.candidates, []);
+  }
+});
+
 test("inferIntent treats scene-safety facts as flow facts before generic next-step questions", () => {
   assert.equal(inferIntent("周围安全"), "scene_safe");
   assert.equal(inferIntent("环境安全，可以靠近患者了"), "scene_safe");
   assert.equal(inferIntent("我已确认周围安全，并在患者身边，请告诉我接下来怎么做。"), "scene_safe");
+  assert.equal(inferIntent("确认安全，我已经在患者身旁。"), "scene_safe");
   assert.equal(inferIntent("周围没有危险，我可以靠近他。"), "scene_safe");
 });
 
@@ -73,8 +94,11 @@ test("inferIntent keeps unsafe-scene phrases from being mistaken as scene_safe",
 
 test("inferIntent recognizes design-script abnormal breathing and agonal phrasing", () => {
   assert.equal(inferIntent("没有正常呼吸"), "no_normal_breathing");
+  assert.equal(inferIntent("胸口没有起伏"), "no_normal_breathing");
+  assert.equal(inferIntent("他没气了"), "no_normal_breathing");
   assert.equal(inferIntent("好像没有呼吸，偶尔喘一下"), "agonal_breathing");
   assert.equal(inferIntent("他只有偶尔喘息"), "agonal_breathing");
+  assert.equal(inferIntent("只是偶尔点头样呼吸"), "agonal_breathing");
 });
 
 test("classifyIntent returns best intent score and candidates", () => {

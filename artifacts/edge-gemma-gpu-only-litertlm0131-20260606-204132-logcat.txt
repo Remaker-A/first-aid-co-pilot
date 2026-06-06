@@ -1,0 +1,235 @@
+﻿06-06 20:41:31.406 I/mali    (24203): [DebugProp] GPU Debug-Mechanism Disable !
+06-06 20:41:31.440 I/ActivityTaskManager( 1553): Displayed com.firstaid.copilot.debug/com.firstaid.copilot.live.edge.EdgeModelSmokeActivity: +821ms
+06-06 20:41:31.625 I/EdgeModelSmoke(24203): Edge model smoke phase=models_inspected
+06-06 20:41:31.633 I/EdgeModelSmoke(24203): Edge model smoke phase=gemma_prewarm_start
+06-06 20:41:31.645 E/d.copilot.debug(24203): No implementation found for void com.google.ai.edge.litertlm.NativeLibraryLoader.nativeCheckLoaded() (tried Java_com_google_ai_edge_litertlm_NativeLibraryLoader_nativeCheckLoaded and Java_com_google_ai_edge_litertlm_NativeLibraryLoader_nativeCheckLoaded__)
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.660764   24261 litert_lm_loader.cc:197] LitertLmLoader::Initialize
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661277   24261 litert_lm_loader.cc:220] mmap_status is ok
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661355   24261 litert_lm_loader.cc:225] status: OK
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661375   24261 litert_lm_loader.cc:226] major_version: 1
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661396   24261 litert_lm_loader.cc:227] minor_version: 5
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661411   24261 litert_lm_loader.cc:228] patch_version: 0
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661438   24261 litert_lm_loader.cc:261] section_index: 0
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661453   24261 litert_lm_loader.cc:262] section_data_type: LlmMetadataProto
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661468   24261 litert_lm_loader.cc:264] section_begin_offset: 16384
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661481   24261 litert_lm_loader.cc:265] section_end_offset: 28576
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661496   24261 litert_lm_loader.cc:261] section_index: 1
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661509   24261 litert_lm_loader.cc:262] section_data_type: SP_Tokenizer
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661520   24261 litert_lm_loader.cc:264] section_begin_offset: 32768
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661532   24261 litert_lm_loader.cc:265] section_end_offset: 4721781
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661557   24261 litert_lm_loader.cc:105] model_type: tf_lite_embedder
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661574   24261 litert_lm_loader.cc:261] section_index: 2
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661587   24261 litert_lm_loader.cc:262] section_data_type: TFLiteModel
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661597   24261 litert_lm_loader.cc:264] section_begin_offset: 4734976
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661609   24261 litert_lm_loader.cc:265] section_end_offset: 108546696
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661623   24261 litert_lm_loader.cc:105] model_type: tf_lite_per_layer_embedder
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661636   24261 litert_lm_loader.cc:261] section_index: 3
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661649   24261 litert_lm_loader.cc:262] section_data_type: TFLiteModel
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661660   24261 litert_lm_loader.cc:264] section_begin_offset: 108560384
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661675   24261 litert_lm_loader.cc:265] section_end_offset: 1393078776
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661689   24261 litert_lm_loader.cc:105] model_type: tf_lite_audio_encoder_hw
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661702   24261 litert_lm_loader.cc:244] section_backend_constraint: cpu
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661714   24261 litert_lm_loader.cc:261] section_index: 4
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661727   24261 litert_lm_loader.cc:262] section_data_type: TFLiteModel
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661738   24261 litert_lm_loader.cc:264] section_begin_offset: 1393082368
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661750   24261 litert_lm_loader.cc:265] section_end_offset: 1487134648
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661763   24261 litert_lm_loader.cc:105] model_type: tf_lite_audio_adapter
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661776   24261 litert_lm_loader.cc:244] section_backend_constraint: cpu
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661788   24261 litert_lm_loader.cc:261] section_index: 5
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661801   24261 litert_lm_loader.cc:262] section_data_type: TFLiteModel
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661812   24261 litert_lm_loader.cc:264] section_begin_offset: 1487142912
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661824   24261 litert_lm_loader.cc:265] section_end_offset: 1496584156
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661837   24261 litert_lm_loader.cc:105] model_type: tf_lite_end_of_audio
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661853   24261 litert_lm_loader.cc:261] section_index: 6
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661866   24261 litert_lm_loader.cc:262] section_data_type: TFLiteModel
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661877   24261 litert_lm_loader.cc:264] section_begin_offset: 1496596480
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661889   24261 litert_lm_loader.cc:265] section_end_offset: 1496603252
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661903   24261 litert_lm_loader.cc:105] model_type: tf_lite_vision_encoder
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661915   24261 litert_lm_loader.cc:248] section_prefer_activation_type: fp16
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661927   24261 litert_lm_loader.cc:261] section_index: 7
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661939   24261 litert_lm_loader.cc:262] section_data_type: TFLiteModel
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661950   24261 litert_lm_loader.cc:264] section_begin_offset: 1496612864
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661965   24261 litert_lm_loader.cc:265] section_end_offset: 1720750800
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661979   24261 litert_lm_loader.cc:105] model_type: tf_lite_vision_adapter
+06-06 20:41:31.661 I/native  (24203): I0000 00:00:1780749691.661991   24261 litert_lm_loader.cc:244] section_backend_constraint: cpu
+06-06 20:41:31.662 I/native  (24203): I0000 00:00:1780749691.662003   24261 litert_lm_loader.cc:261] section_index: 8
+06-06 20:41:31.662 I/native  (24203): I0000 00:00:1780749691.662016   24261 litert_lm_loader.cc:262] section_data_type: TFLiteModel
+06-06 20:41:31.662 I/native  (24203): I0000 00:00:1780749691.662028   24261 litert_lm_loader.cc:264] section_begin_offset: 1720762368
+06-06 20:41:31.662 I/native  (24203): I0000 00:00:1780749691.662047   24261 litert_lm_loader.cc:265] section_end_offset: 1725505296
+06-06 20:41:31.662 I/native  (24203): I0000 00:00:1780749691.662062   24261 litert_lm_loader.cc:105] model_type: tf_lite_end_of_vision
+06-06 20:41:31.662 I/native  (24203): I0000 00:00:1780749691.662074   24261 litert_lm_loader.cc:261] section_index: 9
+06-06 20:41:31.662 I/native  (24203): I0000 00:00:1780749691.662086   24261 litert_lm_loader.cc:262] section_data_type: TFLiteModel
+06-06 20:41:31.662 I/native  (24203): I0000 00:00:1780749691.662099   24261 litert_lm_loader.cc:264] section_begin_offset: 1725513728
+06-06 20:41:31.662 I/native  (24203): I0000 00:00:1780749691.662111   24261 litert_lm_loader.cc:265] section_end_offset: 1725520500
+06-06 20:41:31.662 I/native  (24203): I0000 00:00:1780749691.662124   24261 litert_lm_loader.cc:105] model_type: tf_lite_prefill_decode
+06-06 20:41:31.662 I/native  (24203): I0000 00:00:1780749691.662137   24261 litert_lm_loader.cc:248] section_prefer_activation_type: fp16
+06-06 20:41:31.662 I/native  (24203): I0000 00:00:1780749691.662149   24261 litert_lm_loader.cc:261] section_index: 10
+06-06 20:41:31.662 I/native  (24203): I0000 00:00:1780749691.662162   24261 litert_lm_loader.cc:262] section_data_type: TFLiteModel
+06-06 20:41:31.662 I/native  (24203): I0000 00:00:1780749691.662174   24261 litert_lm_loader.cc:264] section_begin_offset: 1725530112
+06-06 20:41:31.662 I/native  (24203): I0000 00:00:1780749691.662187   24261 litert_lm_loader.cc:265] section_end_offset: 2543805296
+06-06 20:41:31.662 I/native  (24203): I0000 00:00:1780749691.662200   24261 litert_lm_loader.cc:105] model_type: tf_lite_mtp_drafter
+06-06 20:41:31.662 I/native  (24203): I0000 00:00:1780749691.662215   24261 litert_lm_loader.cc:261] section_index: 11
+06-06 20:41:31.662 I/native  (24203): I0000 00:00:1780749691.662230   24261 litert_lm_loader.cc:262] section_data_type: TFLiteModel
+06-06 20:41:31.662 I/native  (24203): I0000 00:00:1780749691.662243   24261 litert_lm_loader.cc:264] section_begin_offset: 2543812608
+06-06 20:41:31.662 I/native  (24203): I0000 00:00:1780749691.662256   24261 litert_lm_loader.cc:265] section_end_offset: 2588138320
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665152   24261 litert_lm_loader.cc:197] LitertLmLoader::Initialize
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665379   24261 litert_lm_loader.cc:220] mmap_status is ok
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665433   24261 litert_lm_loader.cc:225] status: OK
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665451   24261 litert_lm_loader.cc:226] major_version: 1
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665472   24261 litert_lm_loader.cc:227] minor_version: 5
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665485   24261 litert_lm_loader.cc:228] patch_version: 0
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665504   24261 litert_lm_loader.cc:261] section_index: 0
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665535   24261 litert_lm_loader.cc:262] section_data_type: LlmMetadataProto
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665550   24261 litert_lm_loader.cc:264] section_begin_offset: 16384
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665564   24261 litert_lm_loader.cc:265] section_end_offset: 28576
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665579   24261 litert_lm_loader.cc:261] section_index: 1
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665592   24261 litert_lm_loader.cc:262] section_data_type: SP_Tokenizer
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665603   24261 litert_lm_loader.cc:264] section_begin_offset: 32768
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665616   24261 litert_lm_loader.cc:265] section_end_offset: 4721781
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665632   24261 litert_lm_loader.cc:105] model_type: tf_lite_embedder
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665648   24261 litert_lm_loader.cc:261] section_index: 2
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665661   24261 litert_lm_loader.cc:262] section_data_type: TFLiteModel
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665673   24261 litert_lm_loader.cc:264] section_begin_offset: 4734976
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665685   24261 litert_lm_loader.cc:265] section_end_offset: 108546696
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665698   24261 litert_lm_loader.cc:105] model_type: tf_lite_per_layer_embedder
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665712   24261 litert_lm_loader.cc:261] section_index: 3
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665724   24261 litert_lm_loader.cc:262] section_data_type: TFLiteModel
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665736   24261 litert_lm_loader.cc:264] section_begin_offset: 108560384
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665750   24261 litert_lm_loader.cc:265] section_end_offset: 1393078776
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665765   24261 litert_lm_loader.cc:105] model_type: tf_lite_audio_encoder_hw
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665777   24261 litert_lm_loader.cc:244] section_backend_constraint: cpu
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665789   24261 litert_lm_loader.cc:261] section_index: 4
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665801   24261 litert_lm_loader.cc:262] section_data_type: TFLiteModel
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665814   24261 litert_lm_loader.cc:264] section_begin_offset: 1393082368
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665827   24261 litert_lm_loader.cc:265] section_end_offset: 1487134648
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665841   24261 litert_lm_loader.cc:105] model_type: tf_lite_audio_adapter
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665854   24261 litert_lm_loader.cc:244] section_backend_constraint: cpu
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665866   24261 litert_lm_loader.cc:261] section_index: 5
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665879   24261 litert_lm_loader.cc:262] section_data_type: TFLiteModel
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665890   24261 litert_lm_loader.cc:264] section_begin_offset: 1487142912
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665902   24261 litert_lm_loader.cc:265] section_end_offset: 1496584156
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665916   24261 litert_lm_loader.cc:105] model_type: tf_lite_end_of_audio
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665929   24261 litert_lm_loader.cc:261] section_index: 6
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665940   24261 litert_lm_loader.cc:262] section_data_type: TFLiteModel
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665952   24261 litert_lm_loader.cc:264] section_begin_offset: 1496596480
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665964   24261 litert_lm_loader.cc:265] section_end_offset: 1496603252
+06-06 20:41:31.665 I/native  (24203): I0000 00:00:1780749691.665978   24261 litert_lm_loader.cc:105] model_type: tf_lite_vision_encoder
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.665998   24261 litert_lm_loader.cc:248] section_prefer_activation_type: fp16
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666011   24261 litert_lm_loader.cc:261] section_index: 7
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666024   24261 litert_lm_loader.cc:262] section_data_type: TFLiteModel
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666035   24261 litert_lm_loader.cc:264] section_begin_offset: 1496612864
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666049   24261 litert_lm_loader.cc:265] section_end_offset: 1720750800
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666064   24261 litert_lm_loader.cc:105] model_type: tf_lite_vision_adapter
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666077   24261 litert_lm_loader.cc:244] section_backend_constraint: cpu
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666089   24261 litert_lm_loader.cc:261] section_index: 8
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666103   24261 litert_lm_loader.cc:262] section_data_type: TFLiteModel
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666114   24261 litert_lm_loader.cc:264] section_begin_offset: 1720762368
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666126   24261 litert_lm_loader.cc:265] section_end_offset: 1725505296
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666140   24261 litert_lm_loader.cc:105] model_type: tf_lite_end_of_vision
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666152   24261 litert_lm_loader.cc:261] section_index: 9
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666165   24261 litert_lm_loader.cc:262] section_data_type: TFLiteModel
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666176   24261 litert_lm_loader.cc:264] section_begin_offset: 1725513728
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666188   24261 litert_lm_loader.cc:265] section_end_offset: 1725520500
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666202   24261 litert_lm_loader.cc:105] model_type: tf_lite_prefill_decode
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666214   24261 litert_lm_loader.cc:248] section_prefer_activation_type: fp16
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666227   24261 litert_lm_loader.cc:261] section_index: 10
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666239   24261 litert_lm_loader.cc:262] section_data_type: TFLiteModel
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666251   24261 litert_lm_loader.cc:264] section_begin_offset: 1725530112
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666264   24261 litert_lm_loader.cc:265] section_end_offset: 2543805296
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666278   24261 litert_lm_loader.cc:105] model_type: tf_lite_mtp_drafter
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666293   24261 litert_lm_loader.cc:261] section_index: 11
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666305   24261 litert_lm_loader.cc:262] section_data_type: TFLiteModel
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666316   24261 litert_lm_loader.cc:264] section_begin_offset: 2543812608
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666328   24261 litert_lm_loader.cc:265] section_end_offset: 2588138320
+06-06 20:41:31.666 I/native  (24203): I0000 00:00:1780749691.666841   24261 engine_advanced_impl.cc:252] New model files have LlmModelType, loading tokenizer asynchronously
+06-06 20:41:31.667 I/native  (24203): I0000 00:00:1780749691.667101   24261 engine_settings.cc:101] The Main backend constraint is not set.
+06-06 20:41:31.667 I/native  (24203): I0000 00:00:1780749691.667207   24261 engine_settings.cc:443] The validated engine settings: EngineSettings: 
+06-06 20:41:31.667 I/native  (24203):   MainExecutorSettings: backend: GPU
+06-06 20:41:31.667 I/native  (24203): backend_config:
+06-06 20:41:31.667 I/native  (24203): max_top_k: 1
+06-06 20:41:31.667 I/native  (24203): 
+06-06 20:41:31.667 I/native  (24203): max_tokens: 4096
+06-06 20:41:31.667 I/native  (24203): activation_data_type: FLOAT16
+06-06 20:41:31.667 I/native  (24203): max_num_images: 0
+06-06 20:41:31.667 I/native  (24203): lora_rank: 0
+06-06 20:41:31.667 I/native  (24203): cache_dir: /data/user/0/com.firstaid.copilot.debug/cache/litertlm
+06-06 20:41:31.667 I/native  (24203): cache_file: Not set
+06-06 20:41:31.667 I/native  (24203): litert_dispatch_lib_dir: Not set
+06-06 20:41:31.667 I/native  (24203): model_assets: model_path: /storage/emulated/0/Android/media/com.firstaid.copilot.debug/models/gemma/gemma-4-E2B-it.litertlm
+06-06 20:41:31.667 I/native  (24203): fake_weights_mode: FAKE_WEIGHTS_NONE
+06-06 20:41:31.667 I/native  (24203): 
+06-06 20:41:31.667 I/native  (24203): advanced_settings: prefill_batch_sizes: []
+06-06 20:41:31.667 I/native  (24203): num_output_candidates: 1
+06-06 20:41:31.667 I/native  (24203): configure_magic_numbers: true
+06-06 20:41:31.667 I/native  (24203): verify_magic_numbers: false
+06-06 20:41:31.667 I/native  (24203): clear_kv_cache_before_prefill: true
+06-06 20:41:31.667 I/native  (24203): num_logits_to_print_after_decode: 0
+06-06 20:41:31.667 I/native  (24203): gpu_madvise_original_shared_tensors: true
+06-06 20:41:31.667 I/native  (24203): is_benchmark: true
+06-06 20:41:31.667 I/native  (24203): preferred_device_substr: 
+06-06 20:41:31.667 I/native  (24203): num_threads_to_upload: -1
+06-06 20:41:31.667 I/native  (24203): num_threads_to_compile: -1
+06-06 20:41:31.667 I/native  (24203): convert_weights_on_gpu: true
+06-06 20:41:31.667 I/native  (24203): wait_for_weights_conversion_complete_in_benchmark: true
+06-06 20:41:31.667 I/native  (24203): optimize_shader_compilation: true
+06-06 20:41:31.667 I/native  (24203): cache_compiled_shaders_only: false
+06-06 20:41:31.667 I/native  (24203): share_constant_tensors: true
+06-06 20:41:31.667 I/native  (24203): sampler_handles_input: true
+06-06 20:41:31.667 I/native  (24203): allow_src_quantized_fc_conv_ops: true
+06-06 20:41:31.667 I/native  (24203): hint_waiting_for_completion: false
+06-06 20:41:31.667 I/native  (24203): gpu_context_low_priority: Not set
+06-06 20:41:31.667 I/native  (24203): enable_speculative_decoding: true
+06-06 20:41:31.667 I/native  (24203): disable_delegate_clustering: true
+06-06 20:41:31.667 I/native  (24203): hint_kernel_batch_size: Not set
+06-06 20:41:31.667 I/native  (24203): 
+06-06 20:41:31.667 I/native  (24203):   LlmMetadata: MessageLite at 0x749dbde8f0  BenchmarkParams: MessageLite at 0x749dbde8c8  VisionExecutorSettings: Not set
+06-06 20:41:31.667 I/native  (24203):   AudioExecutorSettings: Not set
+06-06 20:41:31.667 I/native  (24203):   ParallelFileSectionLoading: true
+06-06 20:41:31.667 I/native  (24203):   SingleThreadedExecution: false
+06-06 20:41:31.667 I/native  (24203): I0000 00:00:1780749691.667496   24261 model_resources_litert_lm.cc:67] model_type: TF_LITE_PREFILL_DECODE
+06-06 20:41:31.667 I/native  (24203): I0000 00:00:1780749691.667543   24261 model_resources_litert_lm.cc:68] litert model size: 818275184
+06-06 20:41:31.816 I/litert  (24203): [environment.cc:30] Creating LiteRT environment with options
+06-06 20:41:31.816 W/litert  (24203): [npu_registry.cc:34] NPU accelerator could not be loaded and registered: kLiteRtStatusErrorInvalidArgument.
+06-06 20:41:31.816 I/litert  (24203): [gpu_registry.cc:101] Attempting to load GPU accelerator(libLiteRtGpuAccelerator.so).
+06-06 20:41:31.818 I/litert  (24203): [gpu_registry.cc:101] Attempting to load GPU accelerator(libLiteRtClGlAccelerator.so).
+06-06 20:41:31.819 I/litert  (24203): [accelerator_registry.cc:54] RegisterAccelerator: ptr=0xb4000075a06e6070, name=LiteRT GPU
+06-06 20:41:31.819 I/litert  (24203): [gpu_registry.cc:109] Dynamically loaded GPU accelerator(libLiteRtClGlAccelerator.so) registered.
+06-06 20:41:31.819 I/litert  (24203): [accelerator_registry.cc:54] RegisterAccelerator: ptr=0xb4000075a06e52f0, name=CpuAccelerator
+06-06 20:41:31.819 I/litert  (24203): [cpu_registry.cc:42] CPU accelerator registered.
+06-06 20:41:31.821 I/native  (24203): I0000 00:00:1780749691.821461   24261 executor_settings_base.cc:397] File does not exist: /data/user/0/com.firstaid.copilot.debug/cache/litertlm/gemma-4-E2B-it.litertlm_1780335215_2588147712_mldrift_program_cache.bin Cleaning stale caches.
+06-06 20:41:31.821 I/native  (24203): I0000 00:00:1780749691.821568   24261 executor_settings_base.cc:408] Deleted 0 stale cache files.
+06-06 20:41:31.821 I/native  (24203): I0000 00:00:1780749691.821608   24261 executor_settings_base.cc:351] Deleted 0 stale cache files.
+06-06 20:41:31.821 I/native  (24203): I0000 00:00:1780749691.821630   24261 litert_compiled_model_executor_utils.cc:518] Setting serialization dir: /data/user/0/com.firstaid.copilot.debug/cache/litertlm
+06-06 20:41:31.821 I/litert  (24203): [magic_number_utils.cc:97] Loaded: num_subgraphs=976, num_signatures=4
+06-06 20:41:31.821 I/litert  (24203): [magic_number_utils.cc:105]   signature=decode, subgraph_index=0, num_tensors=2703, num_inputs=35, num_outputs=32, num_ops=2068
+06-06 20:41:31.821 I/litert  (24203): [magic_number_utils.cc:105]   signature=prefill_1024, subgraph_index=1, num_tensors=1454, num_inputs=35, num_outputs=30, num_ops=1107
+06-06 20:41:31.821 I/litert  (24203): [magic_number_utils.cc:105]   signature=prefill_128, subgraph_index=2, num_tensors=1454, num_inputs=35, num_outputs=30, num_ops=1107
+06-06 20:41:31.821 I/litert  (24203): [magic_number_utils.cc:105]   signature=verify, subgraph_index=3, num_tensors=2887, num_inputs=35, num_outputs=32, num_ops=2243
+06-06 20:41:31.821 I/litert  (24203): [magic_number_utils.cc:109] Magic number configs: num_configs=1
+06-06 20:41:31.821 I/litert  (24203): [magic_number_utils.cc:116]   config[0]: magic_number=32003, target_number=4096, signature_prefix=null
+06-06 20:41:31.824 I/litert  (24203): [magic_number_utils.cc:425] 439 tensors of signature decode have been updated for magic number  32003 to target number 4096
+06-06 20:41:31.825 I/litert  (24203): [magic_number_utils.cc:425] 271 tensors of signature prefill_1024 have been updated for magic number  32003 to target number 4096
+06-06 20:41:31.826 I/litert  (24203): [magic_number_utils.cc:425] 270 tensors of signature prefill_128 have been updated for magic number  32003 to target number 4096
+06-06 20:41:31.828 I/litert  (24203): [magic_number_utils.cc:425] 444 tensors of signature verify have been updated for magic number  32003 to target number 4096
+06-06 20:41:31.828 I/litert  (24203): [compiled_model.cc:797] Flatbuffer model initialized directly from incoming litert model.
+06-06 20:41:31.898 I/native  (24203): I0000 00:00:1780749691.898418   24261 delegate_opencl.cc:563] options->hint_waiting_for_completion: false
+06-06 20:41:31.898 I/native  (24203): I0000 00:00:1780749691.898492   24261 delegate_opencl.cc:565] options->kernel_batch_size: -1
+06-06 20:41:31.905 I/litert  (24203): [environment.cc:41] Adding options to the existing LiteRT environment
+06-06 20:41:31.905 I/tflite  (24203): Loaded OpenCL library with dlopen.
+06-06 20:41:31.906 I/litert  (24203): [gpu_environment.cc:220] Created OpenCL device from provided device id and platform id.
+06-06 20:41:31.908 I/litert  (24203): [gpu_environment.cc:283] Reusing provided EGL environment.
+06-06 20:41:31.908 I/litert  (24203): [gpu_environment.h:155] Created LiteRT GpuEnvironment.
+06-06 20:41:31.908 I/litert  (24203): [environment.cc:41] Adding options to the existing LiteRT environment
+06-06 20:41:31.915 I/tflite  (24203): Replacing 2068 out of 2068 node(s) with delegate (LITERT_CL) node, yielding 1 partitions for subgraph 0.
+06-06 20:41:31.975 E/native  (24203): E0000 00:00:1780749691.975903   24261 delegate_opencl.cc:330] Failed to create litert::ml_drift::DelegateKernelLiteRt: INTERNAL: Could not open file ('/data/user/0/com.firstaid.copilot.debug/cache/litertlm/gemma-4-E2B-it.litertlm_1780335215_2588147712_mldrift_weight_cache.bin'): No such file or directory
+06-06 20:41:31.975 E/native  (24203): === Source Location Trace: === 
+06-06 20:41:31.975 E/native  (24203): third_party/odml/infra/ml_drift_delegate/serialization_weight_cache/cache_builder.cc:96
+06-06 20:41:31.975 E/native  (24203): third_party/odml/litert/ml_drift/delegate/delegate_kernel.cc:902
+06-06 20:41:31.975 E/native  (24203): third_party/odml/litert/ml_drift/delegate/delegate_kernel.cc:347
+06-06 20:41:31.975 E/native  (24203): third_party/odml/litert/ml_drift/delegate/delegate_kernel.cc:281
+06-06 20:41:31.975 E/native  (24203): third_party/odml/litert/ml_drift/delegate/delegate_kernel_litert.cc:167
+06-06 20:41:32.007 E/tflite  (24203): Restored original execution plan after delegate application failure.
+06-06 20:41:32.222 I/EdgeModelSmoke(24203): Edge model smoke phase=gemma_prewarm_done
+06-06 20:41:32.231 I/EdgeModelSmoke(24203): Edge model smoke phase=gemma_done
+06-06 20:41:32.238 I/EdgeModelSmoke(24203): Edge model smoke phase=finished
+06-06 20:41:32.238 I/EdgeModelSmoke(24203): Edge model smoke result: {"ok":false,"mode":"gemma","runs":3,"threads":2,"gemmaBackendPreference":"GpuOnly","modelRoot":"\/storage\/emulated\/0\/Android\/media\/com.firstaid.copilot.debug\/models","summary":"Gemma=Ready ASR=Ready TTS=Ready sherpa=Ready","gemmaReady":true,"asrReady":true,"ttsReady":true,"phase":"finished","updatedAtMs":1780749692231,"gemma":{"ok":false,"latencyMs":570,"backend":"","prompt":"你是急救语音助手。用一句不超过15个字的中文回答：成人心肺复苏的按压频率是多少？","generateOk":false,"generateError":"prewarm failed","error":"java.lang.IllegalStateException: java.lang.reflect.InvocationTargetException: Failed to create engine: INTERNAL: ERROR: [third_party\/odml\/litert_lm\/runtime\/executor\/llm_litert_compiled_model_executor.cc:1951]\n└ ERROR: [.\/third_party\/odml\/litert\/litert\/cc\/litert_compiled_model.h:1472]"}}

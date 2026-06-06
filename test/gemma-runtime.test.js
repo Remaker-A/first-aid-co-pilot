@@ -16,7 +16,8 @@ import {
   findGemmaModelFile,
   parseGemmaNluResponse,
   parseGemmaResponse,
-  resolveGemmaConfig
+  resolveGemmaConfig,
+  shutdownGemmaServers
 } from "../src/index.js";
 
 const GEMMA_4_REPO = "litert-community/gemma-4-E2B-it-litert-lm";
@@ -285,11 +286,212 @@ test("Gemma server runner uses the served model id from /v1/models when availabl
       modelFile,
       messages: [{ role: "user", content: "hello" }],
       timeoutMs: 50,
+      maxTokens: 24,
     });
 
     const post = requests.find((request) => request.init.method === "POST");
     assert.ok(post);
-    assert.equal(JSON.parse(post.init.body).model, servedModelId);
+    const body = JSON.parse(post.init.body);
+    assert.equal(body.model, servedModelId);
+    assert.equal(body.max_tokens, 24);
+  });
+});
+
+test("Gemma server runner reads OpenAI streaming deltas and returns after a safe short sentence", async () => {
+  await withMockModelFile(async (modelFile) => {
+    const servedModelId = "litert-streaming-gemma-model";
+    const requests = [];
+    let cancelled = false;
+    const runner = createGemmaServerRunner({
+      spawnImpl: createFakeSpawn(),
+      fetchImpl: async (url, init = {}) => {
+        requests.push({ url, init });
+        if (init.method === "GET") {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ data: [{ id: servedModelId }] }),
+            text: async () => "",
+          };
+        }
+        return createSseResponse([
+          { choices: [{ delta: { role: "assistant" } }] },
+          { choices: [{ delta: { content: "继续" } }] },
+          { choices: [{ delta: { content: "按压胸骨。" } }] },
+          { choices: [{ delta: { content: "这段不应等待。" } }] },
+        ], () => {
+          cancelled = true;
+        });
+      },
+    });
+
+    try {
+      const result = await runner({
+        config: {
+          ...resolveGemmaConfig({
+            env: {
+              GEMMA_DAEMON: "1",
+              GEMMA_SERVE_PORT: "8808",
+            },
+            cwd: "D:\\test-workspace",
+          }),
+          modelFile,
+          serveReadyTimeoutMs: 50,
+        },
+        modelFile,
+        messages: [{ role: "user", content: "short answer" }],
+        timeoutMs: 50,
+        maxTokens: 24,
+        stream: true,
+        streamMaxChars: 24,
+        streamStopPattern: "继续按压",
+      });
+
+      assert.equal(result.exitCode, 0);
+      assert.equal(result.daemon, true);
+      assert.equal(result.streamed, true);
+      assert.equal(result.stdout, "继续按压胸骨。");
+      assert.equal(cancelled, false);
+      const post = requests.find((request) => request.init.method === "POST");
+      const body = JSON.parse(post.init.body);
+      assert.equal(body.model, servedModelId);
+      assert.equal(body.stream, true);
+      assert.equal(body.max_tokens, 24);
+    } finally {
+      shutdownGemmaServers();
+    }
+  });
+});
+
+test("Gemma server runner does not early-return streaming text before the required safety anchor", async () => {
+  await withMockModelFile(async (modelFile) => {
+    const requests = [];
+    const runner = createGemmaServerRunner({
+      spawnImpl: createFakeSpawn(),
+      fetchImpl: async (url, init = {}) => {
+        requests.push({ url, init });
+        if (init.method === "GET") {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ data: [{ id: "litert-streaming-gemma-model" }] }),
+            text: async () => "",
+          };
+        }
+        return createSseResponse([
+          { choices: [{ delta: { content: "It looks like a serious issue." } }] },
+          { choices: [{ delta: { content: "继续按压胸骨。" } }] },
+        ]);
+      },
+    });
+
+    try {
+      const result = await runner({
+        config: {
+          ...resolveGemmaConfig({
+            env: {
+              GEMMA_DAEMON: "1",
+              GEMMA_SERVE_PORT: "8810",
+            },
+            cwd: "D:\\test-workspace",
+          }),
+          modelFile,
+          serveReadyTimeoutMs: 50,
+        },
+        modelFile,
+        messages: [{ role: "user", content: "short answer" }],
+        timeoutMs: 50,
+        maxTokens: 24,
+        stream: true,
+        streamMaxChars: 8,
+        streamStopPattern: "继续按压",
+      });
+
+      assert.equal(result.stdout, "It looks like a serious issue.继续按压胸骨。");
+    } finally {
+      shutdownGemmaServers();
+    }
+  });
+});
+
+test("Gemma server runner restarts the daemon after an aborted request", async () => {
+  await withMockModelFile(async (modelFile) => {
+    const children = [];
+    const requests = [];
+    let postAttempts = 0;
+    const runner = createGemmaServerRunner({
+      spawnImpl: createTrackingFakeSpawn(children),
+      fetchImpl: async (url, init = {}) => {
+        requests.push({ url, init });
+        if (init.method === "GET") {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ data: [{ id: "served-after-timeout" }] }),
+            text: async () => "",
+          };
+        }
+        postAttempts += 1;
+        if (postAttempts === 1) {
+          const error = new Error("This operation was aborted");
+          error.name = "AbortError";
+          throw error;
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            choices: [{ message: { content: JSON.stringify(VALID_PATCH) } }],
+          }),
+          text: async () => "",
+        };
+      },
+    });
+    const config = {
+      ...resolveGemmaConfig({
+        env: {
+          GEMMA_DAEMON: "1",
+          GEMMA_SERVE_PORT: "8807",
+        },
+        cwd: "D:\\test-workspace",
+      }),
+      modelFile,
+      serveReadyTimeoutMs: 50,
+    };
+
+    try {
+      await assert.rejects(
+        () =>
+          runner({
+            config,
+            modelFile,
+            messages: [{ role: "user", content: "first" }],
+            timeoutMs: 50,
+          }),
+        /aborted/i
+      );
+
+      assert.equal(children.length, 1);
+      assert.equal(children[0].killCalls, 1, "timed-out daemon should be killed");
+
+      const result = await runner({
+        config,
+        modelFile,
+        messages: [{ role: "user", content: "second" }],
+        timeoutMs: 50,
+      });
+
+      assert.equal(result.exitCode, 0);
+      assert.equal(result.stdout, JSON.stringify(VALID_PATCH));
+      assert.equal(children.length, 2, "next request should spawn a fresh daemon");
+      assert.equal(postAttempts, 2);
+      const postBodies = requests
+        .filter((request) => request.init.method === "POST")
+        .map((request) => JSON.parse(request.init.body));
+      assert.equal(postBodies[1].messages[0].content, "second");
+    } finally {
+      shutdownGemmaServers();
+    }
   });
 });
 
@@ -371,6 +573,85 @@ test("GemmaRuntime generatePatch honors a per-call timeout override", async () =
 
     assert.equal(result.ok, true);
     assert.equal(result.patch.intent, "parse_response_answer");
+  });
+});
+
+test("GemmaRuntime generateText uses daemon chat with a short token budget", async () => {
+  await withMockModelFile(async (modelFile) => {
+    let seen = null;
+    const runtime = new GemmaRuntime({
+      config: {
+        ...resolveGemmaConfig({
+          env: {
+            GEMMA_DAEMON: "1",
+            GEMMA_SERVE_PORT: "8797",
+          },
+          cwd: "D:\\test-workspace",
+        }),
+        modelFile
+      },
+      serverRunner: async (request) => {
+        seen = request;
+        return {
+          stdout: "继续按压，保持节奏。",
+          stderr: "",
+          exitCode: 0,
+          daemon: true,
+        };
+      }
+    });
+
+    const result = await runtime.generateText(
+      [{ role: "user", content: "short answer" }],
+      { timeoutMs: 987, maxTokens: 32 }
+    );
+
+    assert.equal(result.ok, true);
+    assert.equal(result.text, "继续按压，保持节奏。");
+    assert.equal(seen.timeoutMs, 987);
+    assert.equal(seen.maxTokens, 32);
+    assert.equal(seen.stream, false);
+    assert.deepEqual(seen.messages, [{ role: "user", content: "short answer" }]);
+  });
+});
+
+test("GemmaRuntime generateText can request streaming text", async () => {
+  await withMockModelFile(async (modelFile) => {
+    let seen = null;
+    const runtime = new GemmaRuntime({
+      config: {
+        ...resolveGemmaConfig({
+          env: {
+            GEMMA_DAEMON: "1",
+            GEMMA_SERVE_PORT: "8796",
+          },
+          cwd: "D:\\test-workspace",
+        }),
+        modelFile
+      },
+      serverRunner: async (request) => {
+        seen = request;
+        return {
+          stdout: "继续按压胸骨。",
+          stderr: "",
+          exitCode: 0,
+          daemon: true,
+          streamed: true,
+        };
+      }
+    });
+
+    const result = await runtime.generateText(
+      [{ role: "user", content: "short answer" }],
+      { timeoutMs: 900, maxTokens: 24, stream: true, streamMaxChars: 18 }
+    );
+
+    assert.equal(result.ok, true);
+    assert.equal(result.text, "继续按压胸骨。");
+    assert.equal(result.streamed, true);
+    assert.equal(seen.stream, true);
+    assert.equal(seen.streamMaxChars, 18);
+    assert.equal(seen.streamStopPattern, null);
   });
 });
 
@@ -721,6 +1002,56 @@ function createFakeSpawn() {
     child.kill = () => {
       queueMicrotask(() => child.emit("close", 0, null));
     };
+    return child;
+  };
+}
+
+function createSseResponse(events, onCancel = () => {}) {
+  const encoder = new TextEncoder();
+  let index = 0;
+  const body = new ReadableStream({
+    pull(controller) {
+      if (index >= events.length) {
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
+        return;
+      }
+      const event = events[index];
+      index += 1;
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+    },
+    cancel() {
+      onCancel();
+    },
+  });
+
+  return {
+    ok: true,
+    status: 200,
+    headers: new Headers({ "content-type": "text/event-stream" }),
+    body,
+    text: async () => "",
+  };
+}
+
+function createTrackingFakeSpawn(children = []) {
+  return () => {
+    const child = new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.stdout.setEncoding = () => {};
+    child.stderr.setEncoding = () => {};
+    child.stdout.unref = () => {};
+    child.stderr.unref = () => {};
+    child.unref = () => {};
+    child.killCalls = 0;
+    child.kill = (signal) => {
+      child.killCalls += 1;
+      child.killSignal = signal;
+      queueMicrotask(() => child.emit("close", 0, signal || null));
+      return true;
+    };
+    children.push(child);
     return child;
   };
 }

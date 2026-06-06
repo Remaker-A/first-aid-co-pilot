@@ -1,0 +1,102 @@
+{
+  "ok": true,
+  "mode": "gemma",
+  "runs": 5,
+  "threads": 2,
+  "gemmaBackendPreference": "CpuOnly",
+  "gemmaSpeculative": true,
+  "gemmaCpuThreads": 0,
+  "gemmaMaxNumTokens": 4096,
+  "gemmaSampler": "default",
+  "modelRoot": "\/storage\/emulated\/0\/Android\/media\/com.firstaid.copilot.debug\/models",
+  "summary": "Gemma=Ready ASR=Ready TTS=Ready sherpa=Ready",
+  "gemmaReady": true,
+  "asrReady": true,
+  "ttsReady": true,
+  "phase": "finished",
+  "updatedAtMs": 1780752443417,
+  "gemma": {
+    "ok": true,
+    "latencyMs": 679,
+    "backend": "CPU",
+    "prompt": "你是急救语音助手。用一句不超过15个字的中文回答：成人心肺复苏的按压频率是多少？",
+    "generateOk": true,
+    "generateLatencyMs": 2910,
+    "generateText": "每分钟100次按压。",
+    "warmGenerateOk": true,
+    "warmGenerateLatencyMs": 3241,
+    "runs": [
+      {
+        "ok": true,
+        "latencyMs": 2914,
+        "text": "每分钟100次按压。"
+      },
+      {
+        "ok": true,
+        "latencyMs": 2916,
+        "text": "每分钟100次按压。"
+      },
+      {
+        "ok": true,
+        "latencyMs": 2885,
+        "text": "每分钟100次按压。"
+      },
+      {
+        "ok": true,
+        "latencyMs": 2921,
+        "text": "每分钟100次按压。"
+      },
+      {
+        "ok": true,
+        "latencyMs": 2910,
+        "text": "每分钟100次按压。"
+      }
+    ],
+    "latency": {
+      "count": 5,
+      "avgMs": 2909.2,
+      "minMs": 2885,
+      "maxMs": 2921,
+      "p50Ms": 2914,
+      "p95Ms": 2921
+    },
+    "gate": {
+      "gateMs": 1200,
+      "budgetMs": 1500,
+      "totalRuns": 5,
+      "okRuns": 5,
+      "withinBudgetRuns": 0,
+      "p50Ms": 2914,
+      "p95Ms": 2921,
+      "nearRealtimeCapable": false,
+      "recommendation": "ack_then_async"
+    }
+  },
+  "gemmaRuns": [
+    {
+      "ok": true,
+      "latencyMs": 2914,
+      "text": "每分钟100次按压。"
+    },
+    {
+      "ok": true,
+      "latencyMs": 2916,
+      "text": "每分钟100次按压。"
+    },
+    {
+      "ok": true,
+      "latencyMs": 2885,
+      "text": "每分钟100次按压。"
+    },
+    {
+      "ok": true,
+      "latencyMs": 2921,
+      "text": "每分钟100次按压。"
+    },
+    {
+      "ok": true,
+      "latencyMs": 2910,
+      "text": "每分钟100次按压。"
+    }
+  ]
+}

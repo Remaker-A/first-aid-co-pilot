@@ -1,0 +1,138 @@
+﻿{
+    "ok":  true,
+    "artifactDir":  "D:\\文档\\Codex\\first aid\\artifacts\\vivo-live-20260606-063738",
+    "log":  "D:\\文档\\Codex\\first aid\\artifacts\\vivo-live-20260606-063738\\logcat-live.txt",
+    "counts":  {
+                   "metrics":  1,
+                   "asrPartials":  0,
+                   "asrFinals":  0,
+                   "utteranceCommits":  0,
+                   "ttsStarts":  1,
+                   "liveAudioStarts":  0,
+                   "serverAudioBegins":  1,
+                   "serverAudioChunks":  3,
+                   "serverAudioEnds":  1,
+                   "errors":  0
+               },
+    "websocketOpened":  true,
+    "capture":  {
+                    "started":  true,
+                    "rmsPeak":  {
+                                    "count":  8,
+                                    "p50":  0.0004,
+                                    "p95":  0.006,
+                                    "max":  0.006
+                                },
+                    "voiceActiveEvents":  0
+                },
+    "voicePathLatencyMs":  {
+                               "voiceActiveToFirstPartial":  {
+                                                                 "count":  0,
+                                                                 "p50":  null,
+                                                                 "p95":  null,
+                                                                 "max":  null
+                                                             },
+                               "speechEndToFinal":  {
+                                                        "count":  0,
+                                                        "p50":  null,
+                                                        "p95":  null,
+                                                        "max":  null
+                                                    },
+                               "finalToGuidance":  {
+                                                       "count":  0,
+                                                       "p50":  null,
+                                                       "p95":  null,
+                                                       "max":  null
+                                                   },
+                               "guidanceToAndroidTtsStart":  {
+                                                                 "count":  1,
+                                                                 "p50":  231,
+                                                                 "p95":  231,
+                                                                 "max":  231
+                                                             },
+                               "finalToAndroidTtsStart":  {
+                                                              "count":  0,
+                                                              "p50":  null,
+                                                              "p95":  null,
+                                                              "max":  null
+                                                          },
+                               "speechEndToAndroidTtsStart":  {
+                                                                  "count":  0,
+                                                                  "p50":  null,
+                                                                  "p95":  null,
+                                                                  "max":  null
+                                                              }
+                           },
+    "latencyMs":  {
+                      "turnTotal":  {
+                                        "count":  1,
+                                        "p50":  4439,
+                                        "p95":  4439,
+                                        "max":  4439
+                                    },
+                      "tts":  {
+                                  "count":  1,
+                                  "p50":  4436,
+                                  "p95":  4436,
+                                  "max":  4436
+                              },
+                      "serverAudioFirstChunk":  {
+                                                    "count":  1,
+                                                    "p50":  2700,
+                                                    "p95":  2700,
+                                                    "max":  2700
+                                                },
+                      "androidTtsOnStart":  {
+                                                "count":  1,
+                                                "p50":  82,
+                                                "p95":  82,
+                                                "max":  82
+                                            },
+                      "liveAudioStart":  {
+                                             "count":  0,
+                                             "p50":  null,
+                                             "p95":  null,
+                                             "max":  null
+                                         },
+                      "openQuestionWait":  {
+                                               "count":  0,
+                                               "p50":  null,
+                                               "p95":  null,
+                                               "max":  null
+                                           }
+                  },
+    "intents":  [
+
+                ],
+    "stages":  [
+                   "S1_SCENE_SAFE"
+               ],
+    "asrFinals":  [
+
+                  ],
+    "asrPartials":  [
+
+                    ],
+    "metrics":  [
+                    {
+                        "turn":  1,
+                        "stage":  "S1_SCENE_SAFE",
+                        "source":  "state_machine",
+                        "intent":  "",
+                        "intentSource":  "regex",
+                        "totalMs":  4439,
+                        "ttsMs":  4436,
+                        "audioMs":  2700,
+                        "openSegment":  "",
+                        "openWaitMs":  -1,
+                        "openFallback":  false
+                    }
+                ],
+    "errors":  [
+
+               ],
+    "notes":  [
+                  "voicePathLatencyMs pairs Android logcat epoch timestamps when human speech creates voice-active, ASR final, guidance, and TTS events.",
+                  "For final acceptance, run 2-3 human spoken rounds and inspect ASR partial/final plus Live metrics counts."
+              ]
+}

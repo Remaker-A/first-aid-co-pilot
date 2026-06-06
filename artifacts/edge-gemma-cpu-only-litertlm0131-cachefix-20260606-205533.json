@@ -1,0 +1,79 @@
+{
+  "ok": true,
+  "mode": "gemma",
+  "runs": 3,
+  "threads": 2,
+  "gemmaBackendPreference": "CpuOnly",
+  "gemmaSpeculative": true,
+  "modelRoot": "\/storage\/emulated\/0\/Android\/media\/com.firstaid.copilot.debug\/models",
+  "summary": "Gemma=Ready ASR=Ready TTS=Ready sherpa=Ready",
+  "gemmaReady": true,
+  "asrReady": true,
+  "ttsReady": true,
+  "phase": "finished",
+  "updatedAtMs": 1780750533170,
+  "gemma": {
+    "ok": true,
+    "latencyMs": 8448,
+    "backend": "CPU",
+    "prompt": "你是急救语音助手。用一句不超过15个字的中文回答：成人心肺复苏的按压频率是多少？",
+    "generateOk": true,
+    "generateLatencyMs": 2961,
+    "generateText": "每分钟100次按压。",
+    "warmGenerateOk": true,
+    "warmGenerateLatencyMs": 3278,
+    "runs": [
+      {
+        "ok": true,
+        "latencyMs": 2972,
+        "text": "每分钟100次按压。"
+      },
+      {
+        "ok": true,
+        "latencyMs": 2959,
+        "text": "每分钟100次按压。"
+      },
+      {
+        "ok": true,
+        "latencyMs": 2961,
+        "text": "每分钟100次按压。"
+      }
+    ],
+    "latency": {
+      "count": 3,
+      "avgMs": 2964,
+      "minMs": 2959,
+      "maxMs": 2972,
+      "p50Ms": 2961,
+      "p95Ms": 2972
+    },
+    "gate": {
+      "gateMs": 1200,
+      "budgetMs": 1500,
+      "totalRuns": 3,
+      "okRuns": 3,
+      "withinBudgetRuns": 0,
+      "p50Ms": 2961,
+      "p95Ms": 2972,
+      "nearRealtimeCapable": false,
+      "recommendation": "ack_then_async"
+    }
+  },
+  "gemmaRuns": [
+    {
+      "ok": true,
+      "latencyMs": 2972,
+      "text": "每分钟100次按压。"
+    },
+    {
+      "ok": true,
+      "latencyMs": 2959,
+      "text": "每分钟100次按压。"
+    },
+    {
+      "ok": true,
+      "latencyMs": 2961,
+      "text": "每分钟100次按压。"
+    }
+  ]
+}

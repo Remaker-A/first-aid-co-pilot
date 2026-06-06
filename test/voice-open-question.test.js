@@ -176,7 +176,7 @@ test("CPR-live open question answer times out to a safety fallback (never blocks
 
   const result = await service.handleTurn({
     sessionId,
-    text: "为什么要保持这个节奏呢",
+    text: "能不能简单解释一下",
     waitForOpenQuestionAnswer: true,
   });
 
@@ -233,6 +233,211 @@ test("CPR-live common open questions get an immediate safety answer when Gemma i
   assert.equal(principle.open_question_answer.reason, "template_cpr_principle");
   assert.match(principle.open_question_answer.action.tts.text, /血|继续按压/);
   assert.equal(runtimeCalls, 0, "principle template answer must not wait on a stuck model");
+
+  const templateCases = [
+    {
+      text: "为什么要保持这个节奏",
+      reason: "template_cpr_rhythm",
+      speech: /节奏|血流|继续按压/,
+    },
+    {
+      text: "下一分钟我该做什么",
+      reason: "template_next_minute",
+      speech: /下一分钟|继续按压|换手/,
+    },
+    {
+      text: "这个流程背后的依据是什么",
+      reason: "template_guideline_basis",
+      speech: /急救指南|继续按压/,
+    },
+    {
+      text: "如果我快没力气了旁边没人帮怎么办",
+      reason: "template_rescuer_fatigue_plan",
+      speech: /继续按压|换手/,
+    },
+    {
+      text: "为什么不用人工呼吸",
+      reason: "template_hands_only_cpr",
+      speech: /人工呼吸|继续按压|AED|急救员/,
+    },
+    {
+      text: "为什么不能人工呼吸",
+      reason: "template_hands_only_cpr",
+      speech: /人工呼吸|继续按压|AED|急救员/,
+    },
+    {
+      text: "他吐了还按吗",
+      reason: "template_vomit_airway",
+      speech: /继续按压|口鼻|清开/,
+    },
+    {
+      text: "地上有水怎么办",
+      reason: "template_environment_safety",
+      speech: /安全|继续按压|干燥/,
+    },
+    {
+      text: "我一个人怎么办",
+      reason: "template_solo_rescuer",
+      speech: /一个人|继续按压|免提|帮忙/,
+    },
+    {
+      text: "要不要先搬动他",
+      reason: "template_do_not_move_patient",
+      speech: /不要|搬动|继续按压|不安全/,
+    },
+    {
+      text: "要不要喂水找药",
+      reason: "template_no_water_or_medicine",
+      speech: /不要|喂水|找药|继续按压/,
+    },
+    {
+      text: "能不能掐人中",
+      reason: "template_no_stimulation",
+      speech: /不要|掐人中|继续按压/,
+    },
+    {
+      text: "要不要测脉搏",
+      reason: "template_no_pulse_check",
+      speech: /不要|脉搏|继续按压/,
+    },
+    {
+      text: "按断肋骨怎么办",
+      reason: "template_possible_rib_injury",
+      speech: /受伤|继续按压|更重要/,
+    },
+    {
+      text: "为什么他脸色发白",
+      reason: "template_pale_or_blue",
+      speech: /继续按压|脸色|紧急|最重要/,
+    },
+  ];
+
+  for (const item of templateCases) {
+    const answer = await service.handleTurn({
+      sessionId,
+      text: item.text,
+      waitForOpenQuestionAnswer: true,
+    });
+
+    assert.equal(answer.open_question, true, item.text);
+    assert.equal(answer.guidance_source, "open_question_ack", item.text);
+    assert.equal(answer.open_question_answer.ok, true, item.text);
+    assert.equal(answer.open_question_answer.source, "open_question_template", item.text);
+    assert.equal(answer.open_question_answer.wait_ms, 0, item.text);
+    assert.equal(answer.open_question_answer.reason, item.reason, item.text);
+    assert.match(answer.open_question_answer.action.tts.text, item.speech, item.text);
+    assert.equal(answer.guidance_action.haptic.pattern, "metronome", item.text);
+    assert.deepEqual(answer.guidance_action.tool_actions, [], item.text);
+  }
+  assert.equal(runtimeCalls, 0, "all covered templates must bypass the stuck model");
+});
+
+test("CPR-live non-template open questions can use the Gemma text fast path", async () => {
+  let textCalls = 0;
+  let patchCalls = 0;
+  const service = createVoiceDemoService({
+    runtime: {
+      async generateText(messages, options) {
+        textCalls += 1;
+        assert.equal(messages.length, 1);
+        assert.match(messages[0].content, /正在CPR/);
+        assert.match(messages[0].content, /继续按压/);
+        assert.ok(Number.isFinite(options.timeoutMs));
+        assert.ok(options.timeoutMs <= 1000);
+        assert.ok(options.maxTokens === undefined || options.maxTokens <= 32);
+        assert.equal(options.stream, true);
+        assert.ok(options.streamMaxChars <= 24);
+        return { ok: true, text: "分配体力，继续按压，尽量保持节奏。" };
+      },
+      async generatePatch() {
+        patchCalls += 1;
+        return new Promise(() => {});
+      },
+    },
+    tts: { provider: "mock" },
+    gemmaOpenQuestionLiveTimeoutMs: 800,
+    gemmaOpenQuestionTextTimeoutMs: 1000,
+    gemmaOpenQuestionTextMaxTokens: 32,
+  });
+  const sessionId = "open_q_text_fast";
+  await advanceVoiceSessionToCpr(service, sessionId);
+
+  const result = await service.handleTurn({
+    sessionId,
+    text: "为什么他的鞋子湿了",
+    waitForOpenQuestionAnswer: true,
+  });
+
+  assert.equal(result.open_question, true);
+  assert.equal(result.open_question_answer.ok, true);
+  assert.equal(result.open_question_answer.source, "gemma_open_question_text");
+  assert.equal(result.open_question_answer.fallback, false);
+  assert.equal(result.open_question_answer.reason, "open_question_text_answered");
+  assert.match(result.open_question_answer.action.tts.text, /继续按压/);
+  assert.equal(textCalls, 1);
+  assert.equal(patchCalls, 0, "text answer should avoid the slow JSON patch path");
+});
+
+test("CPR-live non-template open questions preserve the Gemma streaming text source", async () => {
+  let textCalls = 0;
+  const service = createVoiceDemoService({
+    runtime: {
+      async generateText(messages, options) {
+        textCalls += 1;
+        assert.equal(messages.length, 1);
+        assert.equal(options.stream, true);
+        assert.match(String(options.streamStopPattern), /继续按压/);
+        return { ok: true, text: "It looks serious.继续按压胸骨。", streamed: true };
+      },
+    },
+    tts: { provider: "mock" },
+  });
+  const sessionId = "open_q_text_stream";
+  await advanceVoiceSessionToCpr(service, sessionId);
+
+  const result = await service.handleTurn({
+    sessionId,
+    text: "为什么他的鞋子湿了",
+    waitForOpenQuestionAnswer: true,
+  });
+
+  assert.equal(result.open_question, true);
+  assert.equal(result.open_question_answer.ok, true);
+  assert.equal(result.open_question_answer.source, "gemma_open_question_text_stream");
+  assert.equal(result.open_question_answer.reason, "open_question_text_stream_answered");
+  assert.equal(result.open_question_answer.action.tts.text, "继续按压胸骨。");
+  assert.equal(textCalls, 1);
+});
+
+test("CPR-live Gemma text fast path blocks unsafe text and falls back", async () => {
+  let patchCalls = 0;
+  const service = createVoiceDemoService({
+    runtime: {
+      async generateText() {
+        return { ok: true, text: "可以停下按压，保证没事。" };
+      },
+      async generatePatch() {
+        patchCalls += 1;
+        return new Promise(() => {});
+      },
+    },
+    tts: { provider: "mock" },
+  });
+  const sessionId = "open_q_text_blocked";
+  await advanceVoiceSessionToCpr(service, sessionId);
+
+  const result = await service.handleTurn({
+    sessionId,
+    text: "为什么他的鞋子湿了",
+    waitForOpenQuestionAnswer: true,
+  });
+
+  assert.equal(result.open_question, true);
+  assert.equal(result.open_question_answer.ok, false);
+  assert.equal(result.open_question_answer.source, "open_question_fallback");
+  assert.equal(result.open_question_answer.fallback, true);
+  assert.match(result.open_question_answer.action.tts.text, /继续按压/);
+  assert.equal(patchCalls, 0, "unsafe text should not continue into a slow live patch retry");
 });
 
 test("open questions use a dedicated timeout, compact Gemma frame, and session answer cache", async () => {
