@@ -77,6 +77,7 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
     implementation("com.google.mediapipe:tasks-vision:0.10.29")
+    implementation("com.google.mediapipe:tasks-text:0.10.29")
     // Runtime-only: this AAR is compiled with newer Kotlin metadata than the app.
     // The Android edge driver calls its stable Java ABI through reflection.
     runtimeOnly("com.google.ai.edge.litertlm:litertlm-android:0.13.1") {

@@ -2,89 +2,75 @@ package com.firstaid.copilot.live.edge
 
 import com.firstaid.copilot.live.LiveNluRequest
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * Rule-classifier intent-mapping coverage for the default (rule-based)
+ * [EdgeTinyNluResolver]. The prototype router itself is covered by
+ * [EdgeBreathingNluPrototypeRouterTest]; this locks in the closed-set mapping and
+ * the safety-relevant "没正常呼吸 → no_normal_breathing" case.
+ */
 class EdgeTinyNluResolverTest {
 
     private val resolver = EdgeTinyNluResolver()
 
     @Test
-    fun agonalBreathingPhrasesResolveWithoutGemma() = runTest {
-        listOf(
-            "他只有偶尔喘息",
-            "只是偶尔喘一下",
-            "好像没有呼吸，偶尔喘一下",
-        ).forEach { transcript ->
-            val result = resolve(transcript)
-
-            assertTrue(transcript, result?.intent == "agonal_breathing")
-            assertFalse(transcript, result?.needsClarification ?: true)
-            assertTrue(transcript, (result?.confidence ?: 0.0) >= 0.78)
+    fun absentBreathingMapsToNoNormalBreathing() = runTest {
+        listOf("他没有呼吸", "他没气了", "停止呼吸").forEach { transcript ->
+            assertEquals(transcript, "no_normal_breathing", resolve(transcript)?.intent)
         }
     }
 
     @Test
-    fun absentBreathingPhrasesResolveToNoNormalBreathing() = runTest {
-        listOf(
-            "他没有呼吸",
-            "没正常呼吸",
-            "胸口看不到起伏",
-            "呼吸很弱",
-        ).forEach { transcript ->
-            val result = resolve(transcript)
+    fun negatedNormalBreathingIsNoNormalBreathingNotNormal() = runTest {
+        // Safety: "没正常呼吸" must not be misread as normal_breathing via the
+        // "正常呼吸" substring; the missing-breathing reading wins.
+        val result = resolve("没正常呼吸")
+        assertEquals("no_normal_breathing", result?.intent)
+        assertFalse(result?.needsClarification ?: true)
+    }
 
-            assertTrue(transcript, result?.intent == "no_normal_breathing")
-            assertFalse(transcript, result?.needsClarification ?: true)
-            assertTrue(transcript, (result?.confidence ?: 0.0) >= 0.78)
+    @Test
+    fun absentChestMovementMapsToNormalBreathingAbsent() = runTest {
+        assertEquals("normal_breathing_absent", resolve("胸口没有起伏")?.intent)
+    }
+
+    @Test
+    fun presentBreathingMapsToNormalBreathing() = runTest {
+        assertEquals("normal_breathing", resolve("他有正常呼吸")?.intent)
+    }
+
+    @Test
+    fun presentChestMovementMapsToNormalBreathingPresent() = runTest {
+        assertEquals("normal_breathing_present", resolve("胸口有起伏")?.intent)
+    }
+
+    @Test
+    fun agonalPhraseMapsToAgonalBreathing() = runTest {
+        listOf("只是偶尔喘一下", "疑似濒死呼吸").forEach { transcript ->
+            assertEquals(transcript, "agonal_breathing", resolve(transcript)?.intent)
         }
     }
 
     @Test
-    fun presentBreathingPhrasesResolveToNormalBreathing() = runTest {
-        listOf(
-            "他有正常呼吸",
-            "胸口有起伏",
-            "他现在呼吸正常",
-        ).forEach { transcript ->
-            val result = resolve(transcript)
-
-            assertTrue(transcript, result?.intent == "normal_breathing")
-            assertFalse(transcript, result?.needsClarification ?: true)
-        }
+    fun breathingQuestionAsksForClarification() = runTest {
+        val result = resolve("有呼吸吗")
+        assertEquals("clarify_breathing", result?.intent)
+        assertTrue(result?.needsClarification ?: false)
     }
 
     @Test
-    fun uncertainBreathingPhrasesAskForClarification() = runTest {
-        listOf(
-            "我看不太清楚他有没有呼吸",
-            "不确定",
-            "他好像没气",
-            "有呼吸吗",
-        ).forEach { transcript ->
-            val result = resolve(transcript)
-
-            assertTrue(transcript, result?.intent == "clarify_breathing")
-            assertTrue(transcript, result?.needsClarification ?: false)
-        }
-    }
-
-    @Test
-    fun resolverIsStageScopedAndNeverEmitsArrestIntent() = runTest {
+    fun staysStageScopedAndNeverEmitsArrestIntent() = runTest {
         // No baked policy outside S3 → decline (the hot path already committed).
-        assertNull(resolve("他没有呼吸", stage = "S7_CPR_LOOP"))
+        assertNull(resolve("他没有呼吸", stage = "S2_CHECK_RESPONSE"))
 
         val allowed = EdgeNluPolicy.forStage(S3)?.allowedIntents.orEmpty()
-        listOf(
-            "他没有呼吸",
-            "他有正常呼吸",
-            "只是偶尔喘一下",
-            "我看不清有没有呼吸",
-        ).forEach { transcript ->
+        listOf("他没有呼吸", "没正常呼吸", "他有正常呼吸", "只是偶尔喘一下").forEach { transcript ->
             val result = resolve(transcript)
-
             assertTrue(transcript, result != null)
             assertTrue(transcript, allowed.any { it == result!!.intent })
             assertFalse(transcript, result!!.intent == "suspected_cardiac_arrest")

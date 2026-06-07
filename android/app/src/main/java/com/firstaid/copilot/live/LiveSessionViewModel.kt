@@ -524,6 +524,7 @@ class LiveSessionViewModel(
         val agent = edgeGemmaAgent
         edgeGemmaAgent = null
         if (nluResolver === edgeNluResolver) nluResolver = null
+        runCatching { (edgeNluResolver as? AutoCloseable)?.close() }
         edgeNluResolver = null
         if (proactivePolisher === agent) proactivePolisher = null
         if (openQuestionSupplementResponder === agent) openQuestionSupplementResponder = null
