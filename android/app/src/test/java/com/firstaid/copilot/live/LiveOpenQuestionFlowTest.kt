@@ -10,9 +10,8 @@ import com.firstaid.copilot.live.audio.LiveAudioPlayer
 import com.firstaid.copilot.live.audio.LiveAudioSink
 import com.firstaid.copilot.live.audio.LiveAudioSinkFactory
 import com.firstaid.copilot.live.edge.EdgeOpenQuestionPolicy
-import com.firstaid.copilot.live.edge.OpenQuestionFrame
-import com.firstaid.copilot.live.edge.OpenQuestionOutcome
-import com.firstaid.copilot.live.edge.OpenQuestionResponder
+import com.firstaid.copilot.live.edge.OpenQuestionSupplementOutcome
+import com.firstaid.copilot.live.edge.OpenQuestionSupplementResponder
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -37,7 +36,10 @@ class LiveOpenQuestionFlowTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private fun viewModel(channel: OqFakeChannel, responder: OpenQuestionResponder?): LiveSessionViewModel {
+    private fun viewModel(
+        channel: OqFakeChannel,
+        responder: OpenQuestionSupplementResponder? = null,
+    ): LiveSessionViewModel {
         val vm = LiveSessionViewModel(
             transport = OqOfflineTransport(),
             liveChannel = channel,
@@ -45,7 +47,7 @@ class LiveOpenQuestionFlowTest {
             sessionId = "oq_test",
             autoStartProactiveMonitor = false,
         )
-        responder?.let { vm.attachOpenQuestionResponder(it) }
+        responder?.let { vm.attachOpenQuestionSupplementResponder(it) }
         return vm
     }
 
@@ -56,58 +58,88 @@ class LiveOpenQuestionFlowTest {
     }
 
     @Test
-    fun detectsQuestionPlaysAckThenAsyncAnswer() = runTest {
+    fun supplementStateIsSeparateFromMainTtsPath() {
+        val state = LiveUiState(
+            openQuestionPhase = OpenQuestionPhase.Answer,
+            ttsText = "rule-first",
+            lastActionId = "rule-action",
+            openQuestionSupplement = OpenQuestionSupplement(
+                id = "open-q-supplement-1",
+                text = "gemma-short",
+            ),
+        )
+
+        assertEquals("rule-first", state.ttsText)
+        assertEquals("rule-action", state.lastActionId)
+        assertEquals("gemma-short", state.openQuestionSupplement?.text)
+        assertEquals(
+            "\u8865\u5145\u4e00\u53e5\uff0cgemma-short",
+            state.openQuestionSupplement?.toOpenQuestionSupplementTtsText(),
+        )
+    }
+
+    @Test
+    fun detectsQuestionPlaysFastRuleThenAsyncSupplement() = runTest {
         val channel = OqFakeChannel()
-        val gate = CompletableDeferred<OpenQuestionOutcome>()
-        val viewModel = viewModel(channel) { gate.await() }
+        val gate = CompletableDeferred<OpenQuestionSupplementOutcome>()
+        val viewModel = viewModel(channel) { _, _ -> gate.await() }
         bringOnlineInCprLoop(channel)
 
         viewModel.submitLiveText("肋骨会不会按断？")
 
-        // Immediate deterministic ack, and the turn was still committed to the server.
-        assertEquals(OpenQuestionPhase.Ack, viewModel.uiState.value.openQuestionPhase)
-        assertEquals(EdgeOpenQuestionPolicy.CPR_ACK_TEXT, viewModel.uiState.value.ttsText)
+        // Immediate rule answer, and the turn was still committed to the server.
+        val fastAnswer = EdgeOpenQuestionPolicy.fallbackAnswer("S7_CPR_LOOP", "肋骨会不会按断？")
+        val fastActionId = viewModel.uiState.value.lastActionId
+        assertEquals(OpenQuestionPhase.Answer, viewModel.uiState.value.openQuestionPhase)
+        assertEquals(fastAnswer, viewModel.uiState.value.ttsText)
+        assertEquals("open_question_fast_rule", viewModel.uiState.value.guidanceSource)
+        assertTrue(fastActionId.orEmpty().contains("fast_rule"))
+        assertEquals(null, viewModel.uiState.value.openQuestionSupplement)
         assertEquals(listOf("肋骨会不会按断？" to null), channel.commits)
 
         gate.complete(
-            OpenQuestionOutcome.Answer(
-                ttsText = "继续用力按压，等急救员接手。",
-                mainText = "继续按压",
-                secondaryText = "等急救员接手",
-                intent = "answer_current_cpr_question",
-                tone = "calm_firm",
+            OpenQuestionSupplementOutcome(
+                accepted = true,
+                text = "按压是在维持血流",
                 latencyMs = 120,
             ),
         )
         advanceUntilIdle()
 
         assertEquals(OpenQuestionPhase.Answer, viewModel.uiState.value.openQuestionPhase)
-        assertEquals("继续用力按压，等急救员接手。", viewModel.uiState.value.ttsText)
+        assertEquals(fastAnswer, viewModel.uiState.value.ttsText)
+        assertEquals(fastActionId, viewModel.uiState.value.lastActionId)
+        assertEquals("按压是在维持血流", viewModel.uiState.value.openQuestionSupplement?.text)
         assertEquals(false, viewModel.uiState.value.suppressLocalTts)
     }
 
     @Test
-    fun guardRejectOrTimeoutSpeaksDeterministicTemplate() = runTest {
+    fun guardRejectOrTimeoutDoesNotSpeakSecondRuleAnswer() = runTest {
         val channel = OqFakeChannel()
-        val viewModel = viewModel(channel) { OpenQuestionOutcome.Fallback("guard:bad_intent") }
+        val viewModel = viewModel(channel) { _, _ ->
+            OpenQuestionSupplementOutcome(accepted = false, reason = "duplicate_fast_answer", latencyMs = 80)
+        }
         bringOnlineInCprLoop(channel)
 
         viewModel.submitLiveText("肋骨会不会按断？")
         advanceUntilIdle()
 
+        val fastAnswer = EdgeOpenQuestionPolicy.fallbackAnswer("S7_CPR_LOOP", "肋骨会不会按断？")
         assertEquals(OpenQuestionPhase.Answer, viewModel.uiState.value.openQuestionPhase)
-        assertEquals(EdgeOpenQuestionPolicy.CPR_FALLBACK_TEXT, viewModel.uiState.value.ttsText)
+        assertEquals(fastAnswer, viewModel.uiState.value.ttsText)
+        assertEquals(null, viewModel.uiState.value.openQuestionSupplement)
+        assertEquals("duplicate_fast_answer", viewModel.uiState.value.lastOpenQuestionMetrics?.openQuestion?.reason)
     }
 
     @Test
     fun ignoresServerOpenQuestionAnswerWhileEdgeOwnsIt() = runTest {
         val channel = OqFakeChannel()
-        val gate = CompletableDeferred<OpenQuestionOutcome>()
-        val viewModel = viewModel(channel) { gate.await() }
+        val viewModel = viewModel(channel)
         bringOnlineInCprLoop(channel)
 
         viewModel.submitLiveText("肋骨会不会按断？")
-        assertEquals(OpenQuestionPhase.Ack, viewModel.uiState.value.openQuestionPhase)
+        val fastAnswer = EdgeOpenQuestionPolicy.fallbackAnswer("S7_CPR_LOOP", "肋骨会不会按断？")
+        assertEquals(OpenQuestionPhase.Answer, viewModel.uiState.value.openQuestionPhase)
 
         // The server also answers the open question; it must be dropped (dedup).
         channel.emit(
@@ -123,48 +155,43 @@ class LiveOpenQuestionFlowTest {
         advanceUntilIdle()
 
         // State is untouched by the dropped server reply.
-        assertEquals(OpenQuestionPhase.Ack, viewModel.uiState.value.openQuestionPhase)
-        assertEquals(EdgeOpenQuestionPolicy.CPR_ACK_TEXT, viewModel.uiState.value.ttsText)
+        assertEquals(OpenQuestionPhase.Answer, viewModel.uiState.value.openQuestionPhase)
+        assertEquals(fastAnswer, viewModel.uiState.value.ttsText)
         assertNotEquals("这是服务端的答复，不应播报。", viewModel.uiState.value.ttsText)
-
-        // Let the parked edge answer finish so no coroutine is left suspended.
-        gate.complete(OpenQuestionOutcome.Fallback("test_cleanup"))
-        advanceUntilIdle()
     }
 
     @Test
     fun localChannelDoesNotMirrorOpenQuestionIntoRuleFlow() = runTest {
         val channel = OqFakeChannel(mirrorsEdgeOpenQuestionTurns = false)
-        val gate = CompletableDeferred<OpenQuestionOutcome>()
-        val viewModel = viewModel(channel) { gate.await() }
+        val gate = CompletableDeferred<OpenQuestionSupplementOutcome>()
+        val viewModel = viewModel(channel) { _, _ -> gate.await() }
         bringOnlineInCprLoop(channel)
 
         viewModel.submitLiveText("旁边的人现在最好帮我做什么？")
 
-        assertEquals(OpenQuestionPhase.Ack, viewModel.uiState.value.openQuestionPhase)
-        assertEquals(EdgeOpenQuestionPolicy.CPR_ACK_TEXT, viewModel.uiState.value.ttsText)
+        val fastAnswer = EdgeOpenQuestionPolicy.fallbackAnswer("S7_CPR_LOOP", "旁边的人现在最好帮我做什么？")
+        assertEquals(OpenQuestionPhase.Answer, viewModel.uiState.value.openQuestionPhase)
+        assertEquals(fastAnswer, viewModel.uiState.value.ttsText)
         assertTrue(channel.commits.isEmpty())
 
         gate.complete(
-            OpenQuestionOutcome.Answer(
-                ttsText = "继续按压，让旁人拿 AED 并准备换手。",
-                mainText = "继续按压",
-                secondaryText = "旁人拿 AED",
-                intent = "answer_current_cpr_question",
-                tone = "calm_firm",
+            OpenQuestionSupplementOutcome(
+                accepted = true,
+                text = "旁人也可准备换手",
                 latencyMs = 140,
             ),
         )
         advanceUntilIdle()
 
         assertEquals(OpenQuestionPhase.Answer, viewModel.uiState.value.openQuestionPhase)
-        assertEquals("继续按压，让旁人拿 AED 并准备换手。", viewModel.uiState.value.ttsText)
+        assertEquals(fastAnswer, viewModel.uiState.value.ttsText)
+        assertEquals("旁人也可准备换手", viewModel.uiState.value.openQuestionSupplement?.text)
     }
 
     @Test
     fun nonQuestionUsesNormalCommitWithoutOpenQuestion() = runTest {
         val channel = OqFakeChannel()
-        val viewModel = viewModel(channel) { OpenQuestionOutcome.Fallback("unused") }
+        val viewModel = viewModel(channel)
         bringOnlineInCprLoop(channel)
 
         viewModel.submitLiveText("我有点累")
@@ -175,7 +202,7 @@ class LiveOpenQuestionFlowTest {
     }
 
     @Test
-    fun withoutResponderQuestionStaysOnServerPath() = runTest {
+    fun withoutResponderQuestionStillSpeaksFastRule() = runTest {
         val channel = OqFakeChannel()
         val viewModel = viewModel(channel, responder = null)
         bringOnlineInCprLoop(channel)
@@ -183,39 +210,39 @@ class LiveOpenQuestionFlowTest {
         viewModel.submitLiveText("肋骨会不会按断？")
         advanceUntilIdle()
 
-        // No edge ack: default server-driven open-question path is unchanged.
-        assertEquals(OpenQuestionPhase.Idle, viewModel.uiState.value.openQuestionPhase)
+        val fastAnswer = EdgeOpenQuestionPolicy.fallbackAnswer("S7_CPR_LOOP", "肋骨会不会按断？")
+        assertEquals(OpenQuestionPhase.Answer, viewModel.uiState.value.openQuestionPhase)
+        assertEquals(fastAnswer, viewModel.uiState.value.ttsText)
+        assertEquals(null, viewModel.uiState.value.openQuestionSupplement)
         assertEquals(listOf("肋骨会不会按断？" to null), channel.commits)
     }
 
     @Test
-    fun bargeInSupersedesPendingAnswer() = runTest {
+    fun bargeInSupersedesPendingSupplement() = runTest {
         val channel = OqFakeChannel()
-        val gate = CompletableDeferred<OpenQuestionOutcome>()
-        val viewModel = viewModel(channel) { gate.await() }
+        val gate = CompletableDeferred<OpenQuestionSupplementOutcome>()
+        val viewModel = viewModel(channel) { _, _ -> gate.await() }
         bringOnlineInCprLoop(channel)
 
         viewModel.submitLiveText("肋骨会不会按断？")
-        assertEquals(OpenQuestionPhase.Ack, viewModel.uiState.value.openQuestionPhase)
+        assertEquals(OpenQuestionPhase.Answer, viewModel.uiState.value.openQuestionPhase)
 
         viewModel.sendLiveBargeIn()
         assertEquals(OpenQuestionPhase.Cancelled, viewModel.uiState.value.openQuestionPhase)
 
-        // A late answer for the superseded turn must not overwrite the cancellation.
+        // A late supplement for the superseded turn must not overwrite the cancellation.
         gate.complete(
-            OpenQuestionOutcome.Answer(
-                ttsText = "迟到的答复",
-                mainText = "",
-                secondaryText = "",
-                intent = "answer_current_cpr_question",
-                tone = "calm_firm",
+            OpenQuestionSupplementOutcome(
+                accepted = true,
+                text = "迟到的补充",
                 latencyMs = 50,
             ),
         )
         advanceUntilIdle()
 
         assertEquals(OpenQuestionPhase.Cancelled, viewModel.uiState.value.openQuestionPhase)
-        assertNotEquals("迟到的答复", viewModel.uiState.value.ttsText)
+        assertEquals(null, viewModel.uiState.value.openQuestionSupplement)
+        assertNotEquals("迟到的补充", viewModel.uiState.value.ttsText)
     }
 
     private fun guidanceAction(text: String): GuidanceAction =

@@ -72,4 +72,39 @@ class EdgeOpenQuestionTest {
         assertTrue(EdgeOpenQuestionPolicy.safetyPhrases("S7_CPR_LOOP").isNotEmpty())
         assertTrue(EdgeOpenQuestionPolicy.safetyPhrases("S3_CHECK_BREATHING").isEmpty())
     }
+
+    @Test
+    fun supplementContract_keepsSeparateModelFromLegacyAnswerFallback() {
+        val frame = OpenQuestionFrame(
+            stage = "S7_CPR_LOOP",
+            userInput = "为什么要一直按",
+            allowedIntents = EdgeOpenQuestionPolicy.answerIntents("S7_CPR_LOOP"),
+        )
+        val request = OpenQuestionSupplementRequest(
+            frame = frame,
+            fastAnswerText = "继续按压，不要停，我在。",
+            answerFocus = "按压是在维持血流。",
+        )
+        val supplement = OpenQuestionSupplementOutcome(
+            accepted = true,
+            text = "按压是在维持血流",
+            latencyMs = 120L,
+        )
+        val legacyAnswer = OpenQuestionOutcome.Answer(
+            ttsText = "继续按压，不要停，我在。",
+            mainText = "继续按压",
+            secondaryText = "我在，听我说",
+            intent = "answer_current_cpr_question",
+            tone = "calm_firm",
+            latencyMs = 50L,
+        )
+        val legacyFallback = OpenQuestionOutcome.Fallback(reason = "guard:duplicate")
+
+        assertEquals("为什么要一直按", request.question)
+        assertEquals("S7_CPR_LOOP", request.stage)
+        assertTrue(supplement.accepted)
+        assertEquals("按压是在维持血流", supplement.text)
+        assertEquals("继续按压，不要停，我在。", legacyAnswer.ttsText)
+        assertEquals("guard:duplicate", legacyFallback.reason)
+    }
 }

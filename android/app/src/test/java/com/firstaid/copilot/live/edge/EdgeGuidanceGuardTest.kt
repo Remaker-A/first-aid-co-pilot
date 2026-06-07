@@ -121,6 +121,16 @@ class EdgeGuidanceGuardTest {
     }
 
     @Test
+    fun textAnswerAcceptsNegatedStopInCpr() {
+        // "不要停下" is the safe "don't stop" phrasing (the app's own fallback uses it),
+        // so the negated stop must not trip the CPR-live stop-compression guard.
+        val decision = guard.validateOpenQuestionText("继续按压，不要停下。", cprFrame())
+
+        assertTrue(decision.reasons.toString(), decision.accepted)
+        assertTrue(decision.reasons.none { it.contains("stop_compression_word") })
+    }
+
+    @Test
     fun textAnswerRejectsBannedDiagnosis() {
         val decision = guard.validateOpenQuestionText("别怕，这是心梗，继续按压。", cprFrame())
 
@@ -169,6 +179,70 @@ class EdgeGuidanceGuardTest {
 
         assertFalse(decision.accepted)
         assertTrue(decision.reasons.contains("unsafe_family_notice_wording"))
+    }
+
+    // endregion
+
+    // region post-rule supplement path (规则首答 + Gemma 简短补充)
+
+    @Test
+    fun supplementAcceptsShortAdditiveText() {
+        val decision = guard.validateOpenQuestionSupplement(
+            rawText = "按压是在维持血流。",
+            frame = cprFrame(),
+            fastAnswerText = "继续按压，不要停，我在。",
+        )
+
+        assertTrue(decision.reason.orEmpty(), decision.accepted)
+        assertEquals("按压是在维持血流", decision.text)
+    }
+
+    @Test
+    fun supplementRejectsOverEighteenChars() {
+        val decision = guard.validateOpenQuestionSupplement(
+            rawText = "按压是在帮助他维持血流直到急救员到来接手",
+            frame = cprFrame(),
+            fastAnswerText = "继续按压，不要停，我在。",
+        )
+
+        assertFalse(decision.accepted)
+        assertTrue(decision.reason.orEmpty(), decision.reason.orEmpty().startsWith("tts_text_too_long"))
+    }
+
+    @Test
+    fun supplementRejectsDangerousText() {
+        val decision = guard.validateOpenQuestionSupplement(
+            rawText = "这可能是心梗。",
+            frame = cprFrame(),
+            fastAnswerText = "继续按压，不要停，我在。",
+        )
+
+        assertFalse(decision.accepted)
+        assertTrue(decision.reason.orEmpty(), decision.reason.orEmpty().contains("心梗"))
+    }
+
+    @Test
+    fun supplementRejectsStopCompressionWordingInCpr() {
+        val decision = guard.validateOpenQuestionSupplement(
+            rawText = "可以先停一下。",
+            frame = cprFrame(),
+            fastAnswerText = "继续按压，不要停，我在。",
+        )
+
+        assertFalse(decision.accepted)
+        assertTrue(decision.reason.orEmpty(), decision.reason.orEmpty().contains("stop_compression_word"))
+    }
+
+    @Test
+    fun supplementRejectsDuplicateFastAnswer() {
+        val decision = guard.validateOpenQuestionSupplement(
+            rawText = "继续按压，注意 AED。",
+            frame = cprFrame(),
+            fastAnswerText = "继续按压，不要停，我在。",
+        )
+
+        assertFalse(decision.accepted)
+        assertEquals("duplicate_fast_answer", decision.reason)
     }
 
     // endregion

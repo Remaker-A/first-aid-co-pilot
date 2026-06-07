@@ -54,9 +54,58 @@ class EdgeGemmaPromptBuilder {
             append("[Answer Focus] ").append(focus).append("\n")
             append(
                 if (cprLive) {
-                    "只回一句中文（25到40字），以“继续按压”开头，再具体作答；不要 JSON、不要引号、不要解释。"
+                    "只回一句中文（不超过12字），以“继续按压”开头；不要 JSON、不要引号、不要解释。"
                 } else {
-                    "只回一句中文（不超过35字）安抚并简短作答；不要 JSON、不要引号、不要解释。"
+                    "只回一句中文（不超过14字）安抚并简短作答；不要 JSON、不要引号、不要解释。"
+                },
+            )
+        }
+    }
+
+    fun openQuestionSupplementPrompt(
+        frame: OpenQuestionFrame,
+        fastAnswerText: String,
+    ): String = openQuestionSupplementPrompt(
+        frame = frame,
+        fastAnswerText = fastAnswerText,
+        answerFocus = openQuestionFocus(frame.userInput),
+    )
+
+    fun openQuestionSupplementPrompt(
+        frame: OpenQuestionFrame,
+        fastAnswerText: String,
+        answerFocus: String,
+    ): String = openQuestionSupplementPrompt(
+        OpenQuestionSupplementRequest(
+            frame = frame,
+            fastAnswerText = fastAnswerText,
+            answerFocus = answerFocus,
+        ),
+    )
+
+    /**
+     * Open-question supplement prompt for "规则首答 + Gemma 简短补充". The rule answer
+     * is already spoken, so this asks Gemma for only one additional non-repeated
+     * point and leaves all safety enforcement to [EdgeGuidanceGuard].
+     */
+    fun openQuestionSupplementPrompt(request: OpenQuestionSupplementRequest): String {
+        val stage = request.stage?.takeIf { it.isNotBlank() } ?: "S7_CPR_LOOP"
+        val fastAnswerSaidContinue = request.fastAnswerText.contains("继续按压")
+        return buildString {
+            append("SYSTEM:\n")
+            append(OPEN_QUESTION_SUPPLEMENT_SYSTEM_PROMPT)
+            append("\n\nUSER:\n")
+            append("[Question] ").append(request.question).append("\n")
+            append("[Stage] ").append(stage).append("\n")
+            append("[Fast Answer Text] ").append(request.fastAnswerText).append("\n")
+            append("[Answer Focus] ").append(request.answerFocus).append("\n")
+            append("只补规则首答没说过的一点，不复述、不同义改写首答。")
+            append("只输出一句中文，不超过18个汉字，不要 JSON、不要引号、不要解释。")
+            append(
+                if (fastAnswerSaidContinue) {
+                    "不要以“继续按压”开头，因为首答已经说过。"
+                } else {
+                    "首答未说“继续按压”时，必要时才可以用它开头。"
                 },
             )
         }
@@ -140,6 +189,13 @@ class EdgeGemmaPromptBuilder {
                 "不决定急救流程、不切换 stage、不调用工具(tool_actions)、不诊断、不承诺结果、不恐吓；" +
                 "CPR 进行中绝不让施救者停下按压，不能说保持呼吸/保持胸腔起伏。\n" +
                 "只输出那一句中文本身，不要 JSON、不要 Markdown、不要引号或任何多余文本。"
+
+        const val OPEN_QUESTION_SUPPLEMENT_SYSTEM_PROMPT: String =
+            "你是 FirstAid Copilot 的开放问答补充层，运行在成人疑似心脏骤停 CPR 场景。" +
+                "规则首答已经先回答了施救者；你只补一句首答没说过的安全细节。\n" +
+                "不要复述、扩写或同义改写规则首答；不决定流程、不切 stage、不调用工具(tool_actions)。\n" +
+                "不诊断、不承诺结果、不恐吓；CPR 进行中绝不让施救者停下按压。\n" +
+                "只输出补充短句本身，不要 JSON、不要 Markdown、不要引号或任何多余文本。"
 
         /**
          * Device-slimmed NLU contract (single-label out). The forbidden-key /

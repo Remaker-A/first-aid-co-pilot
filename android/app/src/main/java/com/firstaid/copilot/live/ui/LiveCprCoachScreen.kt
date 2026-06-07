@@ -96,6 +96,7 @@ import com.firstaid.copilot.live.edge.inspectEdgeModels
 import com.firstaid.copilot.live.inferLiveFastIntent
 import com.firstaid.copilot.live.normalizeOverlayMode
 import com.firstaid.copilot.live.toAttentionMode
+import com.firstaid.copilot.live.toOpenQuestionSupplementTtsText
 import com.firstaid.copilot.live.perception.PerceptionSignal
 import com.firstaid.copilot.live.ui.components.AedGuidanceCard
 import com.firstaid.copilot.live.ui.components.CountdownRing
@@ -473,6 +474,33 @@ fun LiveCprCoachScreen(
             interruptPolicy = "do_not_interrupt_critical",
             tone = cue.tone,
             speed = cue.speed,
+        )
+    }
+
+    LaunchedEffect(state.openQuestionSupplement?.id) {
+        val supplement = state.openQuestionSupplement ?: return@LaunchedEffect
+        if (supplement.text.isBlank()) return@LaunchedEffect
+        val deadlineMs = System.currentTimeMillis() + OPEN_QUESTION_SUPPLEMENT_WAIT_MS
+        while (true) {
+            val latest = viewModel.uiState.value
+            if (latest.openQuestionSupplement?.id != supplement.id) {
+                return@LaunchedEffect
+            }
+            if (!latest.isLiveAudioPlaying && latest.micState != MicState.Speaking) {
+                break
+            }
+            if (System.currentTimeMillis() >= deadlineMs) {
+                return@LaunchedEffect
+            }
+            delay(100)
+        }
+        ttsEdge.speak(
+            text = supplement.toOpenQuestionSupplementTtsText(),
+            utteranceKey = "open_question_supplement:${supplement.id}",
+            priority = "low",
+            interruptPolicy = "do_not_interrupt_critical",
+            tone = supplement.tone,
+            speed = supplement.speed,
         )
     }
 
@@ -1240,6 +1268,7 @@ private fun LiveUiState.isAssistantPlaybackActiveForAsr(): Boolean =
 
 private val recordingMicStates = setOf(MicState.Listening, MicState.Capturing, MicState.Uploading)
 private const val TAG = "LiveCprCoachScreen"
+private const val OPEN_QUESTION_SUPPLEMENT_WAIT_MS = 4_000L
 
 private suspend fun runLiveTestScript(
     context: Context,

@@ -57,6 +57,29 @@ sealed interface OpenQuestionOutcome {
 }
 
 /**
+ * Input contract for the "规则首答 + Gemma 简短补充" path. The deterministic
+ * rules already produced [fastAnswerText]; Gemma may only add one non-repeated
+ * detail that helps answer [frame.userInput].
+ */
+data class OpenQuestionSupplementRequest(
+    val frame: OpenQuestionFrame,
+    val fastAnswerText: String,
+    val answerFocus: String,
+) {
+    val question: String get() = frame.userInput
+    val stage: String? get() = frame.stage
+}
+
+/** Result of a post-rule Gemma supplement attempt. */
+data class OpenQuestionSupplementOutcome(
+    val accepted: Boolean,
+    val text: String = "",
+    val reason: String? = null,
+    val latencyMs: Long = 0L,
+    val cacheHit: Boolean = false,
+)
+
+/**
  * The single suspendable entry the [com.firstaid.copilot.live.LiveSessionViewModel]
  * depends on for Phase C. [EdgeGemmaAgent] is the production implementation; tests
  * inject a fake. Implementations must never throw for ordinary failures — they
@@ -64,6 +87,18 @@ sealed interface OpenQuestionOutcome {
  */
 fun interface OpenQuestionResponder {
     suspend fun answerOpenQuestion(frame: OpenQuestionFrame): OpenQuestionOutcome
+}
+
+/**
+ * Post-rule supplement seam for open questions. The caller has already spoken a
+ * deterministic fast answer, so implementations return either one short extra
+ * detail or a rejected reason; they must never produce a replacement answer.
+ */
+fun interface OpenQuestionSupplementResponder {
+    suspend fun answerOpenQuestionSupplement(
+        frame: OpenQuestionFrame,
+        fastAnswerText: String,
+    ): OpenQuestionSupplementOutcome
 }
 
 /**
@@ -178,6 +213,9 @@ object EdgeOpenQuestionPolicy {
             Regex("(救护车|急救员|急救人员|等待|还没到|留意|注意)")
                 .containsMatchIn(compact) ->
                 "继续按压，留意 AED 指令和是否恢复正常呼吸。"
+            Regex("(肋骨|骨头|按断|压断|断了)")
+                .containsMatchIn(compact) ->
+                "先别因担心停下，继续按压，这是现在最重要的事。"
             Regex("(害怕|紧张|慌|按错|不准|位置)")
                 .containsMatchIn(compact) ->
                 "你做得对，手掌根在胸口中央，跟着节拍继续。"
@@ -191,6 +229,23 @@ object EdgeOpenQuestionPolicy {
                 .containsMatchIn(compact) ->
                 "不用自己数，我会给节拍，你跟着用力快压。"
             else -> fallbackAnswer(stage)
+        }
+    }
+
+    fun questionBucket(question: String?): String {
+        val compact = question?.replace(Regex("\\s+"), "").orEmpty()
+        return when {
+            Regex("(为什么|为何|为啥|原因|突然|怎么会|怎么就)").containsMatchIn(compact) -> "cause"
+            Regex("(旁边的人|别人|同伴|路人|帮我|分工|做什么)").containsMatchIn(compact) -> "bystander"
+            Regex("(家属|亲人|通知|告诉)").containsMatchIn(compact) -> "family"
+            Regex("(AED|aed|除颤|电击)").containsMatchIn(compact) -> "aed"
+            Regex("(救护车|急救员|急救人员|等待|还没到|注意)").containsMatchIn(compact) -> "waiting"
+            Regex("(肋骨|骨头|按断|压断|断了)").containsMatchIn(compact) -> "fear"
+            Regex("(害怕|紧张|慌|按错|不准|位置)").containsMatchIn(compact) -> "fear"
+            Regex("(会不会|能不能).*(醒|救活|好|醒过来)|结果").containsMatchIn(compact) -> "outcome"
+            Regex("(累|没力|撑不住|换手)").containsMatchIn(compact) -> "tired"
+            Regex("(数|节拍|频率|多快)").containsMatchIn(compact) -> "count"
+            else -> "general"
         }
     }
 

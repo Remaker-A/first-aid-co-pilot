@@ -58,6 +58,7 @@ data class LiveUiState(
     val eventMode: String? = null,
     val openQuestionPhase: OpenQuestionPhase = OpenQuestionPhase.Idle,
     val lastOpenQuestionMetrics: LiveTurnMetrics? = null,
+    val openQuestionSupplement: OpenQuestionSupplement? = null,
 
     /**
      * Latest on-device proactive nudge (Phase D). Written only by the proactive
@@ -109,6 +110,23 @@ enum class MicState { Idle, Listening, Capturing, Uploading, Speaking, Off }
 
 /** Visible lifecycle for low-latency Gemma open Q&A on the live voice path. */
 enum class OpenQuestionPhase { Idle, Ack, Answer, Cancelled }
+
+/**
+ * A short Gemma supplement to an already-spoken rule answer. It is intentionally
+ * separate from [LiveUiState.ttsText], [LiveUiState.lastActionId], and
+ * [LiveUiState.proactiveCue] so it cannot replace primary guidance audio.
+ */
+data class OpenQuestionSupplement(
+    val id: String,
+    val text: String,
+    val tone: String = "calm_firm",
+    val speed: String = "normal",
+)
+
+internal const val OPEN_QUESTION_SUPPLEMENT_TTS_PREFIX = "\u8865\u5145\u4e00\u53e5\uff0c"
+
+internal fun OpenQuestionSupplement.toOpenQuestionSupplementTtsText(): String =
+    OPEN_QUESTION_SUPPLEMENT_TTS_PREFIX + text.trim()
 
 /** Haptic metronome intent derived from `guidance_action.haptic` / tool actions. */
 data class HapticState(

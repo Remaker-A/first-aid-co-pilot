@@ -49,7 +49,7 @@ class EdgeGemmaAgent(
     private val guard: EdgeGuidanceGuard = EdgeGuidanceGuard(),
     private val clockMs: () -> Long = { System.currentTimeMillis() },
     parentScope: CoroutineScope? = null,
-) : OpenQuestionResponder, LiveNluResolver, ProactivePolisher, AutoCloseable {
+) : OpenQuestionResponder, OpenQuestionSupplementResponder, LiveNluResolver, ProactivePolisher, AutoCloseable {
 
     private val ownsScope = parentScope == null
     private val scope = parentScope ?: CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -69,6 +69,11 @@ class EdgeGemmaAgent(
     private val answerCache = object : LinkedHashMap<String, OpenQuestionOutcome.Answer>(16, 0.75f, true) {
         override fun removeEldestEntry(
             eldest: MutableMap.MutableEntry<String, OpenQuestionOutcome.Answer>?,
+        ): Boolean = size > ANSWER_CACHE_MAX_ENTRIES
+    }
+    private val supplementCache = object : LinkedHashMap<String, OpenQuestionSupplementOutcome>(16, 0.75f, true) {
+        override fun removeEldestEntry(
+            eldest: MutableMap.MutableEntry<String, OpenQuestionSupplementOutcome>?,
         ): Boolean = size > ANSWER_CACHE_MAX_ENTRIES
     }
     @Volatile
@@ -148,6 +153,69 @@ class EdgeGemmaAgent(
             latencyMs = latencyMs,
         )
 
+    override suspend fun answerOpenQuestionSupplement(
+        frame: OpenQuestionFrame,
+        fastAnswerText: String,
+    ): OpenQuestionSupplementOutcome {
+        if (!flags.openQuestionActive) {
+            return rejectedOpenQuestionSupplement("disabled")
+        }
+        if (frame.allowedIntents.isEmpty()) {
+            return rejectedOpenQuestionSupplement("no_allowed_intents")
+        }
+
+        val key = supplementCacheKey(frame)
+        cachedSupplement(key, frame, fastAnswerText)?.let { return it }
+
+        val now = clockMs()
+        if (now < openQuestionCircuitOpenUntilMs) {
+            return rejectedOpenQuestionSupplement("circuit_open")
+        }
+        if (!reserveBudget()) {
+            return rejectedOpenQuestionSupplement("budget_exceeded")
+        }
+
+        val prompt = promptBuilder.openQuestionSupplementPrompt(
+            frame = frame,
+            fastAnswerText = fastAnswerText,
+            answerFocus = supplementFocus(frame.userInput),
+        )
+        val generation = enqueue(PRIORITY_OPEN_QUESTION, prompt, flags.openQuestionSupplementTimeoutMs)
+            ?: return rejectedOpenQuestionSupplement("queue_full")
+        if (!generation.ok || generation.text.isBlank()) {
+            if (generation.isTimeoutLike()) {
+                tripOpenQuestionCircuit()
+            }
+            return rejectedOpenQuestionSupplement(
+                reason = "generation:${generation.error ?: "empty"}",
+                latencyMs = generation.latencyMs,
+            )
+        }
+
+        val decision = guard.validateOpenQuestionSupplement(generation.text, frame, fastAnswerText)
+        val outcome = decision.copy(latencyMs = generation.latencyMs, cacheHit = false)
+        if (!outcome.accepted) {
+            Log.w(TAG, "Edge open-question supplement rejected (${outcome.reason ?: "rejected"})")
+            return outcome
+        }
+
+        consecutiveOpenQuestionTimeouts = 0
+        openQuestionCircuitOpenUntilMs = 0L
+        storeSupplement(key, outcome)
+        Log.i(TAG, "Edge open-question supplement in ${generation.latencyMs}ms cacheKey=$key")
+        return outcome
+    }
+
+    private fun rejectedOpenQuestionSupplement(
+        reason: String,
+        latencyMs: Long = 0L,
+    ): OpenQuestionSupplementOutcome =
+        OpenQuestionSupplementOutcome(
+            accepted = false,
+            reason = reason,
+            latencyMs = latencyMs,
+        )
+
     private fun tripOpenQuestionCircuit() {
         val count = (consecutiveOpenQuestionTimeouts + 1).coerceAtMost(10)
         consecutiveOpenQuestionTimeouts = count
@@ -215,6 +283,25 @@ class EdgeGemmaAgent(
         synchronized(answerCache) { answerCache[key] = answer }
     }
 
+    private fun cachedSupplement(
+        key: String,
+        frame: OpenQuestionFrame,
+        fastAnswerText: String,
+    ): OpenQuestionSupplementOutcome? {
+        val cached = synchronized(supplementCache) { supplementCache[key] } ?: return null
+        val revalidated = guard.validateOpenQuestionSupplement(cached.text, frame, fastAnswerText)
+        if (!revalidated.accepted) {
+            synchronized(supplementCache) { supplementCache.remove(key) }
+            return null
+        }
+        return revalidated.copy(latencyMs = 0L, cacheHit = true)
+    }
+
+    private fun storeSupplement(key: String, outcome: OpenQuestionSupplementOutcome) {
+        if (!outcome.accepted || outcome.text.isBlank()) return
+        synchronized(supplementCache) { supplementCache[key] = outcome.copy(cacheHit = false) }
+    }
+
     private fun reserveBudget(): Boolean {
         val now = clockMs()
         synchronized(budgetLock) {
@@ -229,6 +316,23 @@ class EdgeGemmaAgent(
 
     private fun cacheKey(frame: OpenQuestionFrame): String =
         "${frame.stage.orEmpty()}|${frame.userInput.trim()}"
+
+    private fun supplementCacheKey(frame: OpenQuestionFrame): String =
+        "${frame.stage.orEmpty()}|${EdgeOpenQuestionPolicy.questionBucket(frame.userInput)}"
+
+    private fun supplementFocus(question: String): String =
+        when (EdgeOpenQuestionPolicy.questionBucket(question)) {
+            "cause" -> "按压是在维持血流。"
+            "bystander" -> "旁人也可准备换手。"
+            "family" -> "旁人联系家属并迎接急救员。"
+            "aed" -> "分析时所有人离开。"
+            "waiting" -> "留意 AED 指令和正常呼吸。"
+            "fear" -> "胸口中央就是正确方向。"
+            "outcome" -> "现在不能承诺结果。"
+            "tired" -> "换手要快，节拍不断。"
+            "count" -> "跟我的节拍就行。"
+            else -> "补充一个安全细节，不重复首答。"
+        }
 
     // --- Priority scheduler over the single driver ---
 
@@ -368,6 +472,7 @@ data class EdgeGemmaFeatureFlags(
     val openQuestionBudgetPerMinute: Int = 20,
     val nluTimeoutMs: Long = GEMMA_GENERATE_BUDGET_MS,
     val openQuestionTimeoutMs: Long = OPEN_QUESTION_ANSWER_TIMEOUT_MS,
+    val openQuestionSupplementTimeoutMs: Long = OPEN_QUESTION_SUPPLEMENT_TIMEOUT_MS,
     val proactiveTimeoutMs: Long = GEMMA_GENERATE_BUDGET_MS,
 ) {
     /** Master switch AND the per-feature switch — the only "is this on" predicate. */
@@ -385,6 +490,9 @@ data class EdgeGemmaFeatureFlags(
          * and degrade to ack-then-async when the model cannot make that window.
          */
         const val OPEN_QUESTION_ANSWER_TIMEOUT_MS: Long = 1_800L
+
+        /** Slow supplement is allowed to arrive later; it never blocks first response. */
+        const val OPEN_QUESTION_SUPPLEMENT_TIMEOUT_MS: Long = 16_000L
     }
 }
 

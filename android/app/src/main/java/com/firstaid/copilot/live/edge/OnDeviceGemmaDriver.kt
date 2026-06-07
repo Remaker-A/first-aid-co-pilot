@@ -4,6 +4,7 @@ import android.content.Context
 import java.io.File
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import kotlin.math.ceil
@@ -171,8 +172,21 @@ class OnDeviceGemmaDriver(
                         latencyMs = System.currentTimeMillis() - startedMs,
                     )
                 } catch (timeout: TimeoutException) {
-                    future.cancel(true)
-                    discardEngine()
+                    // The native sendMessage cannot be stopped by Thread.interrupt, so a bare
+                    // future.cancel(true) leaves it running and burning CPU; under repeated
+                    // timeouts those orphaned generations pile up and starve the device (the
+                    // 259s "hang" + sustained slowdown). Instead ask LiteRT-LM to cancel the
+                    // in-flight generation and wait briefly for the native call to unwind. If
+                    // it drains we KEEP the (healthy) engine so the next call does not pay a
+                    // full model re-initialize; only when the cancel does not take effect in
+                    // time do we fall back to discarding and rebuilding the engine.
+                    cancelActiveConversation()
+                    if (awaitQuietly(future, NATIVE_CANCEL_GRACE_MS)) {
+                        future.cancel(true)
+                    } else {
+                        future.cancel(true)
+                        discardEngine()
+                    }
                     EdgeInferenceResult(
                         ok = false,
                         latencyMs = System.currentTimeMillis() - startedMs,
@@ -306,6 +320,22 @@ class OnDeviceGemmaDriver(
         }
     }
 
+    /**
+     * Wait up to [graceMs] for a generation [future] to unwind (normally or
+     * exceptionally) after a cancel. Returns true when it drained — so the engine is
+     * idle and safe to reuse — or false when the native call is still running past the
+     * grace and the engine state is unknown.
+     */
+    private fun awaitQuietly(future: Future<String>, graceMs: Long): Boolean =
+        try {
+            future.get(graceMs, TimeUnit.MILLISECONDS)
+            true
+        } catch (timeout: TimeoutException) {
+            false
+        } catch (error: Throwable) {
+            true
+        }
+
     private fun resetEngine() {
         engine.callQuietly("close")
         engine = null
@@ -350,6 +380,11 @@ class OnDeviceGemmaDriver(
         const val DEFAULT_MAX_NUM_TOKENS = 4096
         private const val DECODE_TOKEN_RESERVE = 512
         private const val ENGINE_INIT_TIMEOUT_MS = 60_000L
+
+        // After a generation timeout, how long to wait for cancelProcess to unwind the
+        // native call before giving up and discarding the engine. Keeping it short bounds
+        // how long the mutex is held while a stuck native call drains.
+        private const val NATIVE_CANCEL_GRACE_MS = 2_000L
         private const val CJK_TOKENS_PER_CHAR = 1.2
         private const val OTHER_CHARS_PER_TOKEN = 3.0
     }

@@ -14,9 +14,10 @@ import com.firstaid.copilot.live.audio.LiveAudioPlayer
 import com.firstaid.copilot.live.edge.EdgeGemmaAgent
 import com.firstaid.copilot.live.edge.EdgeOpenQuestionDetector
 import com.firstaid.copilot.live.edge.EdgeOpenQuestionPolicy
+import com.firstaid.copilot.live.edge.EdgeTinyNluResolver
 import com.firstaid.copilot.live.edge.OpenQuestionFrame
-import com.firstaid.copilot.live.edge.OpenQuestionOutcome
-import com.firstaid.copilot.live.edge.OpenQuestionResponder
+import com.firstaid.copilot.live.edge.OpenQuestionSupplementOutcome
+import com.firstaid.copilot.live.edge.OpenQuestionSupplementResponder
 import com.firstaid.copilot.live.perception.EmaQualityScore
 import com.firstaid.copilot.live.perception.HandPositionHysteresis
 import com.firstaid.copilot.live.perception.PerceptionSignal
@@ -99,13 +100,22 @@ class LiveSessionViewModel(
     private var edgeGemmaAgent: EdgeGemmaAgent? = null
 
     /**
+     * The on-device tiny NLU resolver (功能 E), attached alongside the agent when
+     * `nluEnabled` so breathing-observation intent resolution bypasses the slow 2B
+     * driver entirely. Tracked separately from the agent so [detachEdgeGemmaAgent]
+     * clears exactly what [attachEdgeGemmaAgent] set.
+     */
+    @Volatile
+    private var edgeNluResolver: LiveNluResolver? = null
+
+    /**
      * Phase 2 · C seam — the on-device open-question responder. Attached (usually
      * the [EdgeGemmaAgent] itself) once Gemma is prewarmed and the open-question
      * flag is on; null keeps the prior server-driven open-question path. The hot
      * path only ever *augments* an immediate deterministic ack with this answer.
      */
     @Volatile
-    private var openQuestionResponder: OpenQuestionResponder? = null
+    private var openQuestionSupplementResponder: OpenQuestionSupplementResponder? = null
 
     /**
      * True while the edge layer owns the in-flight/last open question, so the
@@ -496,9 +506,16 @@ class LiveSessionViewModel(
         // Wire each capability seam from the single agent, gated by its flags, so the
         // default (all-off) build keeps the exact prior behavior on every path.
         val flags = agent.flags
-        if (flags.enabled && flags.nluEnabled) nluResolver = agent
+        // E (NLU) is a closed-set classification, so it runs on the microsecond tiny
+        // resolver instead of the ~10-17s 2B driver path (which also drives the driver's
+        // timeout discard/rebuild cascade). C/D still use the agent.
+        if (flags.enabled && flags.nluEnabled) {
+            val tiny = EdgeTinyNluResolver()
+            edgeNluResolver = tiny
+            nluResolver = tiny
+        }
         if (flags.enabled && flags.proactiveEnabled) proactivePolisher = agent
-        if (flags.enabled && flags.openQuestionEnabled) openQuestionResponder = agent
+        if (flags.enabled && flags.openQuestionEnabled) openQuestionSupplementResponder = agent
         Log.i(TAG, "Edge Gemma agent attached (flags=${agent.flags})")
     }
 
@@ -506,9 +523,10 @@ class LiveSessionViewModel(
     fun detachEdgeGemmaAgent() {
         val agent = edgeGemmaAgent
         edgeGemmaAgent = null
-        if (nluResolver === agent) nluResolver = null
+        if (nluResolver === edgeNluResolver) nluResolver = null
+        edgeNluResolver = null
         if (proactivePolisher === agent) proactivePolisher = null
-        if (openQuestionResponder === agent) openQuestionResponder = null
+        if (openQuestionSupplementResponder === agent) openQuestionSupplementResponder = null
     }
 
     /**
@@ -517,8 +535,8 @@ class LiveSessionViewModel(
      * inject a fake; production attaches the [EdgeGemmaAgent] via
      * [attachEdgeGemmaAgent].
      */
-    fun attachOpenQuestionResponder(responder: OpenQuestionResponder?) {
-        openQuestionResponder = responder
+    fun attachOpenQuestionSupplementResponder(responder: OpenQuestionSupplementResponder?) {
+        openQuestionSupplementResponder = responder
     }
 
     /** Accessor for later live phases (NLU / open-question / proactive). */
@@ -608,8 +626,7 @@ class LiveSessionViewModel(
         // that "reads like a question" in an open-question-eligible stage is handled
         // on-device (immediate ack + async controlled answer) when a responder is
         // attached. Response-check questions keep their deterministic server path.
-        val isEdgeOpenQuestion = openQuestionResponder != null &&
-            shouldRouteAsOpenQuestion &&
+        val isEdgeOpenQuestion = shouldRouteAsOpenQuestion &&
             EdgeOpenQuestionPolicy.isOpenQuestionStage(currentState.currentStage) &&
             !isResponseCheckQuestionTranscript(clean) &&
             EdgeOpenQuestionDetector.looksLikeOpenQuestion(clean)
@@ -665,123 +682,111 @@ class LiveSessionViewModel(
                     lastErrorMessage = null,
                     openQuestionPhase = OpenQuestionPhase.Idle,
                     lastOpenQuestionMetrics = null,
+                    openQuestionSupplement = null,
                 )
             }
         }
     }
 
     /**
-     * Phase 2 · C — start the on-device open-question turn: publish the immediate
-     * deterministic ack ([OpenQuestionPhase.Ack]) and kick off the async controlled
-     * answer. When [commitToServer] is true the server is also answering in parallel
-     * and its open-question reply is muted (dedup); offline it is purely on-device.
+     * Rule-first open-question turn. The fast rule answer is the user-visible
+     * reply; Gemma may only add a later one-line supplement.
      */
     private fun startEdgeOpenQuestion(question: String, commitToServer: Boolean) {
         resetEdgeOpenQuestionState()
         val stage = _uiState.value.currentStage
         val epoch = ++openQuestionEpoch
         edgeOpenQuestionActive = commitToServer
-        val ackText = EdgeOpenQuestionPolicy.ackText(stage)
+        val actionId = edgeOpenQuestionActionId("fast_rule", epoch)
+        val fastAnswerText = EdgeOpenQuestionPolicy.fallbackAnswer(stage, question)
+        val metrics = edgeOpenQuestionFastRuleMetrics(stage)
         _uiState.update {
             it.copy(
                 partialTranscript = null,
                 lastUserTranscript = question,
-                isInFlight = true,
+                isInFlight = false,
                 micState = MicState.Listening,
                 sourceBadge = SourceBadge.RecordingOnly,
                 isLiveAudioPlaying = false,
                 activeAudioActionId = null,
                 lastErrorMessage = null,
-                openQuestionPhase = OpenQuestionPhase.Ack,
+                openQuestionPhase = OpenQuestionPhase.Answer,
                 mainText = EdgeOpenQuestionPolicy.ackMainText(stage),
-                secondaryText = EdgeOpenQuestionPolicy.ackSecondaryText(stage),
-                ttsText = ackText,
-                lastAssistantText = ackText,
-                lastActionId = edgeOpenQuestionActionId("ack", epoch),
+                secondaryText = fastAnswerText,
+                ttsText = fastAnswerText,
+                lastAssistantText = fastAnswerText,
+                lastActionId = actionId,
                 ttsPriority = "normal",
                 ttsInterruptPolicy = "do_not_interrupt_critical",
                 ttsTone = "calm_firm",
                 ttsSpeed = "normal",
                 suppressLocalTts = false,
+                responseType = "open_question_answer",
+                guidanceSource = "open_question_fast_rule",
+                lastOpenQuestionMetrics = metrics,
+                openQuestionSupplement = null,
             )
         }
-        launchEdgeOpenQuestionAnswer(stage, question, epoch)
+        launchEdgeOpenQuestionSupplement(stage, question, fastAnswerText, epoch, actionId)
     }
 
-    /** Generate + guard the controlled answer off the hot path, then publish it. */
-    private fun launchEdgeOpenQuestionAnswer(stage: String?, question: String, epoch: Int) {
-        val responder = openQuestionResponder ?: run {
-            applyEdgeOpenQuestionOutcome(
-                stage,
-                OpenQuestionOutcome.Fallback(
-                    reason = "no_responder",
-                    answerText = EdgeOpenQuestionPolicy.fallbackAnswer(stage, question),
-                ),
-                epoch,
-            )
-            return
-        }
+    /** Generate + guard a short, non-repeated supplement off the hot path. */
+    private fun launchEdgeOpenQuestionSupplement(
+        stage: String?,
+        question: String,
+        fastAnswerText: String,
+        epoch: Int,
+        fastActionId: String,
+    ) {
+        val responder = openQuestionSupplementResponder ?: return
         val frame = buildOpenQuestionFrame(stage, question)
         openQuestionJob = viewModelScope.launch {
             val outcome = try {
-                responder.answerOpenQuestion(frame)
+                responder.answerOpenQuestionSupplement(frame, fastAnswerText)
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Throwable) {
-                OpenQuestionOutcome.Fallback(
+                OpenQuestionSupplementOutcome(
+                    accepted = false,
                     reason = "exception:${error.message ?: "unknown"}",
-                    answerText = EdgeOpenQuestionPolicy.fallbackAnswer(stage, question),
                 )
             }
-            if (epoch != openQuestionEpoch) return@launch
-            applyEdgeOpenQuestionOutcome(stage, outcome, epoch)
+            applyEdgeOpenQuestionSupplement(stage, question, fastActionId, outcome, epoch)
         }
     }
 
-    /**
-     * Publish the controlled answer (or a deterministic fallback) as
-     * [OpenQuestionPhase.Answer]. Guard-rejected / timed-out / budget-exhausted
-     * outcomes still speak a safe template so the rescuer always gets a reply. A
-     * superseded epoch or a no-longer-Ack phase (barge-in / new turn) is ignored.
-     */
-    private fun applyEdgeOpenQuestionOutcome(stage: String?, outcome: OpenQuestionOutcome, epoch: Int) {
-        val answerText: String
-        val mainText: String
-        val secondaryText: String
-        val tone: String
-        when (outcome) {
-            is OpenQuestionOutcome.Answer -> {
-                answerText = outcome.ttsText
-                mainText = outcome.mainText
-                secondaryText = outcome.secondaryText
-                tone = outcome.tone
-            }
-            is OpenQuestionOutcome.Fallback -> {
-                answerText = outcome.answerText ?: EdgeOpenQuestionPolicy.fallbackAnswer(stage)
-                mainText = EdgeOpenQuestionPolicy.ackMainText(stage)
-                secondaryText = ""
-                tone = "calm_firm"
-            }
-        }
-        val metrics = edgeOpenQuestionMetrics(stage, outcome)
+    private fun applyEdgeOpenQuestionSupplement(
+        stage: String?,
+        question: String,
+        fastActionId: String,
+        outcome: OpenQuestionSupplementOutcome,
+        epoch: Int,
+    ) {
+        val metrics = edgeOpenQuestionSupplementMetrics(stage, outcome)
         _uiState.update { current ->
-            if (epoch != openQuestionEpoch || current.openQuestionPhase != OpenQuestionPhase.Ack) {
-                return@update current
+            if (epoch != openQuestionEpoch) return@update current
+            val updatedMetrics = current.copy(lastOpenQuestionMetrics = metrics)
+            if (!outcome.accepted || outcome.text.isBlank()) return@update updatedMetrics
+            if (
+                current.currentStage != stage ||
+                current.lastActionId != fastActionId ||
+                current.lastUserTranscript != question ||
+                current.ttsPriority == "critical" ||
+                current.pendingConfirmation != null ||
+                current.emergencyCall.requested
+            ) {
+                return@update updatedMetrics
             }
-            current.copy(
-                openQuestionPhase = OpenQuestionPhase.Answer,
-                isInFlight = false,
-                mainText = mainText.ifBlank { current.mainText },
-                secondaryText = secondaryText,
-                ttsText = answerText,
-                lastAssistantText = answerText,
-                lastActionId = edgeOpenQuestionActionId("answer", epoch),
-                ttsPriority = "normal",
-                ttsInterruptPolicy = "do_not_interrupt_critical",
-                ttsTone = tone,
-                ttsSpeed = "normal",
-                suppressLocalTts = false,
-                lastOpenQuestionMetrics = metrics,
+            updatedMetrics.copy(
+                openQuestionSupplement = OpenQuestionSupplement(
+                    id = edgeOpenQuestionActionId(
+                        if (outcome.cacheHit) "supplement_cache" else "supplement",
+                        epoch,
+                    ),
+                    text = outcome.text,
+                    tone = "calm_firm",
+                    speed = "normal",
+                ),
             )
         }
     }
@@ -803,22 +808,47 @@ class LiveSessionViewModel(
         )
     }
 
-    private fun edgeOpenQuestionMetrics(stage: String?, outcome: OpenQuestionOutcome): LiveTurnMetrics =
+    private fun edgeOpenQuestionFastRuleMetrics(stage: String?): LiveTurnMetrics =
         LiveTurnMetrics(
             currentStage = stage,
-            timings = mapOf("gemma_ms" to outcome.latencyMs),
             gemma = LiveGemmaTurnMetrics(
-                live = outcome is OpenQuestionOutcome.Answer,
+                skipped = true,
+                skipReason = "fast_rule_first",
                 openQuestion = true,
             ),
             openQuestion = LiveOpenQuestionTurnMetrics(
-                segment = "answer",
-                cacheHit = (outcome as? OpenQuestionOutcome.Answer)?.cacheHit,
-                fallback = outcome is OpenQuestionOutcome.Fallback,
-                reason = (outcome as? OpenQuestionOutcome.Fallback)?.reason,
+                segment = "fast_rule",
+                fallback = false,
+                waitMs = 0L,
+            ),
+            guidanceSource = "open_question_fast_rule",
+        )
+
+    private fun edgeOpenQuestionSupplementMetrics(
+        stage: String?,
+        outcome: OpenQuestionSupplementOutcome,
+    ): LiveTurnMetrics =
+        LiveTurnMetrics(
+            currentStage = stage,
+            timings = if (outcome.cacheHit) emptyMap() else mapOf("gemma_supplement_ms" to outcome.latencyMs),
+            gemma = LiveGemmaTurnMetrics(
+                skipped = !outcome.accepted,
+                skipReason = outcome.reason,
+                live = outcome.accepted && !outcome.cacheHit,
+                openQuestion = true,
+            ),
+            openQuestion = LiveOpenQuestionTurnMetrics(
+                segment = "gemma_supplement",
+                cacheHit = outcome.cacheHit,
+                fallback = !outcome.accepted,
+                reason = outcome.reason,
                 waitMs = outcome.latencyMs,
             ),
-            guidanceSource = "edge_open_question",
+            guidanceSource = if (outcome.cacheHit) {
+                "open_question_supplement_cache"
+            } else {
+                "open_question_supplement"
+            },
         )
 
     /**
@@ -832,6 +862,7 @@ class LiveSessionViewModel(
         openQuestionJob = null
         edgeOpenQuestionActive = false
         suppressedOpenQuestionActionIds.clear()
+        _uiState.update { it.copy(openQuestionSupplement = null) }
     }
 
     /**
@@ -1336,10 +1367,17 @@ internal fun reduceLiveEvent(current: LiveUiState, event: LiveAgentEvent): LiveU
                 isInFlight = false,
                 micState = if (current.micState == MicState.Capturing) MicState.Listening else current.micState,
                 openQuestionPhase = openQuestionPhase ?: OpenQuestionPhase.Idle,
+                openQuestionSupplement = null,
             )
             base.applyGuidance(event.action)
         }
-        is LiveAgentEvent.State -> current.copy(currentStage = event.currentStage ?: current.currentStage)
+        is LiveAgentEvent.State -> {
+            val nextStage = event.currentStage ?: current.currentStage
+            current.copy(
+                currentStage = nextStage,
+                openQuestionSupplement = if (nextStage != current.currentStage) null else current.openQuestionSupplement,
+            )
+        }
         is LiveAgentEvent.Metrics -> current.applyLiveMetrics(event.metrics)
         is LiveAgentEvent.AudioBegin -> current.copy(
             isLiveAudioPlaying = true,

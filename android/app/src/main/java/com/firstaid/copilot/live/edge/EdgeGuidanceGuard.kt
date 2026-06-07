@@ -148,6 +148,48 @@ class EdgeGuidanceGuard(
     }
 
     /**
+     * Validate a post-rule Gemma supplement for the "规则首答 + Gemma 简短补充" path.
+     * The supplement is additive only: it must be short, safe, and not repeat the
+     * deterministic [fastAnswerText] that was already spoken.
+     */
+    fun validateOpenQuestionSupplement(
+        rawText: String,
+        frame: OpenQuestionFrame,
+        fastAnswerText: String,
+    ): OpenQuestionSupplementOutcome {
+        if (frame.allowedIntents.isEmpty()) {
+            return rejectedSupplement("no_allowed_intents")
+        }
+        val supplement = cleanAnswerText(rawText)
+            ?: return rejectedSupplement("empty_answer")
+        if (isDuplicateFastAnswer(supplement, fastAnswerText)) {
+            return rejectedSupplement("duplicate_fast_answer")
+        }
+        lowQualityOpenQuestionReason(supplement)?.let { reason ->
+            return rejectedSupplement(reason)
+        }
+
+        val expected = JSONObject()
+            .put("kind", "guidance_patch")
+            .put("allowedIntents", JSONArray(frame.allowedIntents))
+            .put("requireTtsText", true)
+            .put("maxTtsChars", SUPPLEMENT_MAX_CHARS)
+            .put("bannedSubstrings", JSONArray(bannedSubstrings))
+            .put("forbidStopCompressionWords", EdgeOpenQuestionPolicy.isCprLiveStage(frame.stage))
+            .put("allowFallbackIntent", false)
+        val assembled = JSONObject()
+            .put("intent", frame.allowedIntents.first())
+            .put("tts", JSONObject().put("text", supplement))
+            .toString()
+        val verdict = GemmaSuiteAsserts.evaluate(expected, assembled)
+        if (!verdict.pass) {
+            return rejectedSupplement(rejectionReasons(verdict).firstOrNull() ?: "rejected")
+        }
+
+        return OpenQuestionSupplementOutcome(accepted = true, text = supplement)
+    }
+
+    /**
      * Validate a PLAIN-TEXT NLU label (功能 E 选定方案：模型只回一个标签). Matches the
      * cleaned label against [allowedIntents] and enforces the unconditional
      * `suspected_cardiac_arrest` red-line on the raw output. `confidence` is a fixed
@@ -180,6 +222,9 @@ class EdgeGuidanceGuard(
             addAll(verdict.failures)
             addAll(verdict.bannedHits.map { "banned:$it" })
         }.distinct().ifEmpty { listOf("rejected") }
+
+    private fun rejectedSupplement(reason: String): OpenQuestionSupplementOutcome =
+        OpenQuestionSupplementOutcome(accepted = false, reason = reason)
 
     private fun extractJson(raw: String): JSONObject? {
         val start = raw.indexOf('{')
@@ -229,6 +274,57 @@ class EdgeGuidanceGuard(
         return null
     }
 
+    private fun isDuplicateFastAnswer(answer: String, fastAnswerText: String): Boolean {
+        val supplement = duplicateNormalize(answer)
+        val fast = duplicateNormalize(fastAnswerText)
+        if (supplement.isBlank() || fast.isBlank()) return false
+        if (fast.contains("继续按压") && supplement.startsWith("继续按压")) return true
+        if (supplement.length >= 4 && fast.contains(supplement)) return true
+        if (fast.length >= 4 && supplement.contains(fast)) return true
+
+        val repeatedActionPhrases = listOf(
+            "继续按压",
+            "不要停",
+            "别停",
+            "拿AED",
+            "打开AED",
+            "分析时所有人离开",
+            "电击时所有人离开",
+            "所有人离开",
+            "联系家属",
+            "通知家属",
+            "胸口中央",
+            "跟着节拍",
+            "准备换手",
+            "维持血流",
+            "留意AED",
+            "正常呼吸",
+            "不用自己数",
+        ).map(::duplicateNormalize)
+        if (repeatedActionPhrases.any { it.length >= 3 && fast.contains(it) && supplement.contains(it) }) {
+            return true
+        }
+
+        val supplementTokens = duplicateTokens(supplement)
+        val fastTokens = duplicateTokens(fast)
+        if (supplementTokens.isEmpty() || fastTokens.isEmpty()) return false
+        val overlap = supplementTokens.intersect(fastTokens)
+        return overlap.size >= 2 && overlap.size >= minOf(supplementTokens.size, fastTokens.size)
+    }
+
+    private fun duplicateNormalize(text: String): String =
+        text.replace(Regex("[\\s，。,.！？!、；;：:\"“”'「」（）()《》]+"), "")
+            .uppercase()
+
+    private fun duplicateTokens(compact: String): Set<String> {
+        val stopWords = setOf("继续", "按压", "不要", "别停", "现在", "可以", "就是", "你先", "旁人", "别人")
+        if (compact.length < 2) return emptySet()
+        return (0 until compact.length - 1)
+            .map { compact.substring(it, it + 2) }
+            .filter { it !in stopWords }
+            .toSet()
+    }
+
     private fun firstMeaningfulLine(raw: String): String? {
         var text = raw.trim()
         if (text.startsWith("```")) text = text.trim('`').trim()
@@ -248,6 +344,8 @@ class EdgeGuidanceGuard(
 
         /** A single label carries no score; treat an accepted label as a confident hint. */
         const val NLU_LABEL_CONFIDENCE = 0.7
+
+        const val SUPPLEMENT_MAX_CHARS = 18
 
         /** Keys the NLU parser may never emit (mirrors the server forbidden set). */
         val DEFAULT_NLU_FORBIDDEN_KEYS = listOf(
