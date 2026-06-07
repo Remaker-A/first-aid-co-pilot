@@ -81,6 +81,7 @@ import com.firstaid.copilot.live.audio.MetronomeController
 import com.firstaid.copilot.live.demoCprSetupSequence
 import com.firstaid.copilot.live.demoPresetById
 import com.firstaid.copilot.live.demoPresets
+import com.firstaid.copilot.live.edge.EdgeBreathingNluResolvers
 import com.firstaid.copilot.live.edge.EdgeGemmaAgent
 import com.firstaid.copilot.live.edge.EdgeGemmaFeatureFlags
 import com.firstaid.copilot.live.edge.EdgeModelKind
@@ -390,8 +391,13 @@ fun LiveCprCoachScreen(
                     // from the agent's flags. The agent is inert unless its flags are
                     // on, so this is a no-op for the default (all-off) build.
                     val agent = EdgeGemmaAgent(driver, edgeGemmaFlags)
+                    val nluResolver = if (edgeGemmaFlags.enabled && edgeGemmaFlags.nluEnabled) {
+                        EdgeBreathingNluResolvers.tfliteOrRuleBased(context.applicationContext)
+                    } else {
+                        null
+                    }
                     gemmaAgent = agent
-                    viewModel.attachEdgeGemmaAgent(agent)
+                    viewModel.attachEdgeGemmaAgent(agent, nluResolver)
                     "GemmaWarm=${warmup.latencyMs}ms"
                 } else {
                     "GemmaWarm=error"

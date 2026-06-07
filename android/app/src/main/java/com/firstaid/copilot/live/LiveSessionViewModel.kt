@@ -1,5 +1,6 @@
 package com.firstaid.copilot.live
 
+import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -501,7 +502,7 @@ class LiveSessionViewModel(
      * The screen owns the agent's lifecycle (it closes it on dispose); the
      * ViewModel only holds the reference for later phases to use off the hot path.
      */
-    fun attachEdgeGemmaAgent(agent: EdgeGemmaAgent) {
+    fun attachEdgeGemmaAgent(agent: EdgeGemmaAgent, edgeResolver: LiveNluResolver? = null) {
         edgeGemmaAgent = agent
         // Wire each capability seam from the single agent, gated by its flags, so the
         // default (all-off) build keeps the exact prior behavior on every path.
@@ -510,9 +511,9 @@ class LiveSessionViewModel(
         // resolver instead of the ~10-17s 2B driver path (which also drives the driver's
         // timeout discard/rebuild cascade). C/D still use the agent.
         if (flags.enabled && flags.nluEnabled) {
-            val tiny = EdgeTinyNluResolver()
-            edgeNluResolver = tiny
-            nluResolver = tiny
+            val resolver = edgeResolver ?: EdgeTinyNluResolver()
+            edgeNluResolver = resolver
+            nluResolver = resolver
         }
         if (flags.enabled && flags.proactiveEnabled) proactivePolisher = agent
         if (flags.enabled && flags.openQuestionEnabled) openQuestionSupplementResponder = agent
@@ -877,7 +878,16 @@ class LiveSessionViewModel(
         val stage = _uiState.value.currentStage
         viewModelScope.launch {
             try {
+                val startedAtMs = SystemClock.elapsedRealtime()
                 val resolution = resolver.resolveIntent(LiveNluRequest(transcript = transcript, stage = stage))
+                val elapsedMs = SystemClock.elapsedRealtime() - startedAtMs
+                Log.i(
+                    TAG,
+                    "On-device NLU resolved resolver=${resolver.debugName()} " +
+                        "intent=${resolution?.intent ?: "null"} " +
+                        "needsClarification=${resolution?.needsClarification ?: false} " +
+                        "latencyMs=$elapsedMs",
+                )
                 nluCoordinator.completeResolve(key, resolution?.toFastIntentMatch())
             } catch (cancel: CancellationException) {
                 nluCoordinator.abortResolve(key)
@@ -887,6 +897,12 @@ class LiveSessionViewModel(
                 nluCoordinator.abortResolve(key)
             }
         }
+    }
+
+    private fun LiveNluResolver.debugName(): String {
+        val resolverName = this::class.java.simpleName.ifBlank { this::class.java.name }
+        val classifierName = (this as? EdgeTinyNluResolver)?.classifierDebugName
+        return if (classifierName == null) resolverName else "$resolverName/$classifierName"
     }
 
     /**

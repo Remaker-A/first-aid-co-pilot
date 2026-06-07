@@ -26,6 +26,9 @@ class EdgeTinyNluResolver internal constructor(
 
     constructor() : this(RuleBasedBreathingNluClassifier())
 
+    internal val classifierDebugName: String
+        get() = classifier::class.java.simpleName.ifBlank { classifier::class.java.name }
+
     override suspend fun resolveIntent(request: LiveNluRequest): LiveNluResolution? {
         val policy = EdgeNluPolicy.forStage(request.stage) ?: return null
         val resolution = classifier.classify(request.transcript) ?: return null
