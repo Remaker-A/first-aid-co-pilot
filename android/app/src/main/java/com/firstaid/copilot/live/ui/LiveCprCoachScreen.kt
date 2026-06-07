@@ -97,12 +97,16 @@ import com.firstaid.copilot.live.edge.buildSherpaStreamingAsrSession
 import com.firstaid.copilot.live.edge.inspectEdgeModels
 import com.firstaid.copilot.live.normalizeOverlayMode
 import com.firstaid.copilot.live.toAttentionMode
+import com.firstaid.copilot.live.vision.cpr.CprOverlayPoint
 import com.firstaid.copilot.live.vision.cpr.CprVisionAnalyzer
+import com.firstaid.copilot.live.vision.cpr.CprVisionOverlaySnapshot
 import com.firstaid.copilot.live.vision.cpr.VisionCameraFacing
 import com.firstaid.copilot.live.vision.cpr.VisionCameraMount
 import java.io.File
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
+import kotlin.math.hypot
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -391,6 +395,13 @@ fun LiveCprCoachScreen(
             modifier = Modifier.fillMaxSize(),
         )
 
+        if (useCameraSource) {
+            CprVisionDebugOverlay(
+                overlay = state.visionOverlay,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+
         when (attentionMode) {
             AttentionMode.Coach -> CoachLayout(state)
             AttentionMode.EyesOff -> EyesOffLayout(state)
@@ -657,6 +668,161 @@ fun CprCoachOverlay(
     }
 }
 
+@Composable
+private fun CprVisionDebugOverlay(
+    overlay: CprVisionOverlaySnapshot?,
+    modifier: Modifier = Modifier,
+) {
+    if (overlay == null) return
+
+    val aligned = overlay.handChestDistance() ?: Double.POSITIVE_INFINITY
+    val alignmentColor = if (aligned <= 0.07) Color(0xFF22C55E) else Color(0xFFFBBF24)
+
+    Box(modifier = modifier) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            fun CprOverlayPoint.toOffset(): Offset =
+                Offset(
+                    x = (x.coerceIn(0.0, 1.0) * size.width).toFloat(),
+                    y = (y.coerceIn(0.0, 1.0) * size.height).toFloat(),
+                )
+
+            fun drawBone(a: CprOverlayPoint?, b: CprOverlayPoint?, color: Color) {
+                if (a == null || b == null) return
+                drawLine(
+                    color = color.copy(alpha = 0.88f),
+                    start = a.toOffset(),
+                    end = b.toOffset(),
+                    strokeWidth = 7f,
+                    cap = StrokeCap.Round,
+                )
+            }
+
+            fun drawJoint(point: CprOverlayPoint?, color: Color, radius: Float = 10f) {
+                if (point == null) return
+                drawCircle(
+                    color = Color.Black.copy(alpha = 0.58f),
+                    radius = radius + 4f,
+                    center = point.toOffset(),
+                )
+                drawCircle(color = color, radius = radius, center = point.toOffset())
+            }
+
+            val detectedPoints = listOfNotNull(
+                overlay.leftShoulder,
+                overlay.rightShoulder,
+                overlay.leftElbow,
+                overlay.rightElbow,
+                overlay.leftWrist,
+                overlay.rightWrist,
+                overlay.handCenter,
+                overlay.chestCenter,
+            ).map { it.toOffset() }
+            if (detectedPoints.isNotEmpty()) {
+                val pad = 28f
+                val minX = (detectedPoints.minOf { it.x } - pad).coerceAtLeast(0f)
+                val minY = (detectedPoints.minOf { it.y } - pad).coerceAtLeast(0f)
+                val maxX = (detectedPoints.maxOf { it.x } + pad).coerceAtMost(size.width)
+                val maxY = (detectedPoints.maxOf { it.y } + pad).coerceAtMost(size.height)
+                drawRoundRect(
+                    color = Color(0xFFE0F2FE).copy(alpha = 0.58f),
+                    topLeft = Offset(minX, minY),
+                    size = androidx.compose.ui.geometry.Size(maxX - minX, maxY - minY),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(28f, 28f),
+                    style = Stroke(width = 4f),
+                )
+            }
+
+            drawBone(overlay.leftShoulder, overlay.leftElbow, Color(0xFF38BDF8))
+            drawBone(overlay.leftElbow, overlay.leftWrist, Color(0xFF38BDF8))
+            drawBone(overlay.rightShoulder, overlay.rightElbow, Color(0xFF60A5FA))
+            drawBone(overlay.rightElbow, overlay.rightWrist, Color(0xFF60A5FA))
+            drawBone(overlay.leftShoulder, overlay.rightShoulder, Color(0xFFA5B4FC))
+
+            if (overlay.handCenter != null && overlay.chestCenter != null) {
+                drawLine(
+                    color = alignmentColor.copy(alpha = 0.85f),
+                    start = overlay.handCenter.toOffset(),
+                    end = overlay.chestCenter.toOffset(),
+                    strokeWidth = 5f,
+                    cap = StrokeCap.Round,
+                )
+            }
+
+            drawJoint(overlay.leftShoulder, Color(0xFFA5B4FC), 8f)
+            drawJoint(overlay.rightShoulder, Color(0xFFA5B4FC), 8f)
+            drawJoint(overlay.leftElbow, Color(0xFF38BDF8), 10f)
+            drawJoint(overlay.rightElbow, Color(0xFF60A5FA), 10f)
+            drawJoint(overlay.leftWrist, Color(0xFF22D3EE), 9f)
+            drawJoint(overlay.rightWrist, Color(0xFF22D3EE), 9f)
+
+            overlay.chestCenter?.let { chest ->
+                val center = chest.toOffset()
+                drawCircle(
+                    color = Color(0xFFEF4444).copy(alpha = 0.22f),
+                    radius = 36f,
+                    center = center,
+                    style = Stroke(width = 6f),
+                )
+                drawLine(
+                    color = Color(0xFFEF4444).copy(alpha = 0.9f),
+                    start = Offset(center.x - 24f, center.y),
+                    end = Offset(center.x + 24f, center.y),
+                    strokeWidth = 5f,
+                    cap = StrokeCap.Round,
+                )
+                drawLine(
+                    color = Color(0xFFEF4444).copy(alpha = 0.9f),
+                    start = Offset(center.x, center.y - 24f),
+                    end = Offset(center.x, center.y + 24f),
+                    strokeWidth = 5f,
+                    cap = StrokeCap.Round,
+                )
+            }
+            drawJoint(overlay.handCenter, alignmentColor, 13f)
+        }
+
+        Surface(
+            color = Color(0xCC020617),
+            shape = RoundedCornerShape(18.dp),
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = 16.dp, top = 72.dp),
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = "CPR Vision Debug",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "Elbow L/R: ${overlay.leftElbowAngleDeg.formatDeg()} / ${overlay.rightElbowAngleDeg.formatDeg()}",
+                    color = Color(0xFFE0F2FE),
+                    fontSize = 12.sp,
+                )
+                Text(
+                    text = "Hand: ${overlay.handPosition.handPositionLabel()}  Align: ${aligned.alignmentLabel()}",
+                    color = alignmentColor,
+                    fontSize = 12.sp,
+                )
+                Text(
+                    text = "Chest: ${overlay.chestSource.chestSourceLabel()}",
+                    color = Color(0xFFDCFCE7),
+                    fontSize = 12.sp,
+                )
+                Text(
+                    text = "Confidence: ${(overlay.confidence * 100).roundToInt()}%  Ready: ${overlay.visionReady}",
+                    color = Color(0xFFCBD5E1),
+                    fontSize = 12.sp,
+                )
+            }
+        }
+    }
+}
+
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCorrectionArrow(
     center: Offset,
     direction: String,
@@ -698,6 +864,42 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCorrectionArrow
         close()
     }
     drawPath(head, color)
+}
+
+private fun Double?.formatDeg(): String =
+    if (this == null) "--" else "${this.roundToInt()} deg"
+
+private fun String?.handPositionLabel(): String =
+    when (this) {
+        "center", "correct" -> "center"
+        "left", "left_offset" -> "left"
+        "right", "right_offset" -> "right"
+        "too_high" -> "high"
+        "too_low" -> "low"
+        "off_center" -> "off"
+        null -> "unknown"
+        else -> this
+    }
+
+private fun String.chestSourceLabel(): String =
+    when (this) {
+        "fixed_chest_target" -> "chest target"
+        "rescuer_pose" -> "rescuer pose"
+        else -> this
+    }
+
+private fun Double.alignmentLabel(): String =
+    when {
+        !isFinite() -> "unknown"
+        this <= 0.07 -> "ok"
+        this <= 0.13 -> "near"
+        else -> "far"
+    }
+
+private fun CprVisionOverlaySnapshot.handChestDistance(): Double? {
+    val hand = handCenter ?: return null
+    val chest = chestCenter ?: return null
+    return hypot(hand.x - chest.x, hand.y - chest.y)
 }
 
 @Composable

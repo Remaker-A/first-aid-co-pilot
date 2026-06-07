@@ -73,6 +73,34 @@ class CprMetricsDeriverTest {
     }
 
     @Test
+    fun update_emitsDebugOverlayWithElbowAnglesAndTargets() {
+        val snapshot = CprMetricsDeriver().update(landmarks(), 1_000L)
+
+        assertNotNull(snapshot?.overlay)
+        assertNotNull(snapshot?.overlay?.leftElbowAngleDeg)
+        assertNotNull(snapshot?.overlay?.rightElbowAngleDeg)
+        assertTrue((snapshot?.overlay?.leftElbowAngleDeg ?: 0.0) > 150.0)
+        assertNotNull(snapshot?.overlay?.handCenter)
+        assertNotNull(snapshot?.overlay?.chestCenter)
+        assertEquals(snapshot?.armStraight, snapshot?.overlay?.armStraight)
+        assertTrue(snapshot?.toCprQualityMap()?.get("debug_overlay") is CprVisionOverlaySnapshot)
+    }
+
+    @Test
+    fun update_keepsChestTargetFixedWhenRescuerPoseMoves() {
+        val deriver = CprMetricsDeriver()
+
+        val first = deriver.update(landmarks(shiftX = -0.12), 1_000L)
+        val second = deriver.update(landmarks(shiftX = 0.14), 1_400L)
+
+        assertEquals(0.50, first?.overlay?.chestCenter?.x ?: 0.0, 0.001)
+        assertEquals(0.56, first?.overlay?.chestCenter?.y ?: 0.0, 0.001)
+        assertEquals(0.50, second?.overlay?.chestCenter?.x ?: 0.0, 0.001)
+        assertEquals(0.56, second?.overlay?.chestCenter?.y ?: 0.0, 0.001)
+        assertEquals("fixed_chest_target", second?.overlay?.chestSource)
+    }
+
+    @Test
     fun update_nullsGuessedFieldsWhenConfidenceIsLow() {
         val snapshot = CprMetricsDeriver().update(landmarks(confidence = 0.2), 1_000L)
 

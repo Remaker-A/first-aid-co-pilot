@@ -10,6 +10,7 @@ import com.firstaid.copilot.live.perception.EmaQualityScore
 import com.firstaid.copilot.live.perception.HandPositionHysteresis
 import com.firstaid.copilot.live.perception.PerceptionSignal
 import com.firstaid.copilot.live.perception.smoothInterruptionSeconds
+import com.firstaid.copilot.live.vision.cpr.CprVisionOverlaySnapshot
 import com.firstaid.copilot.live.vision.cpr.evaluateVisionReadiness
 import java.util.UUID
 import java.util.concurrent.Executors
@@ -235,6 +236,7 @@ class LiveSessionViewModel(
         _uiState.update {
             it.copy(
                 sourceBadge = SourceBadge.LiveRecognition,
+                visionOverlay = cprQuality.visionOverlayOrNull(),
                 perceptionSignals = smoothedQuality.toPerceptionSignals(nowMs, safeConfidence),
                 lastErrorMessage = null,
             )
@@ -255,6 +257,7 @@ class LiveSessionViewModel(
         _uiState.update {
             it.copy(
                 sourceBadge = SourceBadge.RecordingOnly,
+                visionOverlay = cprQuality.visionOverlayOrNull(),
                 lastErrorMessage = visionReadinessMessage(reason),
                 perceptionSignals = cprQuality.toVisionMetadata(reason).toPerceptionSignals(
                     timestampMs = nowMs,
@@ -524,6 +527,9 @@ private fun Map<String, Any?>.numberOrNull(key: String): Double? =
 
 private fun Map<String, Any?>.booleanOrNull(key: String): Boolean? =
     this[key] as? Boolean
+
+private fun Map<String, Any?>.visionOverlayOrNull(): CprVisionOverlaySnapshot? =
+    this["debug_overlay"] as? CprVisionOverlaySnapshot
 
 private fun Map<String, Any?>.toVisionMetadata(readinessReason: String?): Map<String, Any?> =
     linkedMapOf(

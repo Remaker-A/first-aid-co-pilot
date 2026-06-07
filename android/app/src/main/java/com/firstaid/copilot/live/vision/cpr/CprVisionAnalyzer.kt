@@ -14,6 +14,8 @@ import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerResult
 import java.io.ByteArrayOutputStream
+import kotlin.math.abs
+import kotlin.math.hypot
 
 class CprVisionAnalyzer(
     context: Context,
@@ -85,7 +87,7 @@ class CprVisionAnalyzer(
             val options = PoseLandmarker.PoseLandmarkerOptions.builder()
                 .setBaseOptions(baseOptions)
                 .setRunningMode(RunningMode.LIVE_STREAM)
-                .setNumPoses(1)
+                .setNumPoses(3)
                 .setMinPoseDetectionConfidence(0.5f)
                 .setMinPosePresenceConfidence(0.5f)
                 .setMinTrackingConfidence(0.5f)
@@ -101,23 +103,80 @@ class CprVisionAnalyzer(
     }
 
     private fun handleResult(result: PoseLandmarkerResult) {
-        val pose = result.landmarks().firstOrNull()
-        if (pose.isNullOrEmpty()) return
-        val landmarks = pose.map { landmark ->
-            CprLandmark(
-                x = landmark.x().toDouble(),
-                y = landmark.y().toDouble(),
-                visibility = landmark.visibility().orElse(0f).toDouble(),
-            )
+        val poses = result.landmarks().map { pose ->
+            pose.map { landmark ->
+                CprLandmark(
+                    x = landmark.x().toDouble(),
+                    y = landmark.y().toDouble(),
+                    visibility = landmark.visibility().orElse(0f).toDouble(),
+                )
+            }
         }
+        val landmarks = selectRescuerPose(poses) ?: return
         val metrics = deriver.update(landmarks, result.timestampMs()) ?: return
         onMetrics(
             metrics.toCprQualityMap() + mapOf(
                 "camera_facing" to cameraFacing.eventValue,
                 "camera_mount" to cameraMount.eventValue,
                 "mirrored" to mirrored,
+                "pose_selection" to "rescuer_vertical",
             ),
         )
+    }
+
+    private fun selectRescuerPose(poses: List<List<CprLandmark>>): List<CprLandmark>? =
+        poses
+            .filter { it.isNotEmpty() }
+            .maxByOrNull(::rescuerPoseScore)
+
+    private fun rescuerPoseScore(pose: List<CprLandmark>): Double {
+        val shoulder = averageVisible(
+            pose,
+            CprMetricsDeriver.LEFT_SHOULDER,
+            CprMetricsDeriver.RIGHT_SHOULDER,
+        ) ?: return -1.0
+        val hip = averageVisible(
+            pose,
+            CprMetricsDeriver.LEFT_HIP,
+            CprMetricsDeriver.RIGHT_HIP,
+        ) ?: return -1.0
+        val dx = hip.x - shoulder.x
+        val dy = hip.y - shoulder.y
+        val verticality = abs(dy) / (abs(dx) + abs(dy) + 1e-6)
+        val visibility = requiredVisibility(pose)
+        val torsoSize = hypot(dx, dy)
+        val sizeScore = torsoSize.coerceIn(0.0, 0.5) / 0.5
+        return 0.62 * verticality + 0.28 * visibility + 0.10 * sizeScore
+    }
+
+    private fun averageVisible(pose: List<CprLandmark>, firstIndex: Int, secondIndex: Int): CprLandmark? {
+        val first = pose.getOrNull(firstIndex)
+        val second = pose.getOrNull(secondIndex)
+        val points = listOfNotNull(first, second).filter { (it.visibility ?: 0.0) >= 0.35 }
+        if (points.isEmpty()) return null
+        return CprLandmark(
+            x = points.sumOf { it.x } / points.size,
+            y = points.sumOf { it.y } / points.size,
+            visibility = points.sumOf { it.visibility ?: 0.0 } / points.size,
+        )
+    }
+
+    private fun requiredVisibility(pose: List<CprLandmark>): Double {
+        val indices = intArrayOf(
+            CprMetricsDeriver.LEFT_SHOULDER,
+            CprMetricsDeriver.RIGHT_SHOULDER,
+            CprMetricsDeriver.LEFT_ELBOW,
+            CprMetricsDeriver.RIGHT_ELBOW,
+            CprMetricsDeriver.LEFT_WRIST,
+            CprMetricsDeriver.RIGHT_WRIST,
+            CprMetricsDeriver.LEFT_HIP,
+            CprMetricsDeriver.RIGHT_HIP,
+        )
+        return indices
+            .map { pose.getOrNull(it)?.visibility ?: 0.0 }
+            .average()
+            .takeIf { it.isFinite() }
+            ?: 0.0
     }
 
     private fun assetExists(assetName: String): Boolean =

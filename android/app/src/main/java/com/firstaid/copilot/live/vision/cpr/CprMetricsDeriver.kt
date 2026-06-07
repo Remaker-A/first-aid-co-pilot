@@ -14,6 +14,32 @@ data class CprLandmark(
     val visibility: Double? = null,
 )
 
+data class CprOverlayPoint(
+    val x: Double,
+    val y: Double,
+    val visibility: Double? = null,
+)
+
+data class CprVisionOverlaySnapshot(
+    val leftShoulder: CprOverlayPoint? = null,
+    val rightShoulder: CprOverlayPoint? = null,
+    val leftElbow: CprOverlayPoint? = null,
+    val rightElbow: CprOverlayPoint? = null,
+    val leftWrist: CprOverlayPoint? = null,
+    val rightWrist: CprOverlayPoint? = null,
+    val handCenter: CprOverlayPoint? = null,
+    val chestCenter: CprOverlayPoint? = null,
+    val leftElbowAngleDeg: Double? = null,
+    val rightElbowAngleDeg: Double? = null,
+    val compressionRate: Double? = null,
+    val handPosition: String? = null,
+    val armStraight: Boolean? = null,
+    val qualityScore: Int? = null,
+    val confidence: Double = 0.0,
+    val visionReady: Boolean = false,
+    val chestSource: String = "unknown",
+)
+
 data class CprMetricsSnapshot(
     val compressionsStarted: Boolean,
     val compressionRate: Double?,
@@ -27,9 +53,10 @@ data class CprMetricsSnapshot(
     val frameStability: Double,
     val visionReady: Boolean,
     val observedWindowMs: Long,
+    val overlay: CprVisionOverlaySnapshot? = null,
 ) {
-    fun toCprQualityMap(): Map<String, Any?> =
-        linkedMapOf(
+    fun toCprQualityMap(): Map<String, Any?> {
+        val map = linkedMapOf(
             "compressions_started" to compressionsStarted,
             "compression_rate" to compressionRate,
             "interruption_seconds" to interruptionSeconds,
@@ -43,6 +70,11 @@ data class CprMetricsSnapshot(
             "vision_ready" to visionReady,
             "observed_window_ms" to observedWindowMs,
         )
+        if (overlay != null) {
+            map["debug_overlay"] = overlay
+        }
+        return map
+    }
 }
 
 /**
@@ -103,7 +135,8 @@ class CprMetricsDeriver(
 
         val compressionRate = estimateCompressionRate(state.samples, options)
         val handPosition = estimateHandPosition(normalizedLandmarks, options)
-        val armStraight = estimateArmStraight(normalizedLandmarks, options)
+        val armPosture = estimateArmPosture(normalizedLandmarks, options)
+        val armStraight = armPosture.straight
         val qualityScore = computeQualityScore(
             compressionRate = compressionRate,
             armStraight = armStraight,
@@ -114,21 +147,35 @@ class CprMetricsDeriver(
             poseCoverage >= options.readyPoseCoverage &&
                 frameStability >= options.readyFrameStability &&
                 confidence >= options.readyConfidence
+        val roundedCompressionRate = compressionRate?.let(::round1)
+        val roundedQualityScore = qualityScore?.roundToInt()
+        val roundedConfidence = round2(confidence)
+        val overlay = buildOverlaySnapshot(
+            landmarks = normalizedLandmarks,
+            armPosture = armPosture,
+            compressionRate = roundedCompressionRate,
+            handPosition = handPosition,
+            armStraight = armStraight,
+            qualityScore = roundedQualityScore,
+            confidence = roundedConfidence,
+            visionReady = visionReady,
+        )
 
         return commitSnapshot(
             CprMetricsSnapshot(
                 compressionsStarted = state.everMoved,
-                compressionRate = compressionRate?.let(::round1),
+                compressionRate = roundedCompressionRate,
                 interruptionSeconds = round2(state.interruptionSeconds),
                 handPosition = handPosition,
                 armStraight = armStraight,
-                qualityScore = qualityScore?.roundToInt(),
+                qualityScore = roundedQualityScore,
                 totalCompressions = state.totalCompressions,
-                confidence = round2(confidence),
+                confidence = roundedConfidence,
                 poseCoverage = round2(poseCoverage),
                 frameStability = round2(frameStability),
                 visionReady = visionReady,
                 observedWindowMs = observedWindowMs(),
+                overlay = overlay,
             ),
         )
     }
@@ -345,9 +392,14 @@ class CprMetricsDeriver(
     private fun estimateHandPosition(landmarks: List<CprLandmark>, options: Options): String? {
         val floor = options.visibilityFloor
         val wrist = averageVisible(landmarks, intArrayOf(LEFT_WRIST, RIGHT_WRIST), floor)
+        if (wrist == null) return null
+        if (options.useFixedChestCenter) {
+            return estimateFixedChestHandPosition(wrist, options)
+        }
+
         val leftShoulder = visiblePoint(landmarks, LEFT_SHOULDER, floor)
         val rightShoulder = visiblePoint(landmarks, RIGHT_SHOULDER, floor)
-        if (wrist == null || leftShoulder == null || rightShoulder == null) return null
+        if (leftShoulder == null || rightShoulder == null) return null
 
         val shoulderMidX = (leftShoulder.x + rightShoulder.x) / 2
         val shoulderMidY = (leftShoulder.y + rightShoulder.y) / 2
@@ -380,21 +432,27 @@ class CprMetricsDeriver(
         }
     }
 
-    private fun estimateArmStraight(landmarks: List<CprLandmark>, options: Options): Boolean? {
-        val sides = arrayOf(
-            intArrayOf(LEFT_SHOULDER, LEFT_ELBOW, LEFT_WRIST),
-            intArrayOf(RIGHT_SHOULDER, RIGHT_ELBOW, RIGHT_WRIST),
+    private fun estimateArmPosture(landmarks: List<CprLandmark>, options: Options): ArmPosture {
+        val leftAngle = elbowAngleDeg(
+            landmarks = landmarks,
+            shoulderIndex = LEFT_SHOULDER,
+            elbowIndex = LEFT_ELBOW,
+            wristIndex = LEFT_WRIST,
+            visibilityFloor = options.visibilityFloor,
         )
-        val angles = mutableListOf<Double>()
-        for (side in sides) {
-            val shoulder = visiblePoint(landmarks, side[0], options.visibilityFloor)
-            val elbow = visiblePoint(landmarks, side[1], options.visibilityFloor)
-            val wrist = visiblePoint(landmarks, side[2], options.visibilityFloor)
-            if (shoulder == null || elbow == null || wrist == null) continue
-            angleDeg(shoulder, elbow, wrist)?.let { angles.add(it) }
-        }
-        if (angles.isEmpty()) return null
-        return angles.none { it < options.armStraightDeg }
+        val rightAngle = elbowAngleDeg(
+            landmarks = landmarks,
+            shoulderIndex = RIGHT_SHOULDER,
+            elbowIndex = RIGHT_ELBOW,
+            wristIndex = RIGHT_WRIST,
+            visibilityFloor = options.visibilityFloor,
+        )
+        val angles = listOfNotNull(leftAngle, rightAngle)
+        return ArmPosture(
+            straight = if (angles.isEmpty()) null else angles.none { it < options.armStraightDeg },
+            leftAngleDeg = leftAngle?.let(::round1),
+            rightAngleDeg = rightAngle?.let(::round1),
+        )
     }
 
     private fun computeQualityScore(
@@ -443,6 +501,84 @@ class CprMetricsDeriver(
         return averageVisible(landmarks, intArrayOf(LEFT_SHOULDER, RIGHT_SHOULDER), floor)?.y
     }
 
+    private fun buildOverlaySnapshot(
+        landmarks: List<CprLandmark>,
+        armPosture: ArmPosture,
+        compressionRate: Double?,
+        handPosition: String?,
+        armStraight: Boolean?,
+        qualityScore: Int?,
+        confidence: Double,
+        visionReady: Boolean,
+    ): CprVisionOverlaySnapshot {
+        val floor = options.visibilityFloor
+        return CprVisionOverlaySnapshot(
+            leftShoulder = overlayPoint(landmarks, LEFT_SHOULDER, floor),
+            rightShoulder = overlayPoint(landmarks, RIGHT_SHOULDER, floor),
+            leftElbow = overlayPoint(landmarks, LEFT_ELBOW, floor),
+            rightElbow = overlayPoint(landmarks, RIGHT_ELBOW, floor),
+            leftWrist = overlayPoint(landmarks, LEFT_WRIST, floor),
+            rightWrist = overlayPoint(landmarks, RIGHT_WRIST, floor),
+            handCenter = averageVisible(landmarks, intArrayOf(LEFT_WRIST, RIGHT_WRIST), floor)?.toOverlayPoint(),
+            chestCenter = chestCenter(landmarks, floor)?.toOverlayPoint(),
+            leftElbowAngleDeg = armPosture.leftAngleDeg,
+            rightElbowAngleDeg = armPosture.rightAngleDeg,
+            compressionRate = compressionRate,
+            handPosition = handPosition,
+            armStraight = armStraight,
+            qualityScore = qualityScore,
+            confidence = confidence,
+            visionReady = visionReady,
+            chestSource = if (options.useFixedChestCenter) "fixed_chest_target" else "rescuer_pose",
+        )
+    }
+
+    private fun estimateFixedChestHandPosition(wrist: Point, options: Options): String {
+        val dx = (wrist.x - options.fixedChestCenterX) / options.fixedChestWidth
+        val dy = (wrist.y - options.fixedChestCenterY) / options.fixedChestHeight
+        val horizontalOff = abs(dx) > options.fixedChestToleranceX
+        val verticalOff = abs(dy) > options.fixedChestToleranceY
+
+        return when {
+            horizontalOff && verticalOff -> "off_center"
+            horizontalOff -> if (dx < 0) "left" else "right"
+            dy < -options.fixedChestToleranceY -> "too_high"
+            dy > options.fixedChestToleranceY -> "too_low"
+            else -> "center"
+        }
+    }
+
+    private fun elbowAngleDeg(
+        landmarks: List<CprLandmark>,
+        shoulderIndex: Int,
+        elbowIndex: Int,
+        wristIndex: Int,
+        visibilityFloor: Double,
+    ): Double? {
+        val shoulder = visiblePoint(landmarks, shoulderIndex, visibilityFloor)
+        val elbow = visiblePoint(landmarks, elbowIndex, visibilityFloor)
+        val wrist = visiblePoint(landmarks, wristIndex, visibilityFloor)
+        if (shoulder == null || elbow == null || wrist == null) return null
+        return angleDeg(shoulder, elbow, wrist)
+    }
+
+    private fun chestCenter(landmarks: List<CprLandmark>, floor: Double): Point? {
+        if (options.useFixedChestCenter) {
+            return Point(options.fixedChestCenterX, options.fixedChestCenterY)
+        }
+
+        val shoulder = averageVisible(landmarks, intArrayOf(LEFT_SHOULDER, RIGHT_SHOULDER), floor)
+        val hip = averageVisible(landmarks, intArrayOf(LEFT_HIP, RIGHT_HIP), floor)
+        return when {
+            shoulder != null && hip != null -> Point(
+                x = shoulder.x,
+                y = shoulder.y + (hip.y - shoulder.y) * options.chestCenterTorsoRatio,
+            )
+            shoulder != null -> shoulder
+            else -> hip
+        }
+    }
+
     private fun torsoCenter(landmarks: List<CprLandmark>, floor: Double): Point? {
         val shoulder = averageVisible(landmarks, intArrayOf(LEFT_SHOULDER, RIGHT_SHOULDER), floor)
         val hip = averageVisible(landmarks, intArrayOf(LEFT_HIP, RIGHT_HIP), floor)
@@ -467,6 +603,11 @@ class CprMetricsDeriver(
             }
         }
         return if (count == 0) null else Point(sumX / count, sumY / count)
+    }
+
+    private fun overlayPoint(landmarks: List<CprLandmark>, index: Int, floor: Double): CprOverlayPoint? {
+        val point = visiblePoint(landmarks, index, floor) ?: return null
+        return CprOverlayPoint(point.x, point.y, visibility(landmarks, index))
     }
 
     private fun visiblePoint(landmarks: List<CprLandmark>, index: Int, floor: Double): Point? {
@@ -523,12 +664,27 @@ class CprMetricsDeriver(
         val readyConfidence: Double = LIVE_CONFIDENCE_THRESHOLD,
         val readyPoseCoverage: Double = LIVE_POSE_COVERAGE_THRESHOLD,
         val readyFrameStability: Double = LIVE_FRAME_STABILITY_THRESHOLD,
+        val chestCenterTorsoRatio: Double = 0.32,
+        val useFixedChestCenter: Boolean = true,
+        val fixedChestCenterX: Double = 0.50,
+        val fixedChestCenterY: Double = 0.56,
+        val fixedChestWidth: Double = 0.28,
+        val fixedChestHeight: Double = 0.22,
+        val fixedChestToleranceX: Double = 0.22,
+        val fixedChestToleranceY: Double = 0.22,
     )
 
     private data class Sample(val t: Long, val y: Double)
     private data class FrameCenter(val t: Long, val x: Double, val y: Double)
-    private data class Point(val x: Double, val y: Double)
+    private data class Point(val x: Double, val y: Double) {
+        fun toOverlayPoint(): CprOverlayPoint = CprOverlayPoint(x, y)
+    }
     private data class WeightedComponent(val weight: Double, val value: Double)
+    private data class ArmPosture(
+        val straight: Boolean?,
+        val leftAngleDeg: Double?,
+        val rightAngleDeg: Double?,
+    )
 
     private enum class CompressionState { Unknown, High, Low }
 

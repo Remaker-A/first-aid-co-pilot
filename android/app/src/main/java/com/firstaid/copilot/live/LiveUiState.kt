@@ -1,5 +1,7 @@
 package com.firstaid.copilot.live
 
+import com.firstaid.copilot.live.vision.cpr.CprVisionOverlaySnapshot
+
 /**
  * Immutable UI state for the Live CPR Coach screen.
  *
@@ -31,6 +33,7 @@ data class LiveUiState(
     // --- visual_overlay-derived fields (D2 overlays consume these) ---
     val visualOverlayMode: String? = null,
     val correctionArrow: String? = null,
+    val visionOverlay: CprVisionOverlaySnapshot? = null,
 
     // --- Haptic metronome intent (D-phase MetronomeController consumes this) ---
     val haptic: HapticState = HapticState(),
