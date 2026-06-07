@@ -33,7 +33,16 @@ const MOCK_LOCATION = {
 const BASELINE_SEQUENCE = ["thinking", "final", "guidance", "state", "audio_begin", "audio_end"];
 
 // Readiness / "开始吧" phrases that the S6 fast path must map to continue_cpr.
-const READINESS_PHRASES = ["我准备好了", "准备好了", "开始吧", "可以开始"];
+const READINESS_PHRASES = [
+  "我准备好了",
+  "准备好了",
+  "开始吧",
+  "可以开始",
+  "我好了",
+  "准备好了可以开始",
+  "来吧",
+  "开始压吧",
+];
 
 function buildScenario(sessionId = "live_flow_test") {
   // Stub Gemma runtime: never patches, never resolves an intent, never spawns
@@ -294,6 +303,25 @@ test("S7 说 AED 到了 -> 进入 S8 并播 AED 分析/电击安全指令", asyn
   assert.equal(aed.finalStage, "S8_ASSISTANCE");
   assert.equal(aed.segments[0].intent, "assist_aed");
   assertIncludes(aed.segments[0].tts, ["AED", "继续按压", "分析或电击", "离开"], "AED arrival TTS");
+
+  scenario.session.close();
+});
+
+test("S6 说 AED 来了 -> 确认 AED 已到但仍停在开始按压确认门", async () => {
+  const scenario = buildScenario("live_flow_aed_arrival_before_cpr");
+  await driveToCprReady(scenario);
+
+  const aed = await scenario.drive({ type: "final", text: "AED 来了" });
+  assert.equal(aed.finalEvent.intent, "aed_available");
+  assert.equal(aed.finalStage, "S6_CPR_READY");
+  assert.equal(aed.segments.length, 1);
+  assert.equal(aed.segments[0].intent, "guide_cpr_position");
+  assertIncludes(aed.segments[0].tts, ["AED", "胸口中央", "开始"], "S6 early AED TTS");
+
+  const start = await scenario.drive({ type: "final", text: "准备好了可以开始" });
+  assert.equal(start.finalEvent.intent, "continue_cpr");
+  assert.equal(start.finalStage, "S7_CPR_LOOP");
+  assert.equal(start.segments[0].source, "rule_flow_fast_path");
 
   scenario.session.close();
 });

@@ -188,4 +188,14 @@ test("intent resolver maps short CPR start words only after the call/CPR gate", 
   });
   assert.equal(startCompressions.intent, "continue_cpr");
   assert.equal(startCompressions.source, "rule_flow_fast_path");
+
+  for (const phrase of ["我好了", "准备好了可以开始", "开始压吧", "来吧"]) {
+    const resolved = await resolveUserIntent({
+      transcript: phrase,
+      stage: AgentStage.S6_CPR_READY,
+      options: { env: {} }
+    });
+    assert.equal(resolved.intent, "continue_cpr", `${phrase} maps to continue_cpr`);
+    assert.equal(resolved.source, "rule_flow_fast_path", `${phrase} stays deterministic`);
+  }
 });

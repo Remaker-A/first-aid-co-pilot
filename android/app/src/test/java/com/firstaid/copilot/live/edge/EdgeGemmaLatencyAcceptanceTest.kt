@@ -14,13 +14,12 @@ import org.junit.Test
  *    recommendation is `ack_then_async` — the plan's "regex now, Gemma corrects
  *    next turn" degrade path.
  *  - Open question (C): the live acceptance ceiling for the *async answer wait*
- *    is 3000ms (README Vivo acceptance / plan Phase 2); the immediate CPR ack is
- *    deterministic and always first.
+ *    is 2000ms; the immediate CPR ack is deterministic and always first.
  */
 class EdgeGemmaLatencyAcceptanceTest {
 
-    /** Open-question async answer-wait ceiling (README Vivo acceptance, plan Phase 2). */
-    private val openQuestionAnswerGateMs = 3_000L
+    /** Open-question async answer-wait ceiling for the 1-2s live target. */
+    private val openQuestionAnswerGateMs = 2_000L
 
     @Test
     fun nluLatencyWithinNearRealtimeGateRecommendsNearRealtime() {
@@ -57,31 +56,31 @@ class EdgeGemmaLatencyAcceptanceTest {
     @Test
     fun openQuestionAnswerWaitWithinAcceptanceGatePasses() {
         val gate = gemmaLatencyGate(
-            okLatenciesMs = listOf(1_200L, 1_800L, 2_200L, 2_600L, 2_900L),
+            okLatenciesMs = listOf(900L, 1_200L, 1_500L, 1_700L, 1_900L),
             totalRuns = 5,
             gateMs = openQuestionAnswerGateMs,
             budgetMs = openQuestionAnswerGateMs,
         )
 
-        assertEquals(2_200L, gate.stats.p50Ms)
-        assertEquals(2_900L, gate.stats.p95Ms)
-        assertTrue("answer-wait p95 under the 3000ms acceptance gate", gate.nearRealtimeCapable)
+        assertEquals(1_500L, gate.stats.p50Ms)
+        assertEquals(1_900L, gate.stats.p95Ms)
+        assertTrue("answer-wait p95 under the 2000ms acceptance gate", gate.nearRealtimeCapable)
         assertEquals(5, gate.withinBudgetRuns)
     }
 
     @Test
     fun openQuestionAnswerWaitExceedingGateFails() {
         val gate = gemmaLatencyGate(
-            okLatenciesMs = listOf(2_000L, 2_800L, 3_200L, 3_500L, 4_000L),
+            okLatenciesMs = listOf(1_200L, 1_700L, 2_100L, 2_500L, 2_800L),
             totalRuns = 5,
             gateMs = openQuestionAnswerGateMs,
             budgetMs = openQuestionAnswerGateMs,
         )
 
-        assertEquals(4_000L, gate.stats.p95Ms)
-        assertFalse("answer-wait p95 over 3000ms must fail the gate", gate.nearRealtimeCapable)
+        assertEquals(2_800L, gate.stats.p95Ms)
+        assertFalse("answer-wait p95 over 2000ms must fail the gate", gate.nearRealtimeCapable)
         assertEquals(GemmaLatencyGate.RECOMMEND_ACK_THEN_ASYNC, gate.recommendation)
-        assertEquals("only 2 answers landed within 3000ms", 2, gate.withinBudgetRuns)
+        assertEquals("only 2 answers landed within 2000ms", 2, gate.withinBudgetRuns)
     }
 
     @Test

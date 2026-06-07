@@ -88,6 +88,41 @@ class LocalAgentTransportTest {
     }
 
     @Test
+    fun localTransportAcknowledgesAedArrivalAtReadyGateWithoutSkippingCprStart() = runTest {
+        val transport = LocalAgentTransport()
+        val sessionId = "local_s6_aed_arrival"
+
+        transport.success(firstAidSessionStartedRequest(sessionId))
+        transport.success(TurnRequest(sessionId = sessionId, text = "现场安全"))
+        transport.success(TurnRequest(sessionId = sessionId, text = "没有反应"))
+        transport.success(TurnRequest(sessionId = sessionId, text = "没有正常呼吸"))
+        transport.success(TurnRequest(sessionId = sessionId, text = "已拨打120"))
+
+        val aed = transport.success(TurnRequest(sessionId = sessionId, text = "AED 来了"))
+        assertEquals("S6_CPR_READY", aed.currentStage)
+        assertEquals("guide_cpr_position", aed.guidanceAction?.intent)
+        assertTrue(aed.guidanceAction?.tts?.text.orEmpty().contains("AED"))
+        assertTrue(aed.guidanceAction?.tts?.text.orEmpty().contains("开始"))
+
+        val ready = transport.success(TurnRequest(sessionId = sessionId, text = "准备好了可以开始"))
+        assertEquals("S7_CPR_LOOP", ready.currentStage)
+        assertEquals("start_cpr_loop", ready.guidanceAction?.intent)
+        assertTrue(ready.guidanceAction?.haptic?.enabled == true)
+    }
+
+    @Test
+    fun localTransportAcceptsChineseAedArrivalDuringCprLoop() = runTest {
+        val transport = LocalAgentTransport()
+        val sessionId = "local_zh_aed_arrival"
+        bringToCprLoop(transport, sessionId)
+
+        val aed = transport.success(TurnRequest(sessionId = sessionId, text = "除颤仪到了"))
+        assertEquals("S8_ASSISTANCE", aed.currentStage)
+        assertEquals("assist_aed", aed.guidanceAction?.intent)
+        assertTrue(aed.guidanceAction?.tts?.text.orEmpty().contains("AED"))
+    }
+
+    @Test
     fun localTransportAnswersCprLoopClosedQuestionsWithoutLeavingLoop() = runTest {
         val transport = LocalAgentTransport()
         val sessionId = "local_cpr_questions"

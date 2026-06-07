@@ -361,18 +361,21 @@ private class LocalSession(
                     ToolAction(type = "attach_gps_location", requires_user_confirmation = false),
                 ),
             )
-            "S6_CPR_READY" -> action(
-                timestamp = timestamp,
-                stage = nextStage,
-                intent = "guide_cpr_position",
-                priority = "critical",
-                tts = "双手叠在他胸口中央，手臂伸直。准备好就说开始，或点开始按压。",
-                main = "双手叠在胸口中央",
-                secondary = "手臂伸直，准备好就开始",
-                tags = listOf("胸口中央", "手臂伸直"),
-                primaryButton = mapOf("label" to "开始按压", "action" to "mark_cpr_ready"),
-                overlay = mapOf("mode" to "prepare_cpr_position", "highlight_target" to "chest_center"),
-            )
+            "S6_CPR_READY" -> {
+                val aedPrefix = if (aedAvailable) "AED 已经到了，可以先放在旁边准备；" else ""
+                action(
+                    timestamp = timestamp,
+                    stage = nextStage,
+                    intent = "guide_cpr_position",
+                    priority = "critical",
+                    tts = "${aedPrefix}双手叠在他胸口中央，手臂伸直。准备好就说开始，或点开始按压。",
+                    main = if (aedAvailable) "AED 已到，准备按压" else "双手叠在胸口中央",
+                    secondary = if (aedAvailable) "先上手 CPR，不要等 AED" else "手臂伸直，准备好就开始",
+                    tags = if (aedAvailable) listOf("AED", "胸口中央", "开始按压") else listOf("胸口中央", "手臂伸直"),
+                    primaryButton = mapOf("label" to "开始按压", "action" to "mark_cpr_ready"),
+                    overlay = mapOf("mode" to "prepare_cpr_position", "highlight_target" to "chest_center"),
+                )
+            }
             "S7_CPR_LOOP" -> action(
                 timestamp = timestamp,
                 stage = nextStage,
@@ -818,7 +821,7 @@ private fun inferButtonIntent(text: String): String? {
             compact.contains("cprstarted") ||
             compact == "开始" ||
             compact == "继续" -> "continue_cpr"
-        compact.contains("aed") && (compact.contains("来了") || compact.contains("arrived")) -> "aed_available"
+        isAedArrivalText(compact) -> "aed_available"
         compact.contains("急救员") || compact.contains("emsarrived") -> "paramedics_arrived"
         else -> null
     }
@@ -826,6 +829,10 @@ private fun inferButtonIntent(text: String): String? {
 
 private fun String.containsAny(vararg needles: String): Boolean =
     needles.any { contains(it) }
+
+private fun isAedArrivalText(compact: String): Boolean =
+    compact.containsAny("aed", "除颤仪", "除颤器", "自动体外除颤", "电击器") &&
+        compact.containsAny("来了", "到了", "到达", "拿来", "拿来了", "取来", "取来了", "送来", "送来了", "arrived")
 
 private fun isLocalCprReadinessUtterance(text: String): Boolean {
     val compact = text.trim().lowercase().replace(Regex("[\\s，。,.！？!、]+"), "")
@@ -840,9 +847,17 @@ private fun isLocalCprReadinessUtterance(text: String): Boolean {
         "可以",
         "可以了",
         "准备好了",
+        "准备就绪",
         "我准备好了",
+        "我准备就绪",
+        "我们准备好了",
+        "我们准备就绪",
         "已经准备好了",
         "我已经准备好了",
+        "我好了",
+        "我们好了",
+        "准备好了可以开始",
+        "准备好了开始吧",
         "开始",
         "开始吧",
         "开始了",
@@ -850,6 +865,13 @@ private fun isLocalCprReadinessUtterance(text: String): Boolean {
         "这就开始",
         "马上开始",
         "可以开始",
+        "可以按了",
+        "可以开始按了",
+        "来吧",
+        "开始压吧",
+        "开按吧",
+        "现在压",
+        "马上压",
         "开始按压",
         "开始胸外按压",
         "开始cpr",

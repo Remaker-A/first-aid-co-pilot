@@ -1763,11 +1763,14 @@ function applyCprReadinessFastPath(intentResolution, { stt = {}, stage = null } 
 function isCprReadinessUtterance(transcript = "") {
   const text = normalizeReadinessText(transcript);
   return (
-    /^(?:我)?(?:已|已经)?准备好了?$/.test(text) ||
-    /^(?:我)?准备就绪$/.test(text) ||
+    /^(?:我|我们)?(?:已|已经)?准备好(?:了|啦)?$/.test(text) ||
+    /^(?:我|我们)?准备就绪$/.test(text) ||
+    /^(?:我|我们)?(?:已|已经)?(?:好|好了|准备好了|准备就绪)(?:可以)?(?:开始|按压|开按)?(?:吧|了)?$/.test(text) ||
     /^(?:好|好的|好啊|好了|行|行了|可以)$/.test(text) ||
     // "开始" / "现在开始" / "这就开始" / "开始吧" / "开始按压" / "开始CPR" …
     /^(?:我|我们)?(?:这就|现在|马上)?开始(?:吧|啊|了|按|按压|胸外按压|心肺复苏|cpr)?$/i.test(text) ||
+    /^(?:我|我们)?(?:可以|能)(?:开始|按|按压|压)(?:了|吧)?$/i.test(text) ||
+    /^(?:来吧|开始压吧|开始压|开按吧|现在压|马上压|这就压)$/i.test(text) ||
     /^(?:我|我们)?(?:继续|接着)(?:吧|啊|了|按|按压|胸外按压|心肺复苏|cpr)?$/i.test(text) ||
     /^(?:现在)?(?:怎么|如何)(?:开始)?按压$/.test(text) ||
     /^按压(?:怎么做|怎么开始)$/.test(text) ||

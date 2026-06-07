@@ -102,7 +102,7 @@ const INTENT_RULES = [
   },
   {
     intent: "continue_cpr",
-    pattern: /(continue cpr|start cpr|start pressing|keep pressing|准备好了?|开始吧|开始按|开始胸外按压|开始 CPR|开始心肺复苏|继续按|继续胸外按压|继续 CPR|继续心肺复苏|怎么按压|如何按压|按压怎么做|怎么开始按压|我来按压|我现在按压)/i,
+    pattern: /(continue cpr|start cpr|start pressing|keep pressing|准备好了?|准备就绪|准备好了.*开始|我好了|我们好了|可以开始|可以按|来吧|开始吧|开始压|开始按|现在开始|马上开始|这就开始|开始胸外按压|开始 CPR|开始心肺复苏|继续按|继续胸外按压|继续 CPR|继续心肺复苏|怎么按压|如何按压|按压怎么做|怎么开始按压|我来按压|我来压|我现在按压|现在按压)/i,
   },
   {
     intent: "paramedics_arrived",

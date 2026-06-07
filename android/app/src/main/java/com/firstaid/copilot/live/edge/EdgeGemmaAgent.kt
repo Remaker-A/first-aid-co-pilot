@@ -336,11 +336,10 @@ data class EdgeGemmaFeatureFlags(
 
         /**
          * Open-question generation ceiling. The immediate ack covers perceived
-         * latency, so this is generous relative to the near-realtime gate while
-         * keeping the end-to-end answer within the acceptance budget (p95 < 3000ms
-         * incl. guard + first TTS chunk).
+         * latency, so keep the async answer wait inside the 1-2s live target
+         * and degrade to ack-then-async when the model cannot make that window.
          */
-        const val OPEN_QUESTION_ANSWER_TIMEOUT_MS: Long = 2_600L
+        const val OPEN_QUESTION_ANSWER_TIMEOUT_MS: Long = 1_800L
     }
 }
 

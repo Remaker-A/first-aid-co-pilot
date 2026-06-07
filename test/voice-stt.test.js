@@ -53,6 +53,10 @@ test("inferIntent recognizes CPR live question intents", () => {
   assert.equal(inferIntent("AED 和按压怎么交替？"), "ask_aed_cpr_alternation");
   assert.equal(inferIntent("按压和 AED 怎么配合？"), "ask_aed_cpr_alternation");
   assert.equal(inferIntent("准备好了"), "continue_cpr");
+  assert.equal(inferIntent("我好了"), "continue_cpr");
+  assert.equal(inferIntent("准备好了可以开始"), "continue_cpr");
+  assert.equal(inferIntent("来吧"), "continue_cpr");
+  assert.equal(inferIntent("开始压吧"), "continue_cpr");
   assert.equal(inferIntent("开始吧"), "continue_cpr");
   assert.equal(inferIntent("开始胸外按压"), "continue_cpr");
   assert.equal(inferIntent("怎么按压"), "continue_cpr");

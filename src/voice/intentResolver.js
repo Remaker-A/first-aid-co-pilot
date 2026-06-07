@@ -48,7 +48,21 @@ function isUncertainBreathingClaim(text, intent) {
 // Only consulted when the regex finds no intent, so the step_done coach words
 // (放好了/做好了/明白了) keep their existing per-step coaching behavior.
 const S6_READY_START_PATTERN =
-  /((?:^|[\s，。,.])(?:开始|继续)(?:吧|啊|了)?(?:$|[\s，。,.])|准备\s*(好|就绪|ok|完毕)|准备好(了|啦)?|我?(已经)?准备好|可以开始|开始吧|继续吧|这就开始|马上开始|开始按|开始胸外按压|继续按|继续胸外按压|开始\s*cpr|继续\s*cpr|开始心肺复苏|继续心肺复苏|怎么按压|如何按压|按压怎么做|怎么开始按压|ready|let'?s\s*start|start\s*cpr|continue\s*cpr)/i;
+  /((?:^|[\s，。,.])(?:开始|继续)(?:吧|啊|了)?(?:$|[\s，。,.])|准备\s*(好|就绪|ok|完毕)|准备好(了|啦)?|我?(已经)?准备好|我(?:们)?好了|可以开始|可以按|开始吧|继续吧|来吧|这就开始|马上开始|现在开始|开始压|开按|开始按|开始胸外按压|继续按|继续胸外按压|开始\s*cpr|继续\s*cpr|开始心肺复苏|继续心肺复苏|怎么按压|如何按压|按压怎么做|怎么开始按压|ready|let'?s\s*start|start\s*cpr|continue\s*cpr)/i;
+const S6_READY_START_COMPACT_PHRASES = new Set([
+  "我好了",
+  "我们好了",
+  "我准备好了",
+  "我们准备好了",
+  "准备好了可以开始",
+  "准备好了开始吧",
+  "准备好了按压",
+  "可以按了",
+  "可以开始按了",
+  "开始压吧",
+  "开按吧",
+  "来吧",
+]);
 const S5_S6_SHORT_ACK_PATTERN = /^(好|好的|好啊|好了|行|行了|可以)$/;
 const CPR_CONTROL_STAGES = new Set([
   AgentStage.S5_CALL_EMERGENCY,
@@ -63,7 +77,7 @@ function resolveFlowProgressIntent(text, stage) {
   if (!CPR_CONTROL_STAGES.has(stage)) {
     return null;
   }
-  if (S6_READY_START_PATTERN.test(text)) {
+  if (isReadinessStartUtterance(text) || S6_READY_START_PATTERN.test(text)) {
     return "continue_cpr";
   }
   if (
@@ -79,6 +93,16 @@ function normalizeReadinessText(value) {
   return typeof value === "string"
     ? value.trim().replace(/[。！？!,.，、\s]+$/g, "")
     : "";
+}
+
+function isReadinessStartUtterance(value) {
+  const text = normalizeReadinessText(value).toLowerCase().replace(/\s+/g, "");
+  return (
+    S6_READY_START_COMPACT_PHRASES.has(text) ||
+    /^(?:我|我们)?(?:已|已经)?(?:好|好了|准备好了|准备就绪)(?:可以)?(?:开始|按压|开按)?(?:吧|了)?$/.test(text) ||
+    /^(?:我|我们)?(?:可以|能)(?:开始|按|按压|压)(?:了|吧)?$/.test(text) ||
+    /^(?:来吧|开始压吧|开始压|开按吧|现在压|马上压|这就压)$/.test(text)
+  );
 }
 
 function resolveNluInferenceMode(options = {}) {

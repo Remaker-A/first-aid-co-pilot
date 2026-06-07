@@ -289,26 +289,36 @@ function buildStateAction(state, currentStage, nextStage, decision, event) {
         logEvent: { type: "emergency_call_started", detail: "call_120_gps_recording" },
       });
     }
-    case AgentStage.S6_CPR_READY:
+    case AgentStage.S6_CPR_READY: {
       // The single multimodal confirm gate. Wording = one positioning line +
       // "confirm to start" (decisive instruction, not "you decide"). The button
       // keeps action mark_cpr_ready; "说开始" hits the readiness fast path
       // (service.js) -> continue_cpr -> cpr_state.started -> S6→S7.
+      const aedEvent = isAedEvent(event);
+      const ttsText = aedEvent
+        ? "AED 已经到了，可以先放在旁边准备；双手叠在他胸口中央，胳膊伸直。准备好就说“开始”，或点开始按压。"
+        : "双手叠在他胸口中央，胳膊伸直。准备好就说“开始”，或点开始按压。";
       return action(state, {
         stage: nextStage,
         intent: "guide_cpr_position",
         priority: "critical",
-        reasonCodes: ["emergency_call_started", "prepare_cpr"],
-        tts: { text: "双手叠在他胸口中央，胳膊伸直。准备好就说“开始”，或点开始按压。", tone: "calm_firm" },
+        reasonCodes: aedEvent
+          ? ["emergency_call_started", "aed_available", "prepare_cpr"]
+          : ["emergency_call_started", "prepare_cpr"],
+        tts: { text: ttsText, tone: "calm_firm" },
         ui: {
-          mainText: "双手叠在胸口中央",
-          secondaryText: "胳膊伸直，准备好就说“开始”",
-          statusTags: ["胸口中央", "胳膊伸直", "开始按压"],
+          mainText: aedEvent ? "AED 已到，准备按压" : "双手叠在胸口中央",
+          secondaryText: aedEvent ? "先别停在 AED，上手开始 CPR" : "胳膊伸直，准备好就说“开始”",
+          statusTags: aedEvent ? ["AED", "胸口中央", "开始按压"] : ["胸口中央", "胳膊伸直", "开始按压"],
           primaryButton: { label: "开始按压", action: "mark_cpr_ready" },
         },
         visualOverlay: { mode: "prepare_cpr_position", highlight_target: "chest_center" },
-        logEvent: { type: "cpr_ready_guidance", detail: "hands_chest_center_arms_straight_confirm_to_start" },
+        logEvent: {
+          type: "cpr_ready_guidance",
+          detail: aedEvent ? "aed_arrived_prepare_cpr_confirm_to_start" : "hands_chest_center_arms_straight_confirm_to_start",
+        },
       });
+    }
     case AgentStage.S7_CPR_LOOP: {
       // "Start" wording fires both for the first S6→S7 entry and for a restart
       // from a MONITOR stage (ROSC reversed). Single-voice: the metronome is a
