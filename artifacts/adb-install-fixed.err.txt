@@ -1,2 +1,0 @@
-adb.exe: failed to install D:\android-dev\firstaid-android-build-20260605-043822\android\app\build\outputs\apk\debug\app-debug.apk: Failure [INSTALL_FAILED_ABORTED: User rejected permissions]
-

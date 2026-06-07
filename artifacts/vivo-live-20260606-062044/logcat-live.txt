@@ -1,9 +1,0 @@
---------- beginning of main
-         1780698045.748 27762 27762 I LiveCprCoachScreen: ASR endpoint
-         1780698045.778 27762 27797 I LiveAudioCapture: Capture rmsPeak=4.521528E-4 voiceActive=false voicedMs=0 tts=false tail=false
-         1780698047.795 27762 27797 I LiveAudioCapture: Capture rmsPeak=4.4127682E-4 voiceActive=false voicedMs=0 tts=false tail=false
-         1780698048.315 27762 27762 I LiveCprCoachScreen: ASR endpoint
-         1780698049.798 27762 27797 I LiveAudioCapture: Capture rmsPeak=4.048019E-4 voiceActive=false voicedMs=0 tts=false tail=false
-         1780698050.867 27762 27762 I LiveCprCoachScreen: ASR endpoint
-         1780698051.837 27762 27797 I LiveAudioCapture: Capture rmsPeak=4.1113535E-4 voiceActive=false voicedMs=0 tts=false tail=false
-         1780698053.443 27762 27762 I LiveCprCoachScreen: ASR endpoint

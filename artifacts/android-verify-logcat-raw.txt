@@ -1,7 +1,0 @@
-﻿--------- beginning of main
-06-05 20:50:49.080  5058  5995 W MessengerIpcClient: Timing out request: 1
-06-05 20:50:49.081  5058 17104 W GCM-GMS : Failed to get direct boot token: java.io.IOException: SERVICE_NOT_AVAILABLE
-06-05 20:50:49.087  3989 23684 I NetworkScheduler.Stats: (REDACTED) Task %s/%s finished executing. cause:%s result: %s elapsed_millis: %s uptime_millis: %s exec_start_elapsed_seconds: %s
-06-05 20:50:49.162  3989 23683 I NetworkScheduler.Stats: (REDACTED) Task %s/%s started execution. cause:%s exec_start_elapsed_seconds: %s
-06-05 20:50:49.163  5058 26872 I GCM-GMS : Registering GMS 745476177629
-06-05 20:50:59.144  3989 23684 I NetworkScheduler.Stats: (REDACTED) Task %s/%s finished executing. cause:%s result: %s elapsed_millis: %s uptime_millis: %s exec_start_elapsed_seconds: %s

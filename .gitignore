@@ -1,7 +1,9 @@
+# 模型与密钥
 models/
 .env
 .env.local
 
+# 缓存与临时文件
 .cache/
 src/voice/.runtime/
 tmp/
@@ -11,6 +13,13 @@ temp/
 *.part
 *.partial
 *.download
+
+# 测试/调试产物（运行时生成，不入库）
+artifacts/
+.playwright-cli/
+_test_out.txt
+
+# Android 构建产物
 android/local.properties
 android/.gradle/
 android/build/

@@ -1,1 +1,0 @@
-android\app\build\outputs\apk\debug\app-debug.apk: 1 file pushed, 0 skipped. 32.6 MB/s (252926999 bytes in 7.389s)
