@@ -40,6 +40,12 @@ test("inferIntent recognizes common zh-CN handover arrival phrases", () => {
   assert.equal(inferIntent("医护人员赶到了"), "paramedics_arrived");
 });
 
+test("inferIntent does not treat not-yet-arrived EMS wording as arrival facts", () => {
+  assert.equal(inferIntent("\u6551\u62a4\u8f66\u6765\u4e4b\u524d\u6211\u8fd8\u9700\u8981\u7559\u610f\u4ec0\u4e48\uff1f"), null);
+  assert.equal(inferIntent("\u6025\u6551\u5458\u8fd8\u6ca1\u5230\u6211\u8be5\u6ce8\u610f\u4ec0\u4e48\uff1f"), null);
+  assert.equal(inferIntent("120 \u6765\u4ee5\u524d\u6211\u8fd8\u8981\u505a\u4ec0\u4e48\uff1f"), null);
+});
+
 test("inferIntent recognizes CPR live question intents", () => {
   assert.equal(inferIntent("我按得对吗"), "ask_cpr_quality");
   assert.equal(inferIntent("我爱的对吗"), "ask_cpr_quality");

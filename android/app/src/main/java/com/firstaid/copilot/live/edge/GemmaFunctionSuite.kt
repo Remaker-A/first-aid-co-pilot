@@ -20,6 +20,10 @@ class GemmaFunctionSuite(
     private val root: String = "gemma_suite",
 ) {
 
+    // NLU cases ship structured input and are rendered on-device with the SAME
+    // production builder the live path uses, so the probe has zero prompt drift.
+    private val promptBuilder = EdgeGemmaPromptBuilder()
+
     /**
      * Run every asset case against [driver] and return the full report JSON.
      *
@@ -100,8 +104,9 @@ class GemmaFunctionSuite(
         var parseOkRuns = 0
         var passRuns = 0
         var bannedHits = 0
+        val prompt = resolvePrompt(case)
         for (runIndex in 1..totalRuns) {
-            val generation = driver.generate(case.prompt, timeoutMs)
+            val generation = driver.generate(prompt, timeoutMs)
             val verdict = GemmaSuiteAsserts.evaluate(case.expected, generation.text)
             // Latency mirrors the smoke harness: only successful, non-empty runs count.
             if (generation.ok && generation.text.isNotBlank()) {
@@ -136,6 +141,44 @@ class GemmaFunctionSuite(
         return CaseOutcome(json, totalRuns, parseOkRuns, passRuns, bannedHits)
     }
 
+    /**
+     * Resolve the final prompt for [case]. The plain-text edge functions (single-label
+     * NLU, single-sentence open question) carry structured `input` and are rendered with
+     * the production [EdgeGemmaPromptBuilder] from that input, so the probe feeds the
+     * model exactly what the live path would; every other case uses its pre-rendered
+     * asset prompt.
+     */
+    private fun resolvePrompt(case: SuiteCase): String {
+        val input = case.input ?: return case.prompt
+        return when (case.expected.optString("kind")) {
+            "nlu_label" -> {
+                val stage = input.optString("stage")
+                val transcript = input.optString("transcript")
+                val allowedIntents = jsonStringList(input.optJSONArray("allowedIntents"))
+                if (transcript.isNotBlank() && allowedIntents.isNotEmpty()) {
+                    promptBuilder.nluPrompt(stage, transcript, allowedIntents)
+                } else {
+                    case.prompt
+                }
+            }
+            "open_question_text" -> {
+                val stage = input.optString("stage")
+                val userInput = input.optString("userInput")
+                val frame = OpenQuestionFrame(
+                    stage = stage,
+                    userInput = userInput,
+                    allowedIntents = EdgeOpenQuestionPolicy.answerIntents(stage),
+                )
+                if (userInput.isNotBlank() && frame.allowedIntents.isNotEmpty()) {
+                    promptBuilder.openQuestionPrompt(frame)
+                } else {
+                    case.prompt
+                }
+            }
+            else -> case.prompt
+        }
+    }
+
     private fun loadCases(): List<SuiteCase> {
         val manifest = JSONObject(readAsset("$root/manifest.json"))
         val caseFiles = manifest.optJSONArray("cases") ?: return emptyList()
@@ -149,6 +192,7 @@ class GemmaFunctionSuite(
                 caseId = json.optString("caseId").ifBlank { caseFile },
                 label = json.optString("label"),
                 prompt = json.optString("prompt"),
+                input = json.optJSONObject("input"),
                 expected = json.optJSONObject("expected") ?: JSONObject(),
                 runs = if (json.has("runs")) json.optInt("runs") else null,
             )
@@ -189,6 +233,7 @@ class GemmaFunctionSuite(
         val caseId: String,
         val label: String,
         val prompt: String,
+        val input: JSONObject?,
         val expected: JSONObject,
         val runs: Int?,
     )
@@ -217,6 +262,18 @@ class GemmaFunctionSuite(
 
 private fun rate(passed: Int, total: Int): Double =
     if (total <= 0) 0.0 else passed.toDouble() / total
+
+private fun jsonStringList(array: JSONArray?): List<String> {
+    if (array == null) return emptyList()
+    val out = ArrayList<String>(array.length())
+    for (index in 0 until array.length()) {
+        if (!array.isNull(index)) {
+            val value = array.optString(index, "")
+            if (value.isNotEmpty()) out.add(value)
+        }
+    }
+    return out
+}
 
 private fun LatencyStats.toJson(): JSONObject =
     JSONObject()

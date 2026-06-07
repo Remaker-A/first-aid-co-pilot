@@ -103,7 +103,7 @@ class OnDeviceGemmaDriver(
                     // bounded "not ready" so UI readiness stays deterministic and
                     // the flow can retry later instead of blocking indefinitely.
                     future.cancel(true)
-                    resetEngine()
+                    discardEngine()
                     EdgeInferenceResult(
                         ok = false,
                         latencyMs = System.currentTimeMillis() - startedMs,
@@ -142,8 +142,16 @@ class OnDeviceGemmaDriver(
                     )
                 }
                 val localEngine = try {
-                    ensureEngine()
+                    ensureEngineWithin(ENGINE_INIT_TIMEOUT_MS)
+                } catch (timeout: TimeoutException) {
+                    discardEngine()
+                    return@withContext EdgeInferenceResult(
+                        ok = false,
+                        latencyMs = 0,
+                        error = "Gemma engine init exceeded ${ENGINE_INIT_TIMEOUT_MS}ms",
+                    )
                 } catch (error: Throwable) {
+                    discardEngine()
                     return@withContext EdgeInferenceResult(
                         ok = false,
                         latencyMs = 0,
@@ -163,9 +171,8 @@ class OnDeviceGemmaDriver(
                         latencyMs = System.currentTimeMillis() - startedMs,
                     )
                 } catch (timeout: TimeoutException) {
-                    cancelActiveConversation()
                     future.cancel(true)
-                    resetEngine()
+                    discardEngine()
                     EdgeInferenceResult(
                         ok = false,
                         latencyMs = System.currentTimeMillis() - startedMs,
@@ -174,7 +181,7 @@ class OnDeviceGemmaDriver(
                 } catch (error: ExecutionException) {
                     val cause = error.cause ?: error
                     if (cause.message?.contains("session already exists", ignoreCase = true) == true) {
-                        resetEngine()
+                        discardEngine()
                     }
                     EdgeInferenceResult(
                         ok = false,
@@ -196,6 +203,21 @@ class OnDeviceGemmaDriver(
     override fun close() {
         cancelActiveConversation()
         resetEngine()
+    }
+
+    private fun ensureEngineWithin(timeoutMs: Long): Any {
+        val executor = Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "litertlm-engine-init").apply { isDaemon = true }
+        }
+        val future = executor.submit<Any> { ensureEngine() }
+        return try {
+            future.get(timeoutMs, TimeUnit.MILLISECONDS)
+        } catch (error: ExecutionException) {
+            throw error.cause ?: error
+        } finally {
+            future.cancel(true)
+            executor.shutdownNow()
+        }
     }
 
     private fun ensureEngine(): Any {
@@ -290,6 +312,20 @@ class OnDeviceGemmaDriver(
         backendName = null
     }
 
+    private fun discardEngine() {
+        val staleEngine = engine
+        val staleConversation = activeConversation
+        engine = null
+        activeConversation = null
+        backendName = null
+        if (staleEngine == null && staleConversation == null) return
+        Thread({
+            staleConversation.callQuietly("cancelProcess")
+            staleConversation.callQuietly("close")
+            staleEngine.callQuietly("close")
+        }, "litertlm-discard").apply { isDaemon = true }.start()
+    }
+
     private fun estimateTokenCount(prompt: String): Int {
         var cjkChars = 0
         var otherChars = 0
@@ -313,6 +349,7 @@ class OnDeviceGemmaDriver(
         const val DEFAULT_CPU_THREADS = 0
         const val DEFAULT_MAX_NUM_TOKENS = 4096
         private const val DECODE_TOKEN_RESERVE = 512
+        private const val ENGINE_INIT_TIMEOUT_MS = 60_000L
         private const val CJK_TOKENS_PER_CHAR = 1.2
         private const val OTHER_CHARS_PER_TOKEN = 3.0
     }

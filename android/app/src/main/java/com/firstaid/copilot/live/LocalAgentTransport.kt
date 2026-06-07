@@ -87,6 +87,7 @@ class LocalAgentChannel(
         extraBufferCapacity = 64,
     )
     override val events: Flow<LiveAgentEvent> = _events
+    override val mirrorsEdgeOpenQuestionTurns: Boolean = false
 
     private var sessionId: String = ""
 
@@ -822,7 +823,7 @@ private fun inferButtonIntent(text: String): String? {
             compact == "开始" ||
             compact == "继续" -> "continue_cpr"
         isAedArrivalText(compact) -> "aed_available"
-        compact.contains("急救员") || compact.contains("emsarrived") -> "paramedics_arrived"
+        isParamedicsArrivalText(compact) -> "paramedics_arrived"
         else -> null
     }
 }
@@ -833,6 +834,30 @@ private fun String.containsAny(vararg needles: String): Boolean =
 private fun isAedArrivalText(compact: String): Boolean =
     compact.containsAny("aed", "除颤仪", "除颤器", "自动体外除颤", "电击器") &&
         compact.containsAny("来了", "到了", "到达", "拿来", "拿来了", "取来", "取来了", "送来", "送来了", "arrived")
+
+private fun isParamedicsArrivalText(compact: String): Boolean {
+    if (isParamedicsArrivalNegatedOrHypotheticalCompact(compact)) return false
+    return compact.containsAny(
+        "emsarrived",
+        "paramedics",
+        "ambulancearrived",
+        "120到了",
+        "120来了",
+        "急救员到了",
+        "急救员来了",
+        "急救人员到了",
+        "急救人员来了",
+        "救护车到了",
+        "救护车来了",
+        "救护车到达",
+        "医生来了",
+        "医护人员赶到",
+    )
+}
+
+private fun isParamedicsArrivalNegatedOrHypotheticalCompact(compact: String): Boolean =
+    Regex("(还没|还未|没有|没|未|尚未).{0,8}(到|来|到达)|(到|来|到达).{0,4}(前|之前|以前)|(来的?路上|在路上)|before|notyet|notarrived|hasn'?tarrived", RegexOption.IGNORE_CASE)
+        .containsMatchIn(compact)
 
 private fun isLocalCprReadinessUtterance(text: String): Boolean {
     val compact = text.trim().lowercase().replace(Regex("[\\s，。,.！？!、]+"), "")

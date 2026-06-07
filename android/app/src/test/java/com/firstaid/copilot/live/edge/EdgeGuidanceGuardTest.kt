@@ -98,4 +98,124 @@ class EdgeGuidanceGuardTest {
         assertEquals("reassure_rescuer", decision.intent)
         assertEquals("calm_soft", decision.tone)
     }
+
+    // region plain-text answer path (功能 C 选定方案：模型只回一句话，harness 组装)
+
+    @Test
+    fun textAnswerAcceptsPlainSentenceAndAssignsPrimaryIntent() {
+        val decision = guard.validateOpenQuestionText("继续用力按压，肋骨响也正常。", cprFrame())
+
+        assertTrue(decision.reasons.toString(), decision.accepted)
+        // The harness assigns the stage's primary answer intent (model gave no label).
+        assertEquals("answer_current_cpr_question", decision.intent)
+        assertTrue(decision.ttsText.contains("继续用力按压"))
+        assertEquals("calm_firm", decision.tone)
+    }
+
+    @Test
+    fun textAnswerRejectsStopCompressionWordInCpr() {
+        val decision = guard.validateOpenQuestionText("太累就先停下来歇一会儿。", cprFrame())
+
+        assertFalse(decision.accepted)
+        assertTrue(decision.reasons.any { it.contains("stop_compression_word") })
+    }
+
+    @Test
+    fun textAnswerRejectsBannedDiagnosis() {
+        val decision = guard.validateOpenQuestionText("别怕，这是心梗，继续按压。", cprFrame())
+
+        assertFalse(decision.accepted)
+        assertTrue(decision.reasons.any { it.contains("心梗") })
+    }
+
+    @Test
+    fun textAnswerStillExtractsAnswerIfModelReturnsJson() {
+        // Robustness: even if the model ignores "no JSON" and emits a fenced object,
+        // the harness pulls the spoken sentence from tts.text.
+        val json = "```json\n{\"intent\":\"x\",\"tts\":{\"text\":\"继续用力按压，等急救员接手。\"}}\n```"
+        val decision = guard.validateOpenQuestionText(json, cprFrame())
+
+        assertTrue(decision.reasons.toString(), decision.accepted)
+        assertTrue(decision.ttsText.contains("继续用力按压"))
+    }
+
+    @Test
+    fun textAnswerRejectsBlankOutput() {
+        val decision = guard.validateOpenQuestionText("   \n  ", cprFrame())
+
+        assertFalse(decision.accepted)
+        assertTrue(decision.reasons.contains("empty_answer"))
+    }
+
+    @Test
+    fun textAnswerRejectsLowValueUnknownAnswer() {
+        val decision = guard.validateOpenQuestionText("继续按压，不知道。", cprFrame())
+
+        assertFalse(decision.accepted)
+        assertTrue(decision.reasons.contains("low_value_open_question_answer"))
+    }
+
+    @Test
+    fun textAnswerRejectsMisleadingBreathingWording() {
+        val decision = guard.validateOpenQuestionText("继续按压胸骨，保持呼吸。", cprFrame())
+
+        assertFalse(decision.accepted)
+        assertTrue(decision.reasons.contains("misleading_breathing_wording"))
+    }
+
+    @Test
+    fun textAnswerRejectsDirectFamilyNoticeWording() {
+        val decision = guard.validateOpenQuestionText("继续按压，请立即通知家属。", cprFrame())
+
+        assertFalse(decision.accepted)
+        assertTrue(decision.reasons.contains("unsafe_family_notice_wording"))
+    }
+
+    // endregion
+
+    // region plain-text NLU label path (功能 E 选定方案：模型只回一个标签)
+
+    private val breathingIntents = listOf("no_normal_breathing", "agonal_breathing", "clarify_breathing")
+
+    @Test
+    fun nluTextMatchesExactLabel() {
+        val decision = guard.validateNluText("agonal_breathing", breathingIntents)
+
+        assertTrue(decision.accepted)
+        assertEquals("agonal_breathing", decision.intent)
+        assertFalse(decision.needsClarification)
+    }
+
+    @Test
+    fun nluTextMatchesLabelWrappedInExtraText() {
+        val decision = guard.validateNluText("标签：agonal_breathing。", breathingIntents)
+
+        assertTrue(decision.accepted)
+        assertEquals("agonal_breathing", decision.intent)
+    }
+
+    @Test
+    fun nluTextClarifyLabelSetsNeedsClarification() {
+        val decision = guard.validateNluText("clarify_breathing", breathingIntents)
+
+        assertTrue(decision.accepted)
+        assertTrue(decision.needsClarification)
+    }
+
+    @Test
+    fun nluTextRejectsSuspectedCardiacArrestRedLine() {
+        val decision = guard.validateNluText("suspected_cardiac_arrest", breathingIntents)
+
+        assertFalse(decision.accepted)
+        assertTrue(decision.reasons.any { it.contains("suspected_cardiac_arrest") })
+    }
+
+    @Test
+    fun nluTextRejectsUnmatchedLabel() {
+        val decision = guard.validateNluText("我也说不好他怎么了", breathingIntents)
+
+        assertFalse(decision.accepted)
+    }
+
+    // endregion
 }

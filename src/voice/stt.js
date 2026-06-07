@@ -228,23 +228,35 @@ export function classifyIntent(transcript = "") {
     }
   }
 
-  candidates.sort((left, right) => {
+  const rankedCandidates = isParamedicsArrivalNegatedOrHypothetical(text)
+    ? candidates.filter((candidate) => candidate.intent !== "paramedics_arrived")
+    : candidates;
+
+  rankedCandidates.sort((left, right) => {
     if (right.score !== left.score) {
       return right.score - left.score;
     }
     return left.rule_index - right.rule_index;
   });
 
-  const best = candidates[0] || null;
+  const best = rankedCandidates[0] || null;
   return {
     intent: best?.intent || null,
     score: best?.score || 0,
-    candidates
+    candidates: rankedCandidates
   };
 }
 
 export function inferIntent(transcript = "") {
   return classifyIntent(transcript).intent;
+}
+
+function isParamedicsArrivalNegatedOrHypothetical(text = "") {
+  const compact = normalizeText(text).replace(/\s+/g, "");
+  if (!/(?:120|\u5e7a\u4e8c\u96f6|\u4e00\u4e8c\u96f6|\u6551[\u62a4\u8d27]\u8f66|\u6025\u6551(?:\u5458|\u4eba\u5458)?|\u533b\u62a4|\u6551\u63f4|ems|ambulance|paramedics)/i.test(compact)) {
+    return false;
+  }
+  return /(?:\u8fd8\u6ca1|\u8fd8\u672a|\u6ca1\u6709|\u6ca1|\u672a|\u5c1a\u672a).{0,8}(?:\u5230|\u6765|\u5230\u8fbe)|(?:\u5230|\u6765|\u5230\u8fbe).{0,4}(?:\u524d|\u4e4b\u524d|\u4ee5\u524d)|(?:\u6765\u7684?\u8def\u4e0a|\u5728\u8def\u4e0a)|before|notyet|notarrived|hasn'?tarrived/i.test(compact);
 }
 
 export function isResponseCheckQuestion(transcript = "") {

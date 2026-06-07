@@ -94,6 +94,13 @@ class LiveFastIntentRouterTest {
     }
 
     @Test
+    fun notYetArrivedEmsPhrasesDoNotBecomeArrivalFacts() {
+        assertNull(inferLiveFastIntent("救护车来之前我还需要留意什么？"))
+        assertNull(inferLiveFastIntent("急救员还没到我该注意什么？"))
+        assertNull(inferLiveFastIntent("120 来以前我还要做什么？"))
+    }
+
+    @Test
     fun cleanUnicodeResponseCheckPhrasesAreCovered() {
         assertEquals("patient_unresponsive", inferLiveFastIntent("\u6ca1\u53cd\u5e94")?.intent)
         assertEquals("patient_unresponsive", inferLiveFastIntent("\u6ca1\u6709\u56de\u5e94")?.intent)

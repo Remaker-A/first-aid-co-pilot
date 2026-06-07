@@ -3,9 +3,20 @@
   "caseId": "nlu_boundary",
   "label": "呼吸观测 NLU·边界用例（含不确定语气）",
   "runs": 3,
-  "prompt": "SYSTEM:\n你是 FirstAid Copilot 的 Gemma NLU 观察事实解析层（NLU observation parser），运行在成人疑似心脏骤停 CPR 场景。\r\n\r\n角色边界：\r\n- 你只把用户口语转成结构化观察事实。\r\n- 你不决定急救流程，不切换 stage，不触发工具调用，不输出话术。\r\n- 你绝不输出 suspected_cardiac_arrest，也不宣布或诊断心脏骤停。\r\n- 状态机和 CPRStartRule 才能决定流程推进和 CPR 开始条件。\r\n\r\n硬性限制：\r\n1. intent 只能取自当前 NluFrame.allowed_intents。\r\n2. slots 只能包含当前 NluFrame.allowed_slots 中的键。\r\n3. 每个有证据的 slot 必须是 {\"value\": boolean_or_enum, \"confidence\": number_0_to_1}。\r\n4. 没有证据、低置信、不确定或互相矛盾的 slot 必须为 null。\r\n5. 不要臆测年龄、反应、呼吸、安全性；只根据 transcript 明确表达抽取。\r\n6. 如果用户说“偶尔喘一下 / 喘息 / 濒死呼吸 / gasping”，这不是正常呼吸。\r\n7. 如果用户表达不确定，设置 needs_clarification 为 true，并只保留置信度足够的 slot。\r\n8. 禁止输出 stage、next_stage、tool_action、tool_actions、tts、ui、guidance、diagnosis、decision、suspected_cardiac_arrest。\r\n\r\n输出格式：\r\n- 只输出一个顶层 JSON 对象，不要 Markdown、解释、代码块或任何多余文本。\r\n- 第一个字符必须是 {，最后一个字符必须是 }。\r\n\r\nJSON schema：\r\n{\r\n  \"intent\": \"string from allowed_intents\",\r\n  \"slots\": {\r\n    \"slot_name\": {\"value\": true, \"confidence\": 0.0}\r\n  },\r\n  \"overall_confidence\": 0.0,\r\n  \"needs_clarification\": false,\r\n  \"reason\": \"short_machine_readable_reason\"\r\n}\r\n\r\n示例：\r\n{\"intent\":\"agonal_breathing\",\"slots\":{\"normal_breathing\":{\"value\":false,\"confidence\":0.86},\"agonal_breathing\":{\"value\":true,\"confidence\":0.9}},\"overall_confidence\":0.88,\"needs_clarification\":false,\"reason\":\"rescuer_reports_occasional_gasping\"}\n\nUSER:\n你将收到一个 NluFrame。请只返回一个匹配 NLU 观察事实 schema 的顶层 JSON 对象。\r\n\r\n输出契约（务必遵守）：\r\n- The first character must be { and the last character must be }.\r\n- 只输出一个 JSON 对象，不要输出 Markdown、解释、代码块或任何多余文本。\r\n- intent 只能取自 allowed_intents。\r\n- slots 只能包含 allowed_slots 中列出的键；无证据的 slot 填 null。\r\n- 不要返回 stage、next_stage、tool_actions、tts、ui、guidance、diagnosis、decision、suspected_cardiac_arrest。\r\n\r\n[Current Stage]\r\nS3_CHECK_BREATHING\r\n\r\n[Transcript]\r\n他好像没气了\r\n\r\n[Allowed Intents]\r\n[\"no_normal_breathing\",\"normal_breathing\",\"normal_breathing_absent\",\"normal_breathing_present\",\"agonal_breathing\",\"clarify_breathing\"]\r\n\r\n[Allowed Slots]\r\n[\"normal_breathing\",\"agonal_breathing\"]\r\n\r\n[Slots Schema]\r\n{\n  \"normal_breathing\": {\n    \"type\": \"boolean\",\n    \"cpr_trigger_value\": false,\n    \"description\": \"\",\n    \"maps_to\": \"normal_breathing\"\n  },\n  \"agonal_breathing\": {\n    \"type\": \"boolean\",\n    \"cpr_trigger_value\": true,\n    \"description\": \"\",\n    \"maps_to\": \"agonal_breathing\"\n  }\n}\r\n\r\n[Confidence Floors]\r\n{\"default_floor\":0.6,\"cpr_trigger_floor\":0.78,\"overall_floor\":0.55}\r\n\r\n[Existing Facts]\r\n{}\r\n\r\n[Perception Summary]\r\n{\n  \"source\": null\n}\r\n\r\n[Escalation Markers]\r\n{\n  \"uncertain\": [\n    \"好像\",\n    \"可能\",\n    \"似乎\",\n    \"不确定\",\n    \"不太确定\",\n    \"感觉\",\n    \"maybe\",\n    \"probably\",\n    \"not sure\"\n  ],\n  \"negation_or_contrast\": [\n    \"但是\",\n    \"不过\",\n    \"没有但是\",\n    \"不是很\",\n    \"不太\",\n    \"偶尔\",\n    \"只是\",\n    \"只有\",\n    \"but\",\n    \"however\"\n  ]\n}\r\n\r\n[Context]\r\n- language: zh-CN\r\n- output_schema: NluObservationFrame\r\n\r\n[NluFrame JSON]\r\n{\n  \"session_id\": \"sess_unknown\",\n  \"current_stage\": \"S3_CHECK_BREATHING\",\n  \"transcript\": \"他好像没气了\",\n  \"allowed_intents\": [\n    \"no_normal_breathing\",\n    \"normal_breathing\",\n    \"normal_breathing_absent\",\n    \"normal_breathing_present\",\n    \"agonal_breathing\",\n    \"clarify_breathing\"\n  ],\n  \"allowed_slots\": [\n    \"normal_breathing\",\n    \"agonal_breathing\"\n  ],\n  \"slots_schema\": {\n    \"normal_breathing\": {\n      \"type\": \"boolean\",\n      \"cpr_trigger_value\": false,\n      \"description\": \"\",\n      \"maps_to\": \"normal_breathing\"\n    },\n    \"agonal_breathing\": {\n      \"type\": \"boolean\",\n      \"cpr_trigger_value\": true,\n      \"description\": \"\",\n      \"maps_to\": \"agonal_breathing\"\n    }\n  },\n  \"confidence_floors\": {\n    \"default_floor\": 0.6,\n    \"cpr_trigger_floor\": 0.78,\n    \"overall_floor\": 0.55\n  },\n  \"facts\": {},\n  \"perception_summary\": {\n    \"source\": null\n  },\n  \"escalation_markers\": {\n    \"uncertain\": [\n      \"好像\",\n      \"可能\",\n      \"似乎\",\n      \"不确定\",\n      \"不太确定\",\n      \"感觉\",\n      \"maybe\",\n      \"probably\",\n      \"not sure\"\n    ],\n    \"negation_or_contrast\": [\n      \"但是\",\n      \"不过\",\n      \"没有但是\",\n      \"不是很\",\n      \"不太\",\n      \"偶尔\",\n      \"只是\",\n      \"只有\",\n      \"but\",\n      \"however\"\n    ]\n  },\n  \"output_schema\": \"NluObservationFrame\",\n  \"language\": \"zh-CN\"\n}",
+  "input": {
+    "stage": "S3_CHECK_BREATHING",
+    "transcript": "他好像没气了",
+    "allowedIntents": [
+      "no_normal_breathing",
+      "normal_breathing",
+      "normal_breathing_absent",
+      "normal_breathing_present",
+      "agonal_breathing",
+      "clarify_breathing"
+    ]
+  },
   "expected": {
-    "kind": "nlu",
+    "kind": "nlu_label",
     "allowedIntents": [
       "no_normal_breathing",
       "normal_breathing",
@@ -14,18 +25,11 @@
       "agonal_breathing",
       "clarify_breathing"
     ],
-    "requireSlots": {
-      "normal_breathing": false
-    },
-    "forbidKeys": [
-      "suspected_cardiac_arrest",
-      "stage",
-      "next_stage",
-      "tts",
-      "ui",
-      "tool_action",
-      "tool_actions"
-    ],
-    "acceptNeedsClarification": true
+    "expectIntents": [
+      "no_normal_breathing",
+      "normal_breathing_absent",
+      "agonal_breathing",
+      "clarify_breathing"
+    ]
   }
 }

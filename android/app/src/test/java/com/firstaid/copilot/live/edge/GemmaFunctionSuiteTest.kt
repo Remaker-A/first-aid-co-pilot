@@ -27,6 +27,15 @@ class GemmaFunctionSuiteTest {
     private val nluAllowed = listOf("report_breathing_status", "report_patient_state", "needs_clarification")
     private val nluForbid = listOf("suspected_cardiac_arrest", "stage", "tts", "ui", "visual_overlay")
 
+    // Single-label NLU (功能 E 端侧方案): the candidate label set + the per-case expected
+    // subset, mirroring assets/gemma_suite/nlu_main.json + nlu_boundary.json.
+    private val breathingCandidates = listOf(
+        "no_normal_breathing", "normal_breathing", "normal_breathing_absent",
+        "normal_breathing_present", "agonal_breathing", "clarify_breathing",
+    )
+    private val mainExpectIntents = listOf("no_normal_breathing", "normal_breathing_absent", "agonal_breathing")
+    private val boundaryExpectIntents = mainExpectIntents + "clarify_breathing"
+
     // region guidance_patch (功能1 话术润色 / 功能3 开放问答)
 
     /** Case 1 — legal patch: intent allowed + short non-empty tts.text within limit -> pass. */
@@ -440,6 +449,170 @@ class GemmaFunctionSuiteTest {
 
     // endregion
 
+    // region nlu_label (功能2 端侧单标签方案：模型只回一个标签，judges via EdgeGuidanceGuard.validateNluText)
+
+    /** Main case — a decisive label inside the expected set passes cleanly. */
+    @Test
+    fun nluLabelDecisiveLabelPasses() {
+        val expected = nluLabelExpected(breathingCandidates, mainExpectIntents)
+
+        val result = GemmaSuiteAsserts.evaluate(expected, "agonal_breathing")
+
+        assertTrue("a bare candidate label parses", result.parseOk)
+        assertTrue("decisive expected label should pass: ${result.failures}", result.pass)
+        assertTrue(result.failures.isEmpty())
+        assertTrue(result.bannedHits.isEmpty())
+    }
+
+    /** Main case — clarify is a legal candidate but NOT in the main expected set -> fail. */
+    @Test
+    fun nluLabelClarifyFailsMainExpectIntents() {
+        val expected = nluLabelExpected(breathingCandidates, mainExpectIntents)
+
+        val result = GemmaSuiteAsserts.evaluate(expected, "clarify_breathing")
+
+        assertTrue("clarify is still a recognized label", result.parseOk)
+        assertFalse("clarify is not an accepted answer for the decisive utterance", result.pass)
+        assertTrue(
+            "intent_not_expected recorded: ${result.failures}",
+            result.failures.any { it.startsWith("intent_not_expected:") },
+        )
+    }
+
+    /** Main case — an outright "normal breathing" reading is wrong -> fail. */
+    @Test
+    fun nluLabelNormalBreathingFailsMain() {
+        val expected = nluLabelExpected(breathingCandidates, mainExpectIntents)
+
+        val result = GemmaSuiteAsserts.evaluate(expected, "normal_breathing")
+
+        assertTrue(result.parseOk)
+        assertFalse("a 'normal breathing' label contradicts the utterance", result.pass)
+    }
+
+    /** Boundary case — clarify is accepted when listed in the expected set. */
+    @Test
+    fun nluLabelBoundaryClarifyPasses() {
+        val expected = nluLabelExpected(breathingCandidates, boundaryExpectIntents)
+
+        val result = GemmaSuiteAsserts.evaluate(expected, "clarify_breathing")
+
+        assertTrue(result.parseOk)
+        assertTrue("clarify is acceptable on the uncertain utterance: ${result.failures}", result.pass)
+    }
+
+    /** Boundary case — a decisive non-breathing label is also acceptable. */
+    @Test
+    fun nluLabelBoundaryDecisiveAlsoPasses() {
+        val expected = nluLabelExpected(breathingCandidates, boundaryExpectIntents)
+
+        val result = GemmaSuiteAsserts.evaluate(expected, "no_normal_breathing")
+
+        assertTrue(result.parseOk)
+        assertTrue(result.pass)
+    }
+
+    /** The guard recovers a label wrapped in stray text (e.g. "标签：agonal_breathing。"). */
+    @Test
+    fun nluLabelWrappedInExtraTextPasses() {
+        val expected = nluLabelExpected(breathingCandidates, mainExpectIntents)
+
+        val result = GemmaSuiteAsserts.evaluate(expected, "标签：agonal_breathing。")
+
+        assertTrue("label embedded in text still parses", result.parseOk)
+        assertTrue("embedded decisive label should pass: ${result.failures}", result.pass)
+    }
+
+    /** Red-line — raw `suspected_cardiac_arrest` always fails with a banned hit, any expected set. */
+    @Test
+    fun nluLabelSuspectedCardiacArrestRedLineFails() {
+        val expected = nluLabelExpected(breathingCandidates, mainExpectIntents)
+
+        val result = GemmaSuiteAsserts.evaluate(expected, "suspected_cardiac_arrest")
+
+        assertFalse("the arrest red-line must fail", result.pass)
+        assertTrue(
+            "red-line records a banned hit: ${result.bannedHits}",
+            result.bannedHits.contains("suspected_cardiac_arrest"),
+        )
+    }
+
+    /** Gibberish that matches no candidate label does not parse a usable label. */
+    @Test
+    fun nluLabelUnmatchedGibberishParseFails() {
+        val expected = nluLabelExpected(breathingCandidates, mainExpectIntents)
+
+        val result = GemmaSuiteAsserts.evaluate(expected, "我也说不好他到底怎么了")
+
+        assertFalse("no candidate label means parseOk=false", result.parseOk)
+        assertFalse(result.pass)
+    }
+
+    /** No `expectIntents` -> any in-allow-list label passes (only the allow-list/red-line apply). */
+    @Test
+    fun nluLabelWithoutExpectIntentsAcceptsAnyCandidate() {
+        val expected = nluLabelExpected(breathingCandidates)
+
+        val result = GemmaSuiteAsserts.evaluate(expected, "normal_breathing")
+
+        assertTrue(result.parseOk)
+        assertTrue("absent expectIntents, any legal label passes: ${result.failures}", result.pass)
+    }
+
+    // endregion
+
+    // region open_question_text (功能3 端侧纯文本方案：模型只回一句话，judges via EdgeGuidanceGuard.validateOpenQuestionText)
+
+    /** A legal short CPR-live answer (no banned / stop / low-value issues) passes. */
+    @Test
+    fun openQuestionTextLegalCprAnswerPasses() {
+        val expected = openQuestionTextExpected("S7_CPR_LOOP")
+
+        val result = GemmaSuiteAsserts.evaluate(expected, "继续用力按压，肋骨响也正常。")
+
+        assertTrue("a plain sentence parses", result.parseOk)
+        assertTrue("legal CPR answer should pass: ${result.failures}", result.pass)
+        assertTrue(result.bannedHits.isEmpty())
+    }
+
+    /** A stop-compression instruction during CPR fails. */
+    @Test
+    fun openQuestionTextStopCompressionFails() {
+        val expected = openQuestionTextExpected("S7_CPR_LOOP")
+
+        val result = GemmaSuiteAsserts.evaluate(expected, "太累就先停下来歇一会儿。")
+
+        assertFalse("stop-compression answer must fail in CPR", result.pass)
+        assertTrue(
+            "stop-compression failure recorded: ${result.failures}",
+            result.failures.any { it.contains("stop_compression") },
+        )
+    }
+
+    /** A banned diagnosis substring fails with a banned hit. */
+    @Test
+    fun openQuestionTextBannedDiagnosisFails() {
+        val expected = openQuestionTextExpected("S7_CPR_LOOP")
+
+        val result = GemmaSuiteAsserts.evaluate(expected, "别怕，这是心梗，继续按压。")
+
+        assertFalse(result.pass)
+        assertTrue("banned hit recorded: ${result.bannedHits}", result.bannedHits.contains("心梗"))
+    }
+
+    /** A blank answer does not parse a usable sentence. */
+    @Test
+    fun openQuestionTextBlankParseFails() {
+        val expected = openQuestionTextExpected("S7_CPR_LOOP")
+
+        val result = GemmaSuiteAsserts.evaluate(expected, "   \n  ")
+
+        assertFalse("blank output cannot parse a sentence", result.parseOk)
+        assertFalse(result.pass)
+    }
+
+    // endregion
+
     // region handover_narrative (功能4 交接叙述)
 
     /** Case 12 — every narrative number is allowed and all expected numbers appear -> pass. */
@@ -542,6 +715,20 @@ class GemmaFunctionSuiteTest {
         put("requireSlots", slots)
         put("forbidKeys", jsonArray(forbidKeys))
         put("acceptNeedsClarification", acceptNeedsClarification)
+    }
+
+    private fun nluLabelExpected(
+        allowedIntents: List<String>,
+        expectIntents: List<String> = emptyList(),
+    ): JSONObject = JSONObject().apply {
+        put("kind", "nlu_label")
+        put("allowedIntents", jsonArray(allowedIntents))
+        if (expectIntents.isNotEmpty()) put("expectIntents", jsonArray(expectIntents))
+    }
+
+    private fun openQuestionTextExpected(stage: String): JSONObject = JSONObject().apply {
+        put("kind", "open_question_text")
+        put("stage", stage)
     }
 
     private fun handoverExpected(

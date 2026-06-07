@@ -71,42 +71,58 @@ class EdgeGemmaAgent(
             eldest: MutableMap.MutableEntry<String, OpenQuestionOutcome.Answer>?,
         ): Boolean = size > ANSWER_CACHE_MAX_ENTRIES
     }
+    @Volatile
+    private var openQuestionCircuitOpenUntilMs: Long = 0L
+    @Volatile
+    private var consecutiveOpenQuestionTimeouts: Int = 0
 
     /** (C) Answer an out-of-flow open question with a short, guarded patch. */
     override suspend fun answerOpenQuestion(frame: OpenQuestionFrame): OpenQuestionOutcome {
         if (!flags.openQuestionActive) {
-            return OpenQuestionOutcome.Fallback(reason = "disabled")
+            return fallbackOpenQuestion(frame, reason = "disabled")
         }
         if (frame.allowedIntents.isEmpty()) {
-            return OpenQuestionOutcome.Fallback(reason = "no_allowed_intents")
+            return fallbackOpenQuestion(frame, reason = "no_allowed_intents")
+        }
+
+        val now = clockMs()
+        if (now < openQuestionCircuitOpenUntilMs) {
+            return fallbackOpenQuestion(frame, reason = "circuit_open")
         }
 
         val key = cacheKey(frame)
         cachedAnswer(key)?.let { return it.copy(cacheHit = true) }
 
         if (!reserveBudget()) {
-            return OpenQuestionOutcome.Fallback(reason = "budget_exceeded")
+            return fallbackOpenQuestion(frame, reason = "budget_exceeded")
         }
 
         val prompt = promptBuilder.openQuestionPrompt(frame)
         val generation = enqueue(PRIORITY_OPEN_QUESTION, prompt, flags.openQuestionTimeoutMs)
-            ?: return OpenQuestionOutcome.Fallback(reason = "queue_full")
+            ?: return fallbackOpenQuestion(frame, reason = "queue_full")
         if (!generation.ok || generation.text.isBlank()) {
-            return OpenQuestionOutcome.Fallback(
+            if (generation.isTimeoutLike()) {
+                tripOpenQuestionCircuit()
+            }
+            return fallbackOpenQuestion(
+                frame = frame,
                 reason = "generation:${generation.error ?: "empty"}",
                 latencyMs = generation.latencyMs,
             )
         }
 
-        val decision = guard.validateOpenQuestion(generation.text, frame)
+        val decision = guard.validateOpenQuestionText(generation.text, frame)
         if (!decision.accepted) {
             Log.w(TAG, "Edge open-question rejected (${decision.reasons.joinToString(",")})")
-            return OpenQuestionOutcome.Fallback(
+            return fallbackOpenQuestion(
+                frame = frame,
                 reason = "guard:${decision.reasons.joinToString("|")}",
                 latencyMs = generation.latencyMs,
             )
         }
 
+        consecutiveOpenQuestionTimeouts = 0
+        openQuestionCircuitOpenUntilMs = 0L
         val answer = OpenQuestionOutcome.Answer(
             ttsText = decision.ttsText,
             mainText = decision.mainText,
@@ -119,6 +135,29 @@ class EdgeGemmaAgent(
         storeAnswer(key, answer)
         Log.i(TAG, "Edge open-question answered in ${generation.latencyMs}ms intent=${decision.intent}")
         return answer
+    }
+
+    private fun fallbackOpenQuestion(
+        frame: OpenQuestionFrame,
+        reason: String,
+        latencyMs: Long = 0L,
+    ): OpenQuestionOutcome.Fallback =
+        OpenQuestionOutcome.Fallback(
+            reason = reason,
+            answerText = EdgeOpenQuestionPolicy.fallbackAnswer(frame.stage, frame.userInput),
+            latencyMs = latencyMs,
+        )
+
+    private fun tripOpenQuestionCircuit() {
+        val count = (consecutiveOpenQuestionTimeouts + 1).coerceAtMost(10)
+        consecutiveOpenQuestionTimeouts = count
+        val cooldownMs = if (count >= 2) {
+            OPEN_QUESTION_TIMEOUT_COOLDOWN_LONG_MS
+        } else {
+            OPEN_QUESTION_TIMEOUT_COOLDOWN_MS
+        }
+        openQuestionCircuitOpenUntilMs = clockMs() + cooldownMs
+        Log.w(TAG, "Edge open-question circuit opened for ${cooldownMs}ms after timeout count=$count")
     }
 
     /**
@@ -139,7 +178,7 @@ class EdgeGemmaAgent(
         )
         val generation = enqueue(PRIORITY_NLU, prompt, flags.nluTimeoutMs) ?: return null
         if (!generation.ok || generation.text.isBlank()) return null
-        val decision = guard.validateNlu(generation.text, policy.allowedIntents)
+        val decision = guard.validateNluText(generation.text, policy.allowedIntents)
         if (!decision.accepted) {
             Log.w(TAG, "Edge NLU rejected (${decision.reasons.joinToString(",")})")
             return null
@@ -283,9 +322,15 @@ class EdgeGemmaAgent(
 
         private const val ANSWER_CACHE_MAX_ENTRIES = 32
         private const val WINDOW_MS = 60_000L
+        private const val OPEN_QUESTION_TIMEOUT_COOLDOWN_MS = 20_000L
+        private const val OPEN_QUESTION_TIMEOUT_COOLDOWN_LONG_MS = 60_000L
 
         private val CLOSED_RESULT = EdgeInferenceResult(ok = false, error = "edge_agent_closed")
         private val CANCELLED_RESULT = EdgeInferenceResult(ok = false, error = "edge_agent_cancelled")
+
+        private fun EdgeInferenceResult.isTimeoutLike(): Boolean =
+            error?.contains("exceeded", ignoreCase = true) == true ||
+                error?.contains("timeout", ignoreCase = true) == true
 
         /** Strip wrappers/quotes the model may add around a one-line proactive rewrite. */
         private fun cleanProactiveText(raw: String): String? {

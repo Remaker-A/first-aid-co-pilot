@@ -13,8 +13,11 @@ internal fun inferLiveFastIntent(transcript: String?): FastIntentMatch? {
     val text = transcript?.trim().orEmpty()
     if (text.isBlank()) return null
     if (isResponseCheckQuestionTranscript(text)) return null
-    return FAST_INTENT_RULES.firstOrNull { it.pattern.containsMatchIn(text) }
-        ?.let { FastIntentMatch(it.intent, it.confidence) }
+    val match = FAST_INTENT_RULES.firstOrNull { it.pattern.containsMatchIn(text) } ?: return null
+    if (match.intent == "paramedics_arrived" && isParamedicsArrivalNegatedOrHypothetical(text)) {
+        return null
+    }
+    return FastIntentMatch(match.intent, match.confidence)
 }
 
 internal fun resolvePrimaryButtonIntent(actionOrIntent: String?): String? {
@@ -57,6 +60,15 @@ private val RESPONSE_CHECK_QUESTION_PATTERN = Regex(
     "(有\\s*没\\s*有\\s*反应|是否\\s*有\\s*反应|有\\s*反应\\s*(吗|么|嘛|没有)|还有\\s*没有\\s*反应|没(?:有)?\\s*反应\\s*(吗|么|嘛)|无\\s*反应\\s*(吗|么|嘛))",
     RegexOption.IGNORE_CASE,
 )
+
+private fun isParamedicsArrivalNegatedOrHypothetical(text: String): Boolean {
+    val compact = text.lowercase().replace(Regex("\\s+"), "")
+    if (!Regex("(120|\\u5e7a\\u4e8c\\u96f6|\\u4e00\\u4e8c\\u96f6|\\u6551[\\u62a4\\u8d27]\\u8f66|\\u6025\\u6551(?:\\u5458|\\u4eba\\u5458)?|\\u533b\\u62a4|\\u6551\\u63f4|ems|ambulance|paramedics)").containsMatchIn(compact)) {
+        return false
+    }
+    return Regex("(\\u8fd8\\u6ca1|\\u8fd8\\u672a|\\u6ca1\\u6709|\\u6ca1|\\u672a|\\u5c1a\\u672a).{0,8}(\\u5230|\\u6765|\\u5230\\u8fbe)|(\\u5230|\\u6765|\\u5230\\u8fbe).{0,4}(\\u524d|\\u4e4b\\u524d|\\u4ee5\\u524d)|(\\u6765\\u7684?\\u8def\\u4e0a|\\u5728\\u8def\\u4e0a)|before|notyet|notarrived|hasn'?tarrived", RegexOption.IGNORE_CASE)
+        .containsMatchIn(compact)
+}
 
 private val FAST_INTENT_RULES = listOf(
     FastIntentRule(

@@ -2,66 +2,70 @@ package com.firstaid.copilot.live.edge
 
 import com.firstaid.copilot.live.ProactiveCueKind
 import com.firstaid.copilot.live.ProactivePolishRequest
-import org.json.JSONArray
 
 /**
  * Builds the on-device Gemma prompts for the three edge functions.
  *
- * Device-slimmed on purpose. The on-device 2.4GB LiteRT-LM model's bottleneck is
- * prompt prefill, so a verbose prompt (full schema + numbered hard rules + an
- * example + a redundant full DecisionFrame JSON dump) makes a single generation
- * so slow it does not return on real hardware. These prompts therefore carry only
- * the minimal *dynamic* context the model needs (stage, allowed intents, the
- * actual user utterance), and ask for the smallest useful JSON.
+ * Device-slimmed AND plain-output on purpose. On-device latency is dominated by
+ * the number of *output* tokens (real-device measurement: a fenced multi-line
+ * JSON answer took ~8s on this hardware, vs ~3s for a one-line plain answer of
+ * the same content). So the model is asked for the smallest possible output and
+ * the harness owns all structure:
  *
- * The *hard* safety rules are NOT spelled out to the model here. They are enforced
- * deterministically in the harness by [EdgeGuidanceGuard] / [GemmaSuiteAsserts]
- * after generation: banned medical phrases, the "never stop compressions" rule in
- * CPR, the per-stage `allowed_intents` allow-list, the answer length cap, and the
- * NLU forbidden keys / `suspected_cardiac_arrest` red-line. So an over-eager or
- * malformed model output is rejected by the guard and the caller speaks a
- * deterministic fallback — the prompt does not need to re-teach those rules.
+ * - Open question (C): the model returns ONE short Chinese sentence (plain text).
+ *   The harness ([EdgeGuidanceGuard.validateOpenQuestionText]) assigns the intent
+ *   label, wraps it as a `GuidanceActionPatch`, and runs the unchanged
+ *   [GemmaSuiteAsserts] safety grader (banned words / stop-compression / length /
+ *   allow-list). The guard is also robust if the model still emits JSON.
+ * - NLU (E): the model returns ONE intent label from the candidate list (plain
+ *   text). The harness matches it against the allow-list and enforces the
+ *   `suspected_cardiac_arrest` red-line.
+ * - Proactive (D): plain one-line text (unchanged), gated by the proactive net.
  *
- * Output contracts (功能 · 选定方案 B 瘦 JSON):
- * - Open question (C): `{"intent": <allowed>, "tts": {"text": <one line>}}`
- * - NLU (E):           `{"intent": <allowed>, "needs_clarification": bool, "confidence": num}`
- * - Proactive (D):     plain one-line text (gated by the proactive safety net).
+ * The *hard* safety rules are NOT re-taught to the model here; they are enforced
+ * deterministically by the guard after generation, so an over-eager / malformed
+ * output is rejected and the caller speaks a deterministic fallback.
  *
- * Pure (Kotlin + `org.json`, no Android/Context dependency) so it is unit-testable
+ * Pure (Kotlin only, no Android/Context dependency) so it is unit-testable
  * alongside [GemmaSuiteAsserts].
  */
 class EdgeGemmaPromptBuilder {
 
     /**
-     * 受控开放问答 (功能 C). Asks for a slim `{intent, tts.text}` object. `intent`
-     * is constrained to [OpenQuestionFrame.allowedIntents] (the guard re-checks it);
-     * everything structural (tone, ui text, JSON assembly defaults) is owned by the
-     * harness, so the model only contributes the one short Chinese answer.
+     * 受控开放问答 (功能 C). Asks for a single short Chinese sentence (no JSON). The
+     * intent label and JSON structure are assigned by the harness, so the model
+     * only contributes the one line it is good at — minimizing output tokens.
      */
     fun openQuestionPrompt(frame: OpenQuestionFrame): String {
         val stage = frame.stage?.takeIf { it.isNotBlank() } ?: "S7_CPR_LOOP"
-        val allowedIntents = JSONArray(frame.allowedIntents).toString()
+        val cprLive = EdgeOpenQuestionPolicy.isCprLiveStage(stage)
         val safetyPhrase = frame.safetyPhrases.firstOrNull()?.takeIf { it.isNotBlank() }
+        val focus = openQuestionFocus(frame.userInput)
 
         return buildString {
             append("SYSTEM:\n")
             append(OPEN_QUESTION_SYSTEM_PROMPT)
             append("\n\nUSER:\n")
             append("[Stage] ").append(stage).append("\n")
-            append("[Allowed Intents] ").append(allowedIntents).append("\n")
             if (safetyPhrase != null) {
                 append("[Safety Phrase] ").append(safetyPhrase).append("\n")
             }
             append("[User Input] ").append(frame.userInput).append("\n")
-            append("只输出一个 JSON：{\"intent\":\"<allowed_intents 之一>\",\"tts\":{\"text\":\"<一句中文，≤30字>\"}}")
+            append("[Answer Focus] ").append(focus).append("\n")
+            append(
+                if (cprLive) {
+                    "只回一句中文（25到40字），以“继续按压”开头，再具体作答；不要 JSON、不要引号、不要解释。"
+                } else {
+                    "只回一句中文（不超过35字）安抚并简短作答；不要 JSON、不要引号、不要解释。"
+                },
+            )
         }
     }
 
     /**
-     * 呼吸观察 NLU (功能 E). Asks for a slim `{intent, needs_clarification, confidence}`
-     * object. Slots are intentionally not requested: the live path only consumes the
-     * intent (+ clarification/confidence), and the breathing semantics live in the
-     * one-line rule inside [NLU_SYSTEM_PROMPT].
+     * 呼吸观察 NLU (功能 E). Asks for a single intent label from [allowedIntents]
+     * (plain text, no JSON). The harness matches the label against the allow-list
+     * and enforces the red-lines; this keeps both the prompt and the output tiny.
      */
     fun nluPrompt(
         stage: String,
@@ -69,22 +73,22 @@ class EdgeGemmaPromptBuilder {
         allowedIntents: List<String>,
     ): String {
         val resolvedStage = stage.takeIf { it.isNotBlank() } ?: "S3_CHECK_BREATHING"
-        val allowed = JSONArray(allowedIntents).toString()
+        val candidates = allowedIntents.joinToString(" / ")
         return buildString {
             append("SYSTEM:\n")
             append(NLU_SYSTEM_PROMPT)
             append("\n\nUSER:\n")
             append("[Stage] ").append(resolvedStage).append("\n")
             append("[Transcript] ").append(transcript).append("\n")
-            append("[Allowed Intents] ").append(allowed).append("\n")
-            append("只输出一个 JSON：{\"intent\":\"<allowed_intents 之一>\",\"needs_clarification\":false,\"confidence\":0.0}")
+            append("[候选标签] ").append(candidates).append("\n")
+            append("只输出候选标签中的一个英文标签，不要 JSON、不要解释、不要标点。")
         }
     }
 
     /**
      * Proactive-nudge polish prompt (功能 D, 可选). Asks for a single short, calm
-     * Chinese rephrase of an already-safe deterministic template. Plain-text out
-     * (not JSON) — the agent gates the result with the proactive safety net.
+     * Chinese rephrase of an already-safe deterministic template. Plain-text out —
+     * the agent gates the result with the proactive safety net.
      */
     fun proactivePrompt(request: ProactivePolishRequest): String {
         val intent = when (request.kind) {
@@ -105,35 +109,49 @@ class EdgeGemmaPromptBuilder {
         }
     }
 
+    private fun openQuestionFocus(question: String): String {
+        val compact = question.replace(Regex("\\s+"), "")
+        return when {
+            Regex("(为什么|为何|为啥|原因|怎么会|突然).*(倒下|晕倒|这样|不行)|倒下.*(为什么|为何|原因)")
+                .containsMatchIn(compact) -> "不能判断原因；告诉他按压是在维持血流。"
+            Regex("(旁边的人|别人|同伴|家属|路人).*(做什么|帮|怎么帮|最好)|怎么.*(分工|帮忙)")
+                .containsMatchIn(compact) -> "他继续按压；旁人拿 AED、开门、迎接或换手。"
+            Regex("(接手前|急救员|救护车|等待|等.*时候|留意|注意)")
+                .containsMatchIn(compact) -> "继续按压；留意 AED 提示和能否安全换手。"
+            Regex("(家属|亲人|通知|告诉)")
+                .containsMatchIn(compact) -> "他不要停；让旁人通知家属并迎接急救员。"
+            Regex("(害怕|紧张|撑不住|慌)")
+                .containsMatchIn(compact) -> "先安抚，再把注意力拉回节拍和按压。"
+            else -> "简短回答问题，再把注意力拉回继续按压。"
+        }
+    }
+
     companion object {
         /**
-         * Device-slimmed 受控问答 contract. The hard rules (banned diagnosis/outcome
-         * words, the stop-compression ban, the length cap, the intent allow-list) are
-         * enforced by [EdgeGuidanceGuard] after generation, so they are deliberately
-         * not re-listed here; only the behavioural framing + output shape remain.
+         * Device-slimmed 受控问答 contract (plain-text out). The hard rules (banned
+         * diagnosis/outcome words, the stop-compression ban, the length cap, the
+         * intent allow-list) are enforced by [EdgeGuidanceGuard] after generation,
+         * so only the behavioural framing + "one plain sentence" shape remain.
          */
         const val OPEN_QUESTION_SYSTEM_PROMPT: String =
             "你是 FirstAid Copilot 的受控问答层，运行在成人疑似心脏骤停 CPR 场景。" +
-                "施救者问了一个流程外的开放问题，你只用一句中文简短作答。\n" +
-                "不决定急救流程、不切换 stage、不调用工具(tool_actions)、不诊断、不承诺结果；" +
-                "CPR 进行中绝不让施救者停下按压，先肯定“继续按压”再答。\n" +
-                "intent 只能取自 USER 给出的 allowed_intents。" +
-                "只输出一个顶层 JSON 对象：{\"intent\":\"...\",\"tts\":{\"text\":\"...\"}}，" +
-                "第一个字符必须是 {，最后一个字符必须是 }，不要 Markdown、解释或多余文本。"
+                "施救者问了一个流程外的开放问题，你只用一句简短中文口语作答。\n" +
+                "像现场教练一样温和、具体、可执行；不要只说“不知道”或“根据现场情况判断”。\n" +
+                "不决定急救流程、不切换 stage、不调用工具(tool_actions)、不诊断、不承诺结果、不恐吓；" +
+                "CPR 进行中绝不让施救者停下按压，不能说保持呼吸/保持胸腔起伏。\n" +
+                "只输出那一句中文本身，不要 JSON、不要 Markdown、不要引号或任何多余文本。"
 
         /**
-         * Device-slimmed NLU contract. The forbidden-key / `suspected_cardiac_arrest`
-         * red-lines are enforced by the guard; only the one breathing rule the model
-         * actually needs is kept.
+         * Device-slimmed NLU contract (single-label out). The forbidden-key /
+         * `suspected_cardiac_arrest` red-lines are enforced by the guard; only the
+         * one breathing rule the model actually needs is kept.
          */
         const val NLU_SYSTEM_PROMPT: String =
             "你是 FirstAid Copilot 的呼吸观察解析层，运行在成人疑似心脏骤停 CPR 场景。" +
-                "只把施救者口语判成一个观察 intent，不决定流程、不切 stage、不调用工具、不诊断，" +
+                "把施救者口语判成一个观察标签，不决定流程、不切 stage、不调用工具、不诊断，" +
                 "绝不输出 suspected_cardiac_arrest。\n" +
-                "判定规则：偶尔喘/喘息/濒死呼吸都不是正常呼吸；表达不确定时 needs_clarification=true。\n" +
-                "intent 只能取自 USER 给出的 allowed_intents。" +
-                "只输出一个顶层 JSON 对象：{\"intent\":\"...\",\"needs_clarification\":false,\"confidence\":0.0}，" +
-                "第一个字符必须是 {，最后一个字符必须是 }，不要 Markdown 或多余文本。"
+                "判定规则：偶尔喘/喘息/濒死呼吸都不是正常呼吸；表达不确定时选 clarify_breathing。\n" +
+                "只输出候选标签中的一个英文标签，不要 JSON、不要解释、不要标点或多余文本。"
 
         /** Short SYSTEM contract for the optional proactive rephrase (plain text out). */
         const val PROACTIVE_SYSTEM_PROMPT: String =

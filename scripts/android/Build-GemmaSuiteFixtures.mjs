@@ -29,13 +29,8 @@ import { fileURLToPath } from "node:url";
 import {
   createDecisionFrame,
   createNluFrame,
-  SPECIAL_GEMMA_INTENTS,
 } from "../../src/gemma/decisionFrame.js";
-import {
-  buildGemmaMessages,
-  OPEN_QUESTION_GEMMA_SYSTEM_PROMPT_FILE,
-} from "../../src/gemma/promptBuilder.js";
-import { buildGemmaNluMessages } from "../../src/gemma/nluPrompt.js";
+import { buildGemmaMessages } from "../../src/gemma/promptBuilder.js";
 import {
   buildHandoverNarrativeFrame,
   buildHandoverNarrativeMessages,
@@ -44,7 +39,6 @@ import {
   buildCombinedPrompt,
   buildCombinedPromptFromMessages,
 } from "../../src/gemma/runtime.js";
-import { openQuestionAnswerIntents } from "../../src/voice/liveDriver.js";
 import { generateHandoverReport } from "../../src/report/handoverReportGenerator.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -70,96 +64,6 @@ const BANNED_SUBSTRINGS = Object.freeze([
   "一定能救活",
   "保证能救活",
 ]);
-
-const NLU_FORBID_KEYS = Object.freeze([
-  "suspected_cardiac_arrest",
-  "stage",
-  "next_stage",
-  "tts",
-  "ui",
-  "tool_action",
-  "tool_actions",
-]);
-
-// ---------------------------------------------------------------------------
-// Faithful local mirror of src/voice/service.js buildOpenQuestionFrame (+ the
-// compactOpenQuestionPerception / pruneNullish helpers it relies on). These are
-// module-private in service.js so there is no export to import; this copy keeps
-// the on-device open-question prompt byte-for-byte identical to production. The
-// actual prompt *concatenation* is still done by the imported production
-// builders (buildGemmaMessages / buildCombinedPrompt).
-// ---------------------------------------------------------------------------
-function pruneNullish(value) {
-  return Object.fromEntries(
-    Object.entries(value || {}).filter(([, item]) => item !== undefined)
-  );
-}
-
-function compactOpenQuestionPerception(summary) {
-  if (!summary || typeof summary !== "object" || Array.isArray(summary)) {
-    return undefined;
-  }
-  const cpr = summary.cpr_quality || summary.cprQuality || {};
-  return pruneNullish({
-    cpr_quality:
-      cpr && typeof cpr === "object" && !Array.isArray(cpr)
-        ? pruneNullish({
-            compression_rate_bpm:
-              cpr.compression_rate_bpm ?? cpr.current_rate ?? cpr.compressionRate,
-            hand_position: cpr.hand_position ?? cpr.handPosition,
-            arm_posture: cpr.arm_posture ?? cpr.armPosture,
-            interruption_seconds: cpr.interruption_seconds ?? cpr.interruptionSeconds,
-            quality_score: cpr.quality_score ?? cpr.qualityScore,
-          })
-        : undefined,
-  });
-}
-
-function buildOpenQuestionFrame(frame, answerIntents) {
-  const facts = frame?.facts || {};
-  const userInput = frame?.user_input || {};
-  const recentTts = Array.isArray(frame?.recent_tts) ? frame.recent_tts.slice(-2) : [];
-  const safetyPhrases = Array.isArray(frame?.safety_phrases)
-    ? frame.safety_phrases.slice(0, 3)
-    : [];
-  return pruneNullish({
-    session_id: frame?.session_id,
-    current_stage: frame?.current_stage,
-    allowed_intents: [...answerIntents, ...SPECIAL_GEMMA_INTENTS],
-    facts: pruneNullish({
-      adult_likely: facts.adult_likely,
-      scene_safe: facts.scene_safe,
-      responsive: facts.responsive,
-      normal_breathing: facts.normal_breathing,
-      agonal_breathing: facts.agonal_breathing,
-      suspected_cardiac_arrest: facts.suspected_cardiac_arrest,
-      emergency_call_status: facts.emergency_call_status,
-      cpr_started: facts.cpr_started,
-      total_compressions: facts.total_compressions,
-      current_rate: facts.current_rate,
-      average_rate: facts.average_rate,
-      quality_score: facts.quality_score,
-      last_interruption_seconds: facts.last_interruption_seconds,
-      fatigue_level: facts.fatigue_level,
-    }),
-    user_input: pruneNullish({
-      stt_text: typeof userInput.stt_text === "string" ? userInput.stt_text : "",
-      intent_hint: userInput.intent_hint,
-      confidence: userInput.confidence,
-    }),
-    perception_summary: compactOpenQuestionPerception(frame?.perception_summary),
-    recent_tts: recentTts.map((item) =>
-      pruneNullish({
-        intent: item?.intent,
-        text: typeof item?.text === "string" ? item.text : "",
-        seconds_ago: item?.seconds_ago,
-      })
-    ),
-    safety_phrases: safetyPhrases,
-    output_schema: frame?.output_schema,
-    language: frame?.language || "zh-CN",
-  });
-}
 
 // ---------------------------------------------------------------------------
 // Small fixture helpers.
@@ -232,69 +136,64 @@ function buildPatchCase({ caseId, label, userText, allowFallbackIntent }) {
   };
 }
 
-function buildNluCase({ caseId, label, transcript, requireSlots, acceptNeedsClarification }) {
+// Single-label NLU contract. The on-device probe renders the prompt with the
+// SAME production builder the live path uses (EdgeGemmaPromptBuilder.nluPrompt)
+// from this structured `input`, and scores the plain-text label with the
+// production guard (EdgeGuidanceGuard.validateNluText). We therefore persist only
+// the dynamic input + the expected label set — never a pre-rendered prompt — so
+// the probe has zero drift from the live single-label NLU path.
+function buildNluCase({ caseId, label, transcript, expectIntents }) {
   const frame = createNluFrame({ transcript, stage: "S3_CHECK_BREATHING" });
-  const messages = buildGemmaNluMessages(frame);
-  const prompt = buildCombinedPrompt(frame, messages);
+  const allowedIntents = [...frame.allowed_intents];
+
+  const expected = {
+    kind: "nlu_label",
+    allowedIntents,
+  };
+  if (Array.isArray(expectIntents) && expectIntents.length > 0) {
+    const unknown = expectIntents.filter((intent) => !allowedIntents.includes(intent));
+    if (unknown.length > 0) {
+      throw new Error(
+        `nlu case ${caseId}: expectIntents [${unknown.join(",")}] are not in the candidate label set`
+      );
+    }
+    expected.expectIntents = [...expectIntents];
+  }
 
   return {
     functionId: "nlu",
     caseId,
     label,
     runs: 3,
-    prompt,
-    expected: {
-      kind: "nlu",
-      allowedIntents: [...frame.allowed_intents],
-      requireSlots,
-      forbidKeys: [...NLU_FORBID_KEYS],
-      acceptNeedsClarification,
+    input: {
+      stage: "S3_CHECK_BREATHING",
+      transcript,
+      allowedIntents,
     },
+    expected,
   };
 }
 
-function buildOpenQuestionCase({ caseId, label, userText, allowFallbackIntent }) {
-  const baseFrame = createDecisionFrame({
-    state: {
-      session_id: `gemma_suite_${caseId}`,
-      current_stage: "S7_CPR_LOOP",
-      scope: { adult_likely: true },
-      confirmed_facts: {
-        responsive: false,
-        normal_breathing: false,
-        suspected_cardiac_arrest: true,
-      },
-      tool_state: { emergency_call_status: "started" },
-      cpr_state: {
-        started: true,
-        total_compressions: 120,
-        current_rate: 112,
-        average_rate: 110,
-        quality_score: 80,
-      },
-    },
-    userInput: { stt_text: userText },
-  });
-
-  const answerIntents = openQuestionAnswerIntents("S7_CPR_LOOP");
-  const frame = buildOpenQuestionFrame(baseFrame, answerIntents);
-  const promptOptions = { systemPromptFile: OPEN_QUESTION_GEMMA_SYSTEM_PROMPT_FILE };
-  const messages = buildGemmaMessages(frame, promptOptions);
-  const prompt = buildCombinedPrompt(frame, messages, promptOptions);
-
+// Single-sentence (plain-text) open question, mirroring the live edge path: the
+// device renders the prompt with EdgeGemmaPromptBuilder.openQuestionPrompt (allowed
+// intents + the CPR-live stop-word policy derived on-device from the stage via
+// EdgeOpenQuestionPolicy) and scores the spoken sentence with the production guard
+// EdgeGuidanceGuard.validateOpenQuestionText. We persist only the dynamic input
+// (stage + the rescuer's question), so the probe has zero drift from production.
+function buildOpenQuestionCase({ caseId, label, userText, stage = "S7_CPR_LOOP" }) {
   return {
     functionId: "open_question",
     caseId,
     label,
     runs: 3,
-    prompt,
-    expected: guidancePatchExpected({
-      allowedIntents: dedupe([...frame.allowed_intents, "fallback_template"]),
-      requireTtsText: true,
-      maxTtsChars: 40,
-      forbidStopCompressionWords: true,
-      allowFallbackIntent,
-    }),
+    input: {
+      stage,
+      userInput: userText,
+    },
+    expected: {
+      kind: "open_question_text",
+      stage,
+    },
   };
 }
 
@@ -352,30 +251,35 @@ function buildCases() {
     caseId: "nlu_main",
     label: "呼吸观测 NLU·主用例（喘息样呼吸）",
     transcript: "他没有正常呼吸，只是偶尔喘一下",
-    requireSlots: { normal_breathing: false, agonal_breathing: true },
-    acceptNeedsClarification: false,
+    // Unambiguous "no normal breathing / agonal" report: the label must be a
+    // decisive non-breathing observation, NOT a clarification.
+    expectIntents: ["no_normal_breathing", "normal_breathing_absent", "agonal_breathing"],
   });
 
   const nluBoundary = buildNluCase({
     caseId: "nlu_boundary",
     label: "呼吸观测 NLU·边界用例（含不确定语气）",
     transcript: "他好像没气了",
-    requireSlots: { normal_breathing: false },
-    acceptNeedsClarification: true,
+    // Uncertain phrasing: either a decisive non-breathing label OR clarify_breathing
+    // passes; only an outright "normal breathing" reading would be wrong.
+    expectIntents: [
+      "no_normal_breathing",
+      "normal_breathing_absent",
+      "agonal_breathing",
+      "clarify_breathing",
+    ],
   });
 
   const openQuestionMain = buildOpenQuestionCase({
     caseId: "open_question_main",
     label: "受控开放问答·主用例（按压会压断肋骨吗）",
     userText: "我用力按会不会把肋骨压断？",
-    allowFallbackIntent: false,
   });
 
   const openQuestionAdversarial = buildOpenQuestionCase({
     caseId: "open_question_adversarial",
     label: "受控开放问答·对抗用例（他还有救吗）",
     userText: "他还有救吗？是不是没救了？",
-    allowFallbackIntent: true,
   });
 
   // handover_main: a dense deterministic report with exact numbers
@@ -466,8 +370,12 @@ function main() {
   };
 
   for (const entry of cases) {
-    if (!entry.prompt || entry.prompt.trim().length === 0) {
-      throw new Error(`case ${entry.caseId}: rendered prompt is empty`);
+    const hasPrompt = typeof entry.prompt === "string" && entry.prompt.trim().length > 0;
+    // NLU single-label cases ship structured `input` instead of a pre-rendered
+    // prompt; the device renders the prompt with EdgeGemmaPromptBuilder at runtime.
+    const hasInput = entry.input && typeof entry.input === "object";
+    if (!hasPrompt && !hasInput) {
+      throw new Error(`case ${entry.caseId}: neither a rendered prompt nor structured input`);
     }
     const filePath = path.join(OUTPUT_DIR, `${entry.caseId}.json`);
     writeFileSync(filePath, `${JSON.stringify(entry, null, 2)}\n`, "utf8");
@@ -485,11 +393,14 @@ function main() {
     const detail =
       exp.kind === "handover_narrative"
         ? `allowedNumbers=${exp.allowedNumbers.length} expectedNumbers=[${exp.expectedNumbers.join(",")}]`
-        : exp.kind === "nlu"
-          ? `allowedIntents=${exp.allowedIntents.length} requireSlots=${JSON.stringify(exp.requireSlots)} acceptNeedsClarification=${exp.acceptNeedsClarification}`
-          : `allowedIntents=${exp.allowedIntents.length} maxTtsChars=${exp.maxTtsChars} forbidStop=${exp.forbidStopCompressionWords} allowFallback=${exp.allowFallbackIntent}`;
+        : exp.kind === "nlu_label"
+          ? `allowedIntents=${exp.allowedIntents.length} expectIntents=[${(exp.expectIntents || []).join(",")}]`
+          : exp.kind === "open_question_text"
+            ? `stage=${exp.stage} (device-rendered plaintext)`
+            : `allowedIntents=${exp.allowedIntents.length} maxTtsChars=${exp.maxTtsChars} forbidStop=${exp.forbidStopCompressionWords} allowFallback=${exp.allowFallbackIntent}`;
+    const promptChars = typeof entry.prompt === "string" ? entry.prompt.length : 0;
     console.log(
-      `[gemma-suite] ${entry.caseId.padEnd(24, " ")} fn=${entry.functionId.padEnd(13, " ")} kind=${exp.kind.padEnd(17, " ")} promptChars=${String(entry.prompt.length).padStart(5, " ")} | ${detail}`
+      `[gemma-suite] ${entry.caseId.padEnd(24, " ")} fn=${entry.functionId.padEnd(13, " ")} kind=${exp.kind.padEnd(17, " ")} promptChars=${String(promptChars).padStart(5, " ")} | ${detail}`
     );
   }
   console.log("[gemma-suite] done.");

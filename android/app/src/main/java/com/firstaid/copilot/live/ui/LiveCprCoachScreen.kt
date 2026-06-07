@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
+import android.util.Base64
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -92,6 +93,7 @@ import com.firstaid.copilot.live.edge.StreamingAsrSession
 import com.firstaid.copilot.live.edge.buildSherpaSpeechEngine
 import com.firstaid.copilot.live.edge.buildSherpaStreamingAsrSession
 import com.firstaid.copilot.live.edge.inspectEdgeModels
+import com.firstaid.copilot.live.inferLiveFastIntent
 import com.firstaid.copilot.live.normalizeOverlayMode
 import com.firstaid.copilot.live.toAttentionMode
 import com.firstaid.copilot.live.perception.PerceptionSignal
@@ -113,6 +115,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 
 @Composable
 fun LiveCprCoachScreen(
@@ -120,6 +124,14 @@ fun LiveCprCoachScreen(
     onOpenFixtureDebug: () -> Unit = {},
 ) {
     val context = LocalContext.current
+    val liveTestScriptB64 = remember {
+        (context as? Activity)?.intent?.getStringExtra("liveTestScriptB64")
+    }
+    val liveTestRunId = remember {
+        (context as? Activity)?.intent?.getStringExtra("liveTestRunId")
+            ?.takeIf { it.isNotBlank() }
+            ?: SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
+    }
     val skipGemmaWarmup = remember {
         (context as? Activity)?.intent?.getBooleanExtra("skipGemmaWarmup", false) == true
     }
@@ -399,6 +411,19 @@ fun LiveCprCoachScreen(
         if (state.currentStage?.startsWith("S9") == true) {
             showHandover = true
         }
+    }
+
+    LaunchedEffect(liveTestScriptB64, edgeGemmaFlags.enabled, edgeGemmaFlags.openQuestionEnabled, gemmaAgent) {
+        val script = liveTestScriptB64 ?: return@LaunchedEffect
+        if (edgeGemmaFlags.openQuestionEnabled && gemmaAgent == null && !skipGemmaWarmup) {
+            return@LaunchedEffect
+        }
+        runLiveTestScript(
+            context = context.applicationContext,
+            viewModel = viewModel,
+            scriptB64 = script,
+            runId = liveTestRunId,
+        )
     }
 
     LaunchedEffect(localTtsSpeaking, state.isLiveAudioPlaying, liveAudioEnabled) {
@@ -1215,6 +1240,171 @@ private fun LiveUiState.isAssistantPlaybackActiveForAsr(): Boolean =
 
 private val recordingMicStates = setOf(MicState.Listening, MicState.Capturing, MicState.Uploading)
 private const val TAG = "LiveCprCoachScreen"
+
+private suspend fun runLiveTestScript(
+    context: Context,
+    viewModel: LiveSessionViewModel,
+    scriptB64: String,
+    runId: String,
+) {
+    val outputDir = File(context.getExternalFilesDir(null) ?: context.filesDir, "live-test").also { it.mkdirs() }
+    val outputFile = File(outputDir, "$runId.json")
+    val steps = decodeLiveTestScript(scriptB64)
+    val results = JSONArray()
+    Log.i(TAG, "LiveTest start runId=$runId steps=${steps.length()} output=${outputFile.absolutePath}")
+    viewModel.reset()
+    waitForConnection(viewModel, timeoutMs = 5_000)
+    delay(300)
+
+    for (index in 0 until steps.length()) {
+        val step = steps.optJSONObject(index) ?: continue
+        val type = step.optString("type", "text")
+        val label = step.optString("label", "step_$index")
+        val text = step.optString("text", "")
+        val intent = step.optString("intent", "").takeIf { it.isNotBlank() }
+        val timeoutMs = step.optLong(
+            "timeoutMs",
+            if (type == "delay") step.optLong("durationMs", 500) + 500 else 10_000,
+        )
+        val before = viewModel.uiState.value
+        val startedAt = System.currentTimeMillis()
+
+        when (type) {
+            "start" -> viewModel.startFirstAid()
+            "delay" -> delay(step.optLong("durationMs", 500).coerceAtLeast(0))
+            "primary" -> before.primaryButton?.let { button ->
+                viewModel.submitLiveText(
+                    text = button.label,
+                    intent = resolvePrimaryButtonIntent(button.intent),
+                )
+            }
+            else -> viewModel.submitLiveText(text = text, intent = intent)
+        }
+
+        val after = waitForLiveTestStep(
+            viewModel = viewModel,
+            before = before,
+            submittedText = text,
+            startedAtMs = startedAt,
+            timeoutMs = timeoutMs,
+        )
+        val elapsedMs = System.currentTimeMillis() - startedAt
+        val record = liveTestRecord(
+            index = index,
+            label = label,
+            type = type,
+            text = text,
+            intent = intent,
+            localFastIntent = inferLiveFastIntent(text)?.intent,
+            before = before,
+            after = after,
+            elapsedMs = elapsedMs,
+        )
+        results.put(record)
+        outputFile.writeText(
+            JSONObject()
+                .put("runId", runId)
+                .put("count", results.length())
+                .put("results", results)
+                .toString(2),
+            Charsets.UTF_8,
+        )
+        Log.i(
+            TAG,
+            "LiveTest step=$index label=$label type=$type elapsed=${elapsedMs}ms " +
+                "stage=${after.currentStage.orEmpty()} source=${after.guidanceSource.orEmpty()} " +
+                "response=${after.responseType.orEmpty()} open=${after.openQuestionPhase} " +
+                "openWait=${after.lastOpenQuestionMetrics?.openQuestion?.waitMs ?: -1}ms " +
+                "tts='${after.lastAssistantText.orEmpty().take(80)}'",
+        )
+        delay(step.optLong("afterMs", 250).coerceAtLeast(0))
+    }
+    Log.i(TAG, "LiveTest complete runId=$runId output=${outputFile.absolutePath}")
+}
+
+private fun decodeLiveTestScript(scriptB64: String): JSONArray {
+    val decoded = Base64.decode(scriptB64, Base64.DEFAULT).toString(Charsets.UTF_8)
+    return JSONArray(decoded)
+}
+
+private suspend fun waitForConnection(viewModel: LiveSessionViewModel, timeoutMs: Long) {
+    val deadline = System.currentTimeMillis() + timeoutMs
+    while (System.currentTimeMillis() < deadline) {
+        if (viewModel.uiState.value.connectionState == ConnectionState.Online) return
+        delay(100)
+    }
+}
+
+private suspend fun waitForLiveTestStep(
+    viewModel: LiveSessionViewModel,
+    before: LiveUiState,
+    submittedText: String,
+    startedAtMs: Long,
+    timeoutMs: Long,
+): LiveUiState {
+    val deadline = startedAtMs + timeoutMs
+    var sawInFlight = false
+    var latest = viewModel.uiState.value
+    while (System.currentTimeMillis() < deadline) {
+        latest = viewModel.uiState.value
+        if (latest.isInFlight) sawInFlight = true
+        val transcriptMatches = submittedText.isBlank() ||
+            latest.lastUserTranscript == submittedText ||
+            latest.lastUserTranscript?.contains(submittedText.take(8)) == true
+        val changed =
+            latest.lastActionId != before.lastActionId ||
+                latest.currentStage != before.currentStage ||
+                latest.lastLiveTurnSeq != before.lastLiveTurnSeq ||
+                latest.responseType != before.responseType
+        val openQuestionAnswered = latest.openQuestionPhase == com.firstaid.copilot.live.OpenQuestionPhase.Answer &&
+            (transcriptMatches || submittedText.isBlank())
+        val normalTurnDone = sawInFlight && !latest.isInFlight && changed
+        if (openQuestionAnswered || normalTurnDone) return latest
+        delay(100)
+    }
+    return latest
+}
+
+private fun liveTestRecord(
+    index: Int,
+    label: String,
+    type: String,
+    text: String,
+    intent: String?,
+    localFastIntent: String?,
+    before: LiveUiState,
+    after: LiveUiState,
+    elapsedMs: Long,
+): JSONObject {
+    val open = after.lastOpenQuestionMetrics?.openQuestion
+    val timings = after.lastOpenQuestionMetrics?.timings ?: emptyMap()
+    return JSONObject()
+        .put("index", index)
+        .put("label", label)
+        .put("type", type)
+        .put("text", text)
+        .put("intent", intent)
+        .put("localFastIntent", localFastIntent)
+        .put("elapsedMs", elapsedMs)
+        .put("beforeStage", before.currentStage)
+        .put("afterStage", after.currentStage)
+        .put("mainText", after.mainText)
+        .put("secondaryText", after.secondaryText)
+        .put("ttsText", after.ttsText)
+        .put("lastAssistantText", after.lastAssistantText)
+        .put("lastUserTranscript", after.lastUserTranscript)
+        .put("responseType", after.responseType)
+        .put("guidanceSource", after.guidanceSource)
+        .put("sourceBadge", after.sourceBadge.name)
+        .put("openQuestionPhase", after.openQuestionPhase.name)
+        .put("openWaitMs", open?.waitMs)
+        .put("openFallback", open?.fallback)
+        .put("openReason", open?.reason)
+        .put("gemmaMs", timings["gemma_ms"])
+        .put("totalMs", timings["total_ms"])
+        .put("isInFlight", after.isInFlight)
+        .put("lastErrorMessage", after.lastErrorMessage)
+}
 
 @Composable
 private fun EntryScreen(

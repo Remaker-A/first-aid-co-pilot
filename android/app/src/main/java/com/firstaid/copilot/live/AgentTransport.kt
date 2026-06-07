@@ -36,6 +36,14 @@ interface AgentTransport {
 interface LiveAgentChannel {
     val events: Flow<LiveAgentEvent>
 
+    /**
+     * Whether an edge-owned open-question turn should still be mirrored through
+     * this channel. WebSocket mirrors to keep the server session in sync; the
+     * local channel must not, otherwise its deterministic CPR-loop response races
+     * and overwrites the edge Gemma answer.
+     */
+    val mirrorsEdgeOpenQuestionTurns: Boolean get() = true
+
     fun connect(sessionId: String, mode: String = "demo_assisted")
 
     fun updateContext(request: TurnRequest)

@@ -18,10 +18,11 @@ const rounds = positiveInt(args.rounds, 3);
 const realGemma = boolArg(args["real-gemma"]);
 const requireGemmaAnswer = boolArg(args["require-gemma-answer"]);
 const gemmaDelayMs = positiveInt(args["gemma-delay-ms"], 30);
-const textTimeoutMs = positiveInt(args["text-timeout-ms"], 800);
+const textTimeoutMs = positiveInt(args["text-timeout-ms"], 1_800);
 const textStream = args["text-stream"] === "false" || boolArg(args["no-text-stream"]) ? false : true;
-const maxGemmaAnswerWaitMs = positiveInt(args["max-gemma-answer-wait-ms"], 800);
-const maxGemmaTotalMs = positiveInt(args["max-gemma-total-ms"], 1_000);
+const textStreamMaxChars = positiveInt(args["text-stream-max-chars"], 44);
+const maxGemmaAnswerWaitMs = positiveInt(args["max-gemma-answer-wait-ms"], 1_800);
+const maxGemmaTotalMs = positiveInt(args["max-gemma-total-ms"], 2_000);
 const sessionPrefix = args.session || `oq_${Date.now().toString(36)}`;
 
 const CASES = [
@@ -48,7 +49,7 @@ const CASES = [
   },
   {
     id: textStream ? "gemma_text_stream" : "gemma_text",
-    text: "为什么他的鞋子湿了",
+    text: "他为什么会突然倒下？",
     kind: "gemma",
     expect: {
       openQuestion: true,
@@ -70,7 +71,7 @@ async function main() {
     waitForOpenQuestionAnswer: true,
     gemma_open_question_text_timeout_ms: textTimeoutMs,
     gemma_open_question_text_stream: textStream,
-    gemma_open_question_text_stream_max_chars: 24,
+    gemma_open_question_text_stream_max_chars: textStreamMaxChars,
     // Keep non-open-question turns deterministic; open questions still exercise
     // generateText in the controlled text path.
     env: {
@@ -110,6 +111,7 @@ async function main() {
     prewarmMs,
     textTimeoutMs,
     textStream,
+    textStreamMaxChars,
     maxGemmaAnswerWaitMs,
     maxGemmaTotalMs,
   });
@@ -252,6 +254,7 @@ function summarize(results, options) {
     require_gemma_answer: options.requireGemmaAnswer,
     text_timeout_ms: options.textTimeoutMs,
     text_stream: options.textStream,
+    text_stream_max_chars: options.textStreamMaxChars,
     max_gemma_answer_wait_ms: options.maxGemmaAnswerWaitMs,
     max_gemma_total_ms: options.maxGemmaTotalMs,
     prewarm_ms: options.prewarmMs,

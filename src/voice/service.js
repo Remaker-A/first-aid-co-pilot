@@ -32,10 +32,10 @@ const DEFAULT_GEMMA_LIVE_TIMEOUT_MS = 1200;
 const DEFAULT_GEMMA_TURN_TIMEOUT_MS = 1000;
 const DEFAULT_GEMMA_OPEN_QUESTION_LIVE_TIMEOUT_MS = 800;
 const DEFAULT_GEMMA_OPEN_QUESTION_TURN_TIMEOUT_MS = 800;
-const DEFAULT_GEMMA_OPEN_QUESTION_TEXT_TIMEOUT_MS = 800;
-const DEFAULT_GEMMA_OPEN_QUESTION_TEXT_MAX_TOKENS = 32;
+const DEFAULT_GEMMA_OPEN_QUESTION_TEXT_TIMEOUT_MS = 1800;
+const DEFAULT_GEMMA_OPEN_QUESTION_TEXT_MAX_TOKENS = 48;
 const DEFAULT_GEMMA_OPEN_QUESTION_TEXT_STREAM = true;
-const DEFAULT_GEMMA_OPEN_QUESTION_TEXT_STREAM_MAX_CHARS = 24;
+const DEFAULT_GEMMA_OPEN_QUESTION_TEXT_STREAM_MAX_CHARS = 44;
 const DEFAULT_OPEN_QUESTION_CACHE_TTL_MS = 10 * 60 * 1000;
 const DEFAULT_OPEN_QUESTION_CACHE_MAX_ENTRIES = 64;
 const CPR_READINESS_FAST_PATH = "s6_readiness_continue_cpr";
@@ -858,22 +858,40 @@ async function resolveOpenQuestionTextAnswer({ runtime, frame, plan, state, sess
       maxTokens: plan.textMaxTokens,
       stream: plan.textStream,
       streamMaxChars: plan.textStreamMaxChars,
-      streamStopPattern: "(继续按压|别停|保持按压)",
+      streamStopPattern: null,
     }
   );
   const result = plan.textTimeoutMs
     ? await withTimeout(Promise.resolve().then(invokeText), plan.textTimeoutMs, plan.timeoutReason || "gemma_open_question_text_timeout")
     : await invokeText();
   if (!result?.ok || !result.text) {
-    return {
+    const repair = buildOpenQuestionRepairAnswer({
+      stage,
+      frame,
+      state,
+      sessionId,
+      validatorIntents,
+      gemmaReason: result?.reason || result?.skipReason || "gemma_text_unavailable",
+    });
+    return repair || {
       attempted: result?.reason !== "gemma_text_daemon_disabled",
       reason: result?.reason || result?.skipReason || "gemma_text_unavailable",
     };
   }
 
-  const text = normalizeOpenQuestionTextAnswer(result.text);
+  const text = normalizeOpenQuestionTextAnswer(result.text, {
+    question: frame?.user_input?.stt_text || "",
+    stage,
+  });
   if (!text) {
-    return { attempted: true, reason: "gemma_text_empty" };
+    const repair = buildOpenQuestionRepairAnswer({
+      stage,
+      frame,
+      state,
+      sessionId,
+      validatorIntents,
+    });
+    return repair || { attempted: true, reason: "gemma_text_low_quality" };
   }
 
   const candidate = {
@@ -958,14 +976,20 @@ function buildOpenQuestionFrame(frame, answerIntents) {
 function buildOpenQuestionTextMessages(frame = {}, stage = AgentStage.S7_CPR_LOOP) {
   const question = frame.user_input?.stt_text || "";
   const stageText = stage === AgentStage.S8_ASSISTANCE
-    ? "正在CPR和AED协助"
+    ? "CPR和AED协助"
     : "正在CPR";
-  const context = `只用简体中文，必须以“继续按压”开头。成人疑似心脏骤停，${stageText}。施救者问：${question}。只答一句，不超25字；不诊断、不承诺、不新增步骤。`;
+  const focus = describeOpenQuestionAnswerFocus(question);
+  const context = [
+    `只用简体中文。成人疑似心脏骤停，${stageText}；系统已先说“我在，按住别停”。`,
+    `问题：${question}`,
+    `重点：${focus}`,
+    "只输出一句话，必须以“继续按压，”开头，22到42字；具体可执行；不诊断、不承诺、不让停，不说不知道/根据现场情况/保持呼吸/胸腔起伏。",
+  ].join("\n");
 
   return [{ role: "user", content: context }];
 }
 
-function normalizeOpenQuestionTextAnswer(value) {
+function normalizeOpenQuestionTextAnswer(value, { question = "", stage = null } = {}) {
   let text = String(value || "").trim();
   if (!text) {
     return "";
@@ -1001,14 +1025,145 @@ function normalizeOpenQuestionTextAnswer(value) {
   if (/(停止按压|可以停|不用按|不要按|一定|保证|心梗|脑卒中|会死)/u.test(text)) {
     return "";
   }
+  if (isLowQualityOpenQuestionText(text, { question, stage })) {
+    return "";
+  }
   return text;
 }
 
 function pickOpenQuestionSafetySentence(text) {
   const sentences = String(text || "").match(/[^。！？!?.]+[。！？!?.]?/gu) || [];
-  return sentences
-    .map((sentence) => sentence.trim())
-    .find((sentence) => /(继续按压|别停|保持按压)/u.test(sentence)) || "";
+  const cleaned = sentences.map((sentence) => sentence.trim()).filter(Boolean);
+  const index = cleaned.findIndex((sentence) => /(继续按压|别停|保持按压)/u.test(sentence));
+  if (index < 0) {
+    return "";
+  }
+  const picked = cleaned[index];
+  if (isLowValueSafetyOnlySentence(picked) && cleaned[index + 1]) {
+    return `${picked.replace(/[。！？!?.]+$/u, "；")}${cleaned[index + 1]}`.slice(0, 72);
+  }
+  return picked;
+}
+
+function isLowQualityOpenQuestionText(text, { question = "", stage = null } = {}) {
+  const compact = normalizeOpenQuestionBucket(text);
+  if (!compact) {
+    return true;
+  }
+  if (/(保持呼吸|保持胸腔起伏|保持胸口起伏|维持呼吸|让他呼吸)/u.test(compact)) {
+    return true;
+  }
+  if (/(家属|亲人|通知|告诉)/u.test(normalizeOpenQuestionBucket(question)) &&
+      /(通知家属|告诉家属|联系家属|通知亲人|告诉亲人|联系亲人)/u.test(compact) &&
+      !/(旁人|别人|同伴|路人).{0,12}(通知|告诉|联系)(家属|亲人)|让.{0,6}(旁人|别人|同伴|路人).{0,12}(通知|告诉|联系)(家属|亲人)/u.test(compact)) {
+    return true;
+  }
+  if (/(继续按压|保持按压|别停)(不知道|不清楚|说不准|不确定)?$/u.test(compact)) {
+    return true;
+  }
+  if (/(不知道|不清楚|说不准|根据现场情况判断)/u.test(compact) && countZhChars(text) < 18) {
+    return true;
+  }
+  if (isLowValueSafetyOnlySentence(text) && countZhChars(text) < 16) {
+    return true;
+  }
+  return false;
+}
+
+function isLowValueSafetyOnlySentence(text) {
+  return /^(继续按压|保持按压|别停)[，,。.!！\s]*(不要停|别停|继续)?[。.!！\s]*$/u.test(String(text || "").trim());
+}
+
+function describeOpenQuestionAnswerFocus(question = "") {
+  const bucket = normalizeOpenQuestionBucket(question);
+  if (/(为什么|为何|原因|怎么会|突然).*(倒下|晕倒|这样|不行)|倒下.*(为什么|为何|原因)/u.test(bucket)) {
+    return "不能判断倒下原因；告诉他现在按压是在维持血流、争取时间。";
+  }
+  if (/(旁边的人|别人|同伴|家属|路人).*(做什么|帮|怎么帮|最好)|怎么.*(分工|帮忙)/u.test(bucket)) {
+    return "他继续按压；旁人可以拿 AED、开门、迎接急救员或准备换手。";
+  }
+  if (/(接手前|急救员|救护车|等待|等.*时候|留意|注意)/u.test(bucket)) {
+    return "提醒继续按压，留意 AED 提示、急救员到达和是否有人能换手。";
+  }
+  if (/(家属|亲人|通知|告诉)/u.test(bucket)) {
+    return "他不要停按压；让旁人通知家属并迎接急救员。";
+  }
+  if (/(害怕|紧张|撑不住|慌)/u.test(bucket)) {
+    return "先安抚，再把注意力拉回节拍和持续按压。";
+  }
+  return "简短回答问题，然后把注意力拉回继续按压和等待 AED 或急救员。";
+}
+
+function buildOpenQuestionRepairAnswer({ stage, frame, state, sessionId, validatorIntents }) {
+  const spec = openQuestionRepairSpec(stage, frame?.user_input?.stt_text || "");
+  if (!spec) {
+    return null;
+  }
+  const candidate = {
+    intent: spec.intent,
+    session_id: sessionId,
+    stage,
+    source: "open_question_repair_template",
+    priority: "normal",
+    reason_codes: ["open_question_repair_template", spec.reason],
+    tts: {
+      text: spec.text,
+      tone: "calm_firm",
+      speed: "normal",
+      interrupt_policy: "do_not_interrupt_critical",
+    },
+    ui: { main_text: "继续按压", secondary_text: spec.text },
+    log_event: { type: "open_question_repair_template", detail: spec.reason },
+  };
+  const validation = validateAction(candidate, state, { allowedIntents: validatorIntents });
+  if (!validation.ok || !validation.action?.tts?.text) {
+    return null;
+  }
+  return {
+    ok: true,
+    action: validation.action,
+    source: "open_question_repair_template",
+    responseType: LiveResponseType.OPEN_QUESTION_ANSWER,
+    reason: spec.reason,
+    repaired: true,
+  };
+}
+
+function openQuestionRepairSpec(stage, question = "") {
+  if (stage !== AgentStage.S7_CPR_LOOP && stage !== AgentStage.S8_ASSISTANCE) {
+    return null;
+  }
+  const base = { intent: answerIntentsForStage(stage)[0] || "answer_current_cpr_question" };
+  const bucket = normalizeOpenQuestionBucket(question);
+  if (/(为什么|为何|原因|怎么会|突然).*(倒下|晕倒|这样|不行)|倒下.*(为什么|为何|原因)/u.test(bucket)) {
+    return {
+      ...base,
+      text: "继续按压，现在不能判断原因，但按压是在帮他维持血流。",
+      reason: "repair_unknown_cause",
+    };
+  }
+  if (/(旁边的人|别人|同伴|家属|路人).*(做什么|帮|怎么帮|最好)|怎么.*(分工|帮忙)/u.test(bucket)) {
+    return {
+      ...base,
+      text: "继续按压，让旁人拿 AED、开门，并准备和你换手。",
+      reason: "repair_helper_tasks",
+    };
+  }
+  if (/(接手前|急救员|救护车|等待|等.*时候|留意|注意)/u.test(bucket)) {
+    return {
+      ...base,
+      text: "继续按压，留意 AED 提示；有人能换手时再换。",
+      reason: "repair_waiting_attention",
+    };
+  }
+  if (/(家属|亲人|通知|告诉)/u.test(bucket)) {
+    return {
+      ...base,
+      text: "继续按压，你别停；让旁人通知家属并迎接急救员。",
+      reason: "repair_family_notice",
+    };
+  }
+  return null;
 }
 
 function compactOpenQuestionPerception(summary) {
@@ -1050,6 +1205,11 @@ function normalizeOpenQuestionBucket(text) {
     .toLowerCase()
     .replace(/[，。！？、,.!?;；:"“”'‘’\s]/g, "")
     .slice(0, 80);
+}
+
+function countZhChars(text) {
+  const matches = String(text || "").match(/[\u3400-\u4dbf\u4e00-\u9fff]/gu);
+  return matches ? matches.length : 0;
 }
 
 function readOpenQuestionCache(cache, key, options = {}) {

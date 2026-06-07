@@ -575,15 +575,21 @@ class LiveSessionViewModel(
         // recent on-device correction cached for this exact transcript so the next
         // identical turn carries the right hint. Empty until a resolver is attached.
         val resolvedMatch = fastMatch ?: nluCoordinator.cachedIntent(clean, nowMs)
-        val resolvedIntent = resolvedMatch?.intent
+        val currentState = _uiState.value
+        val rawResolvedIntent = resolvedMatch?.intent
+        val shouldRouteAsOpenQuestion =
+            EdgeOpenQuestionPolicy.isOpenQuestionStage(currentState.currentStage) &&
+                !isResponseCheckQuestionTranscript(clean) &&
+                EdgeOpenQuestionDetector.looksLikeOpenQuestion(clean) &&
+                !isDeterministicLiveQuestionIntent(rawResolvedIntent)
+        val resolvedIntent = if (shouldRouteAsOpenQuestion) null else rawResolvedIntent
         val intentMetadata = resolvedIntent
             ?.takeIf(String::isNotBlank)
             ?.let { mapOf("intent_hint" to it, "intent_source" to "local_live_submit") }
-        val currentState = _uiState.value
         val criticalPlaybackBypass = fromAsr &&
             shouldBypassPlaybackForCriticalAsrFinal(
                 currentState,
-                resolvedMatch?.intent,
+                resolvedIntent,
                 resolvedMatch?.confidence,
             )
         if (
@@ -592,7 +598,7 @@ class LiveSessionViewModel(
                 text = clean,
                 state = currentState,
                 nowMs = nowMs,
-                intent = resolvedMatch?.intent,
+                intent = resolvedIntent,
                 confidence = resolvedMatch?.confidence,
             )
         ) {
@@ -603,7 +609,7 @@ class LiveSessionViewModel(
         // on-device (immediate ack + async controlled answer) when a responder is
         // attached. Response-check questions keep their deterministic server path.
         val isEdgeOpenQuestion = openQuestionResponder != null &&
-            resolvedIntent == null &&
+            shouldRouteAsOpenQuestion &&
             EdgeOpenQuestionPolicy.isOpenQuestionStage(currentState.currentStage) &&
             !isResponseCheckQuestionTranscript(clean) &&
             EdgeOpenQuestionDetector.looksLikeOpenQuestion(clean)
@@ -614,7 +620,7 @@ class LiveSessionViewModel(
         // (mirrors the server's GEMMA_NLU_ASYNC=1 contract); throttled by the
         // coordinator's LRU cache + per-minute budget. Skipped for an edge open
         // question — that path already spends this turn's single-driver generation.
-        if (fastMatch == null && !isEdgeOpenQuestion) {
+        if (fastMatch == null && !isEdgeOpenQuestion && !shouldRouteAsOpenQuestion) {
             maybeResolveIntentAsync(clean, nowMs)
         }
         if (_uiState.value.connectionState != ConnectionState.Online) {
@@ -633,13 +639,18 @@ class LiveSessionViewModel(
         } else {
             cancelLiveAudio("new_turn")
         }
-        liveChannel.updateContext(TurnRequest(sessionId = sessionId))
-        liveChannel.commitText(clean, resolvedIntent)
+        val mirrorEdgeOpenQuestionTurn = !isEdgeOpenQuestion || liveChannel.mirrorsEdgeOpenQuestionTurns
+        if (mirrorEdgeOpenQuestionTurn) {
+            liveChannel.updateContext(TurnRequest(sessionId = sessionId))
+            liveChannel.commitText(clean, resolvedIntent)
+        }
         if (isEdgeOpenQuestion) {
             // The server still sees the turn (transcript / stage sync), but the edge
             // owns the answer; its open-question ack/answer is dropped to avoid a
-            // double reply ("置标志忽略服务端 open_question_answer").
-            startEdgeOpenQuestion(clean, commitToServer = true)
+            // double reply. LocalAgentChannel is not a server mirror, so it is not
+            // fed the question; otherwise its deterministic flow guidance wins the
+            // race and hides the edge answer.
+            startEdgeOpenQuestion(clean, commitToServer = liveChannel.mirrorsEdgeOpenQuestionTurns)
         } else {
             resetEdgeOpenQuestionState()
             _uiState.update {
@@ -653,6 +664,7 @@ class LiveSessionViewModel(
                     activeAudioActionId = null,
                     lastErrorMessage = null,
                     openQuestionPhase = OpenQuestionPhase.Idle,
+                    lastOpenQuestionMetrics = null,
                 )
             }
         }
@@ -699,7 +711,14 @@ class LiveSessionViewModel(
     /** Generate + guard the controlled answer off the hot path, then publish it. */
     private fun launchEdgeOpenQuestionAnswer(stage: String?, question: String, epoch: Int) {
         val responder = openQuestionResponder ?: run {
-            applyEdgeOpenQuestionOutcome(stage, OpenQuestionOutcome.Fallback("no_responder"), epoch)
+            applyEdgeOpenQuestionOutcome(
+                stage,
+                OpenQuestionOutcome.Fallback(
+                    reason = "no_responder",
+                    answerText = EdgeOpenQuestionPolicy.fallbackAnswer(stage, question),
+                ),
+                epoch,
+            )
             return
         }
         val frame = buildOpenQuestionFrame(stage, question)
@@ -709,7 +728,10 @@ class LiveSessionViewModel(
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Throwable) {
-                OpenQuestionOutcome.Fallback("exception:${error.message ?: "unknown"}")
+                OpenQuestionOutcome.Fallback(
+                    reason = "exception:${error.message ?: "unknown"}",
+                    answerText = EdgeOpenQuestionPolicy.fallbackAnswer(stage, question),
+                )
             }
             if (epoch != openQuestionEpoch) return@launch
             applyEdgeOpenQuestionOutcome(stage, outcome, epoch)
@@ -735,7 +757,7 @@ class LiveSessionViewModel(
                 tone = outcome.tone
             }
             is OpenQuestionOutcome.Fallback -> {
-                answerText = EdgeOpenQuestionPolicy.fallbackAnswer(stage)
+                answerText = outcome.answerText ?: EdgeOpenQuestionPolicy.fallbackAnswer(stage)
                 mainText = EdgeOpenQuestionPolicy.ackMainText(stage)
                 secondaryText = ""
                 tone = "calm_firm"
@@ -1597,3 +1619,13 @@ private val START_OR_UPDATE_HAPTIC_TOOL_TYPES = setOf(
     "start_haptic_metronome",
     "update_haptic_metronome",
 )
+
+private fun isDeterministicLiveQuestionIntent(intent: String?): Boolean =
+    intent in setOf(
+        "ask_cpr_quality",
+        "ask_can_stop",
+        "ask_aed_cpr_alternation",
+        "ask_aed_help",
+        "ask_next_step",
+        "ask_emergency_call",
+    )

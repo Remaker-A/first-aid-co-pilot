@@ -342,11 +342,12 @@ test("CPR-live non-template open questions can use the Gemma text fast path", as
         assert.equal(messages.length, 1);
         assert.match(messages[0].content, /正在CPR/);
         assert.match(messages[0].content, /继续按压/);
+        assert.match(messages[0].content, /重点/);
         assert.ok(Number.isFinite(options.timeoutMs));
         assert.ok(options.timeoutMs <= 1000);
-        assert.ok(options.maxTokens === undefined || options.maxTokens <= 32);
+        assert.ok(options.maxTokens === undefined || options.maxTokens <= 48);
         assert.equal(options.stream, true);
-        assert.ok(options.streamMaxChars <= 24);
+        assert.ok(options.streamMaxChars <= 44);
         return { ok: true, text: "分配体力，继续按压，尽量保持节奏。" };
       },
       async generatePatch() {
@@ -386,7 +387,7 @@ test("CPR-live non-template open questions preserve the Gemma streaming text sou
         textCalls += 1;
         assert.equal(messages.length, 1);
         assert.equal(options.stream, true);
-        assert.match(String(options.streamStopPattern), /继续按压/);
+        assert.equal(options.streamStopPattern, null);
         return { ok: true, text: "It looks serious.继续按压胸骨。", streamed: true };
       },
     },
@@ -438,6 +439,85 @@ test("CPR-live Gemma text fast path blocks unsafe text and falls back", async ()
   assert.equal(result.open_question_answer.fallback, true);
   assert.match(result.open_question_answer.action.tts.text, /继续按压/);
   assert.equal(patchCalls, 0, "unsafe text should not continue into a slow live patch retry");
+});
+
+test("CPR-live low-value Gemma text is repaired into a question-aware safe answer", async () => {
+  const service = createVoiceDemoService({
+    runtime: {
+      async generateText() {
+        return { ok: true, text: "继续按压，不知道。" };
+      },
+      async generatePatch() {
+        return new Promise(() => {});
+      },
+    },
+    tts: { provider: "mock" },
+  });
+  const sessionId = "open_q_text_low_value";
+  await advanceVoiceSessionToCpr(service, sessionId);
+
+  const result = await service.handleTurn({
+    sessionId,
+    text: "他为什么会突然倒下？",
+    waitForOpenQuestionAnswer: true,
+  });
+
+  assert.equal(result.open_question, true);
+  assert.equal(result.open_question_answer.ok, true);
+  assert.equal(result.open_question_answer.source, "open_question_repair_template");
+  assert.equal(result.open_question_answer.reason, "repair_unknown_cause");
+  assert.match(result.open_question_answer.action.tts.text, /不能判断原因|维持血流/);
+});
+
+test("CPR-live misleading breathing wording from Gemma is blocked and repaired", async () => {
+  const service = createVoiceDemoService({
+    runtime: {
+      async generateText() {
+        return { ok: true, text: "继续按压胸骨，保持呼吸。" };
+      },
+    },
+    tts: { provider: "mock" },
+  });
+  const sessionId = "open_q_text_misleading_breathing";
+  await advanceVoiceSessionToCpr(service, sessionId);
+
+  const result = await service.handleTurn({
+    sessionId,
+    text: "旁边的人现在最好帮我做什么？",
+    waitForOpenQuestionAnswer: true,
+  });
+
+  assert.equal(result.open_question, true);
+  assert.equal(result.open_question_answer.ok, true);
+  assert.equal(result.open_question_answer.source, "open_question_repair_template");
+  assert.equal(result.open_question_answer.reason, "repair_helper_tasks");
+  assert.doesNotMatch(result.open_question_answer.action.tts.text, /保持呼吸|胸腔起伏/);
+  assert.match(result.open_question_answer.action.tts.text, /AED|换手|开门/);
+});
+
+test("CPR-live family notice wording must keep the rescuer on compressions", async () => {
+  const service = createVoiceDemoService({
+    runtime: {
+      async generateText() {
+        return { ok: true, text: "继续按压，请立即通知家属，并让旁人马上联系急救。" };
+      },
+    },
+    tts: { provider: "mock" },
+  });
+  const sessionId = "open_q_family_notice_direct";
+  await advanceVoiceSessionToCpr(service, sessionId);
+
+  const result = await service.handleTurn({
+    sessionId,
+    text: "我现在要不要告诉家属发生了什么？",
+    waitForOpenQuestionAnswer: true,
+  });
+
+  assert.equal(result.open_question, true);
+  assert.equal(result.open_question_answer.ok, true);
+  assert.equal(result.open_question_answer.source, "open_question_repair_template");
+  assert.equal(result.open_question_answer.reason, "repair_family_notice");
+  assert.match(result.open_question_answer.action.tts.text, /让旁人通知家属/);
 });
 
 test("open questions use a dedicated timeout, compact Gemma frame, and session answer cache", async () => {
@@ -780,7 +860,7 @@ function openQuestionLiveService({ answerPromise, ackText = "我在，按住别�
         guidanceDecision: { source: "open_question_ack", responseType: "open_question_ack" },
         pipeline: { state: { current_stage: AgentStage.S7_CPR_LOOP } },
         gemma: { skipped: true, skipReason: "open_question_async" },
-        gemmaPlan: { live: true, openQuestion: true, timeoutMs: 800 },
+        gemmaPlan: { live: true, openQuestion: true, timeoutMs: 1800 },
         openQuestion: true,
         openQuestionAnswer: { promise: answerPromise },
       };

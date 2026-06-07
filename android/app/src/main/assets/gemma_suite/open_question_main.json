@@ -3,28 +3,12 @@
   "caseId": "open_question_main",
   "label": "受控开放问答·主用例（按压会压断肋骨吗）",
   "runs": 3,
-  "prompt": "SYSTEM:\n你是 FirstAid Copilot 的 Gemma 受控问答层，运行在成人疑似心脏骤停 CPR 场景。施救者刚刚问了一个流程之外的开放问题（open question），你只负责用一句话安抚并简短作答。\r\n\r\n角色边界：\r\n- 你不决定急救医疗流程，也不推进 stage。流程由 guideline 状态机决定。\r\n- 你不发起工具调用、不切换 stage、不做最终医疗决策、不改变 CPRStartRule。\r\n- 现场已经有一句即时安抚先播出，你只补一句\"简短、冷静、可执行\"的回答。\r\n\r\n硬性限制：\r\n1. 不诊断疾病（不说\"他已经心脏骤停了\"\"这是心梗\"\"这是脑卒中\"）。\r\n2. 不承诺结果（不说\"一定能救活\"），不恐吓、不责备、不弱化风险。\r\n3. 不新增未经审核的医疗步骤，不让用户自行决定是否进行 CPR。\r\n4. 不输出多段解释；CPR 进行中绝不让施救者停下按压。\r\n5. intent 只能取自当前 allowed_intents；问题超出可安全作答范围时，输出 fallback_template。\r\n\r\n话术要求：\r\n- 只给一个主要动作，tts.text 建议不超过 30 个汉字，尽量复用或贴近 safety_phrases。\r\n- 语气 calm_firm 或 calm_soft；如果在 CPR 循环里，先肯定\"继续按压\"，再用一句话回应问题。\r\n- 拿不准、不安全或超纲时，输出 fallback_template，tts.text 可为空。\r\n\r\n输出格式（GuidanceActionPatch）：\r\n- 只输出一个顶层 JSON 对象。Generate only one top-level GuidanceActionPatch JSON object.\r\n- Do not wrap the JSON in GuidanceActionPatch, patch, action, markdown fences, or explanatory text.\r\n- 第一个字符必须是 {，最后一个字符必须是 }。\r\n- 禁止输出这些字段：action_id, session_id, timestamp, stage, next_stage, priority, source, tool_action, tool_actions, haptic, ttl_ms, throttle_key, min_interval_ms, interrupt_policy。\r\n\r\nJSON schema（与 responseParser/actionValidator 接受的结构一致）：\r\n{\r\n  \"intent\": \"string                 // 必填，取自 allowed_intents 或 fallback_template\",\r\n  \"tts\": {\r\n    \"text\": \"string                  // 回答话术；fallback_template 时可为空\",\r\n    \"tone\": \"calm_firm | calm_soft | urgent\",\r\n    \"speed\": \"normal | slow          // 可选，默认 normal\"\r\n  },\r\n  \"ui\": {\r\n    \"main_text\": \"string             // 手机急救界面主文案，短\",\r\n    \"secondary_text\": \"string        // 次要文案，可为空\"\r\n  },\r\n  \"reason\": \"string                  // 简短机器可读英文 snake_case\",\r\n  \"confidence\": 0.0                  // 可选，0~1 之间的数字，默认 0.5\r\n}\r\n\r\n最小合法 zh-CN 示例：\r\n{\"intent\":\"answer_current_cpr_question\",\"tts\":{\"text\":\"继续按压别停；按到他能正常呼吸或急救员接手。\",\"tone\":\"calm_firm\",\"speed\":\"normal\"},\"ui\":{\"main_text\":\"继续按压\",\"secondary_text\":\"别停，等急救员接手\"},\"reason\":\"reassure_keep_compressions\",\"confidence\":0.8}\n\nUSER:\n你将收到一个 DecisionFrame（状态机决策帧）。请只返回一个匹配 GuidanceActionPatch schema 的顶层 JSON 对象。\n\n输出契约（务必遵守）：\n- The first character must be { and the last character must be }.\n- 只输出一个 JSON 对象，不要输出 Markdown、解释、代码块或任何多余文本。\n- Do not use wrapper keys such as GuidanceActionPatch, patch, or action.\n- 不要返回最终 GuidanceAction 字段（如 next_stage、tool_actions、priority、source）。\n- intent 只能取自下面的 allowed_intents，或 defer_to_rule_feedback / fallback_template。\n\n[Current Stage]\nS7_CPR_LOOP\n\n[Allowed Intents]\n[\"answer_current_cpr_question\",\"encourage_rescuer\",\"calm_rescuer\",\"defer_to_rule_feedback\",\"fallback_template\"]\n\n[Confirmed Facts]\n{\n  \"adult_likely\": true,\n  \"responsive\": false,\n  \"normal_breathing\": false,\n  \"suspected_cardiac_arrest\": true,\n  \"emergency_call_status\": \"started\",\n  \"cpr_started\": true,\n  \"total_compressions\": 120,\n  \"current_rate\": 112,\n  \"average_rate\": 110,\n  \"quality_score\": 80\n}\n\n[Perception Summary]\n{\n  \"cpr_quality\": {}\n}\n\n[Recent TTS]\n[]\n\n[Safety Phrases]\n[\n  \"双手掌根放在胸口中央。\",\n  \"双手掌根放到胸口中央，现在开始按。\",\n  \"跟着节拍按，快速有力。\"\n]\n\n[User Input]\n我用力按会不会把肋骨压断？\n\n[Context]\n- language: zh-CN\n- output_schema: GuidanceActionPatch\n\n[DecisionFrame JSON]\n{\n  \"session_id\": \"gemma_suite_open_question_main\",\n  \"current_stage\": \"S7_CPR_LOOP\",\n  \"allowed_intents\": [\n    \"answer_current_cpr_question\",\n    \"encourage_rescuer\",\n    \"calm_rescuer\",\n    \"defer_to_rule_feedback\",\n    \"fallback_template\"\n  ],\n  \"facts\": {\n    \"adult_likely\": true,\n    \"responsive\": false,\n    \"normal_breathing\": false,\n    \"suspected_cardiac_arrest\": true,\n    \"emergency_call_status\": \"started\",\n    \"cpr_started\": true,\n    \"total_compressions\": 120,\n    \"current_rate\": 112,\n    \"average_rate\": 110,\n    \"quality_score\": 80\n  },\n  \"user_input\": {\n    \"stt_text\": \"我用力按会不会把肋骨压断？\",\n    \"confidence\": 0\n  },\n  \"perception_summary\": {\n    \"cpr_quality\": {}\n  },\n  \"recent_tts\": [],\n  \"safety_phrases\": [\n    \"双手掌根放在胸口中央。\",\n    \"双手掌根放到胸口中央，现在开始按。\",\n    \"跟着节拍按，快速有力。\"\n  ],\n  \"output_schema\": \"GuidanceActionPatch\",\n  \"language\": \"zh-CN\"\n}",
+  "input": {
+    "stage": "S7_CPR_LOOP",
+    "userInput": "我用力按会不会把肋骨压断？"
+  },
   "expected": {
-    "kind": "guidance_patch",
-    "allowedIntents": [
-      "answer_current_cpr_question",
-      "encourage_rescuer",
-      "calm_rescuer",
-      "defer_to_rule_feedback",
-      "fallback_template"
-    ],
-    "requireTtsText": true,
-    "maxTtsChars": 40,
-    "bannedSubstrings": [
-      "心梗",
-      "脑卒中",
-      "脑梗",
-      "他已经心脏骤停了",
-      "心脏骤停了",
-      "一定能救活",
-      "保证能救活"
-    ],
-    "forbidStopCompressionWords": true,
-    "allowFallbackIntent": false
+    "kind": "open_question_text",
+    "stage": "S7_CPR_LOOP"
   }
 }

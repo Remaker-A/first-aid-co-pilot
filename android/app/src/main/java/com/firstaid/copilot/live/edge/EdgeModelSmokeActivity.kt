@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.media.MediaPlayer
 import android.os.Bundle
+import android.util.Base64
 import android.util.Log
 import android.widget.TextView
 import java.io.File
@@ -64,7 +65,11 @@ class EdgeModelSmokeActivity : Activity() {
         val ttsText = intent.getStringExtra("ttsText")?.takeIf { it.isNotBlank() } ?: DEFAULT_TTS_TEXT
         val asrSampleName = intent.getStringExtra("asrSample")?.takeIf { it.isNotBlank() } ?: "0.wav"
         val asrMaxMs = intent.getIntExtra("asrMaxMs", 0).coerceAtLeast(0)
-        val gemmaPrompt = intent.getStringExtra("gemmaPrompt")?.takeIf { it.isNotBlank() }
+        val gemmaPrompt = intent.getStringExtra("gemmaPromptB64")
+            ?.takeIf { it.isNotBlank() }
+            ?.let { Base64.decode(it, Base64.DEFAULT).toString(Charsets.UTF_8) }
+            ?.takeIf { it.isNotBlank() }
+            ?: intent.getStringExtra("gemmaPrompt")?.takeIf { it.isNotBlank() }
             ?: GEMMA_BENCH_DEFAULT_PROMPT
         val gemmaBackendPreference = parseGemmaBackendPreference(intent.getStringExtra("gemmaBackend"))
         val gemmaSpeculative = intent.getStringExtra("gemmaSpeculative")
@@ -199,7 +204,7 @@ class EdgeModelSmokeActivity : Activity() {
                                 JSONObject()
                                     .put("ok", gen.ok)
                                     .put("latencyMs", gen.latencyMs)
-                                    .put("text", gen.text.take(80))
+                                    .put("text", gen.text.take(RAW_GEMMA_OUTPUT_CAPTURE_CHARS))
                                     .put("error", gen.error),
                             )
                             writeCheckpoint(
@@ -223,7 +228,7 @@ class EdgeModelSmokeActivity : Activity() {
                                 .put("prompt", gemmaPrompt)
                                 .put("generateOk", runs > 0 && okLatencies.size == runs)
                                 .put("generateLatencyMs", lastGen.latencyMs)
-                                .put("generateText", lastGen.text.take(80))
+                                .put("generateText", lastGen.text.take(RAW_GEMMA_OUTPUT_CAPTURE_CHARS))
                                 .put("generateError", lastGen.error)
                                 .put("warmGenerateOk", warmGen.ok)
                                 .put("warmGenerateLatencyMs", warmGen.latencyMs)
@@ -595,5 +600,6 @@ class EdgeModelSmokeActivity : Activity() {
         const val DEFAULT_TTS_TEXT = "\u7ee7\u7eed\u6309\u538b"
         const val ASR_SAMPLE_RATE = 16_000
         const val BYTES_PER_SAMPLE = 2
+        const val RAW_GEMMA_OUTPUT_CAPTURE_CHARS = 2_000
     }
 }

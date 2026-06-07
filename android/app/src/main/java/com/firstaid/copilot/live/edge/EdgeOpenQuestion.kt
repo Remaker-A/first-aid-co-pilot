@@ -51,6 +51,7 @@ sealed interface OpenQuestionOutcome {
      */
     data class Fallback(
         val reason: String,
+        val answerText: String? = null,
         override val latencyMs: Long = 0L,
     ) : OpenQuestionOutcome
 }
@@ -157,6 +158,41 @@ object EdgeOpenQuestionPolicy {
 
     fun fallbackAnswer(stage: String?): String =
         if (isCprLiveStage(stage)) CPR_FALLBACK_TEXT else NON_CPR_FALLBACK_TEXT
+
+    fun fallbackAnswer(stage: String?, question: String?): String {
+        val compact = question?.replace(Regex("\\s+"), "").orEmpty()
+        if (compact.isBlank()) return fallbackAnswer(stage)
+        return when {
+            Regex("(为什么|为何|为啥|原因|突然|怎么会).*(倒下|晕倒|这样|不行)|倒下.*(为什么|为何|原因)")
+                .containsMatchIn(compact) ->
+                "先不要判断原因，继续按压，这是现在最能帮他的事。"
+            Regex("(旁边的人|别人|同伴|路人).*(做什么|帮|怎么帮|最好)|怎么.*(分工|帮忙)")
+                .containsMatchIn(compact) ->
+                "继续按压，让旁人拿 AED、开门，并准备和你换手。"
+            Regex("(家属|亲人|通知|告诉)")
+                .containsMatchIn(compact) ->
+                "先让旁人联系家属，你继续按压，别停下来解释。"
+            Regex("(AED|aed|除颤|电击)")
+                .containsMatchIn(compact) ->
+                "让旁人打开 AED 跟语音做；分析或电击时所有人离开。"
+            Regex("(救护车|急救员|急救人员|等待|还没到|留意|注意)")
+                .containsMatchIn(compact) ->
+                "继续按压，留意 AED 指令和是否恢复正常呼吸。"
+            Regex("(害怕|紧张|慌|按错|不准|位置)")
+                .containsMatchIn(compact) ->
+                "你做得对，手掌根在胸口中央，跟着节拍继续。"
+            Regex("(会不会|能不能).*(醒|救活|好)|醒过来|结果")
+                .containsMatchIn(compact) ->
+                "现在不能保证结果，但持续按压是在帮他维持血流。"
+            Regex("(累|没力|撑不住|换手)")
+                .containsMatchIn(compact) ->
+                "让旁人准备换手，换手要快，你先继续按压。"
+            Regex("(数|节拍|频率|多快)")
+                .containsMatchIn(compact) ->
+                "不用自己数，我会给节拍，你跟着用力快压。"
+            else -> fallbackAnswer(stage)
+        }
+    }
 
     fun ackMainText(stage: String?): String = if (isCprLiveStage(stage)) "继续按压" else "我在"
 

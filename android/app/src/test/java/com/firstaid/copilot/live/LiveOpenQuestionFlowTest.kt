@@ -133,6 +133,35 @@ class LiveOpenQuestionFlowTest {
     }
 
     @Test
+    fun localChannelDoesNotMirrorOpenQuestionIntoRuleFlow() = runTest {
+        val channel = OqFakeChannel(mirrorsEdgeOpenQuestionTurns = false)
+        val gate = CompletableDeferred<OpenQuestionOutcome>()
+        val viewModel = viewModel(channel) { gate.await() }
+        bringOnlineInCprLoop(channel)
+
+        viewModel.submitLiveText("旁边的人现在最好帮我做什么？")
+
+        assertEquals(OpenQuestionPhase.Ack, viewModel.uiState.value.openQuestionPhase)
+        assertEquals(EdgeOpenQuestionPolicy.CPR_ACK_TEXT, viewModel.uiState.value.ttsText)
+        assertTrue(channel.commits.isEmpty())
+
+        gate.complete(
+            OpenQuestionOutcome.Answer(
+                ttsText = "继续按压，让旁人拿 AED 并准备换手。",
+                mainText = "继续按压",
+                secondaryText = "旁人拿 AED",
+                intent = "answer_current_cpr_question",
+                tone = "calm_firm",
+                latencyMs = 140,
+            ),
+        )
+        advanceUntilIdle()
+
+        assertEquals(OpenQuestionPhase.Answer, viewModel.uiState.value.openQuestionPhase)
+        assertEquals("继续按压，让旁人拿 AED 并准备换手。", viewModel.uiState.value.ttsText)
+    }
+
+    @Test
     fun nonQuestionUsesNormalCommitWithoutOpenQuestion() = runTest {
         val channel = OqFakeChannel()
         val viewModel = viewModel(channel) { OpenQuestionOutcome.Fallback("unused") }
@@ -233,7 +262,9 @@ private class OqOfflineTransport : AgentTransport {
     override suspend fun health(): Boolean = false
 }
 
-private class OqFakeChannel : LiveAgentChannel {
+private class OqFakeChannel(
+    override val mirrorsEdgeOpenQuestionTurns: Boolean = true,
+) : LiveAgentChannel {
     private val eventFlow = MutableSharedFlow<LiveAgentEvent>(replay = 16, extraBufferCapacity = 16)
     override val events: Flow<LiveAgentEvent> = eventFlow
     val commits = mutableListOf<Pair<String, String?>>()
