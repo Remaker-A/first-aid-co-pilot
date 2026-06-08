@@ -17,13 +17,23 @@
 
 ## 离线 APK 安装包（测试用户看这里）
 
-给测试用户安装这个 APK。推荐从 GitHub Release 页面下载分片：
+给测试用户安装这个 APK。推荐直接从百度网盘下载完整安装包：
+
+```text
+文件名：app-debug.apk
+链接：https://pan.baidu.com/s/1mzdQtl8xNoeYLbIkD3Z7LA?pwd=hnew
+提取码：hnew
+```
+
+这是已经打好的**开箱即用离线大包**，约 **2.85 GiB**，随包内置 Gemma、离线 STT/TTS、MediaPipe Pose、预渲染 TTS 缓存和 Android 原生依赖。用户下载并安装这个 APK 后，不需要再单独推送模型目录，也不需要启动 Node 后端。
+
+如果百度网盘不可用，也可以从 GitHub Release 下载分片作为备用：
 
 ```text
 https://github.com/Remaker-A/first-aid-co-pilot/releases/tag/v0.1.0-offline-apk
 ```
 
-由于 GitHub 单文件限制为 2 GiB，离线 APK 按两个分片保存：
+由于 GitHub 单文件限制为 2 GiB，Release 里的离线 APK 按两个分片保存：
 
 ```text
 releases/firstaid-copilot-offline-debug-v0.1.0.apk.part001
@@ -35,8 +45,6 @@ releases/firstaid-copilot-offline-debug-v0.1.0.apk.part002
 ```bat
 copy /b releases\firstaid-copilot-offline-debug-v0.1.0.apk.part001+releases\firstaid-copilot-offline-debug-v0.1.0.apk.part002 firstaid-copilot-offline-debug-v0.1.0.apk
 ```
-
-这是已经打好的**开箱即用离线大包**，合并后约 **2.85 GiB**，随包内置 Gemma、离线 STT/TTS、MediaPipe Pose、预渲染 TTS 缓存和 Android 原生依赖。用户安装这个 APK 后，不需要再单独推送模型目录，也不需要启动 Node 后端。
 
 安装与首次启动注意事项：
 
