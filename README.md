@@ -17,7 +17,13 @@
 
 ## 离线 APK 安装包（测试用户看这里）
 
-给测试用户安装这个 APK。由于 GitHub LFS 单文件限制为 2 GiB，仓库里按两个分片保存：
+给测试用户安装这个 APK。推荐从 GitHub Release 页面下载分片：
+
+```text
+https://github.com/Remaker-A/first-aid-co-pilot/releases/tag/v0.1.0-offline-apk
+```
+
+由于 GitHub 单文件限制为 2 GiB，离线 APK 按两个分片保存：
 
 ```text
 releases/firstaid-copilot-offline-debug-v0.1.0.apk.part001
