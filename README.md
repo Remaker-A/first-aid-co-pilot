@@ -15,6 +15,34 @@
 
 ---
 
+## 离线 APK 安装包（测试用户看这里）
+
+给测试用户安装这个 APK。由于 GitHub LFS 单文件限制为 2 GiB，仓库里按两个分片保存：
+
+```text
+releases/firstaid-copilot-offline-debug-v0.1.0.apk.part001
+releases/firstaid-copilot-offline-debug-v0.1.0.apk.part002
+```
+
+把两个分片合并成 `firstaid-copilot-offline-debug-v0.1.0.apk` 后安装。Windows 示例：
+
+```bat
+copy /b releases\firstaid-copilot-offline-debug-v0.1.0.apk.part001+releases\firstaid-copilot-offline-debug-v0.1.0.apk.part002 firstaid-copilot-offline-debug-v0.1.0.apk
+```
+
+这是已经打好的**开箱即用离线大包**，合并后约 **2.85 GiB**，随包内置 Gemma、离线 STT/TTS、MediaPipe Pose、预渲染 TTS 缓存和 Android 原生依赖。用户安装这个 APK 后，不需要再单独推送模型目录，也不需要启动 Node 后端。
+
+安装与首次启动注意事项：
+
+- 手机建议预留至少 **6 GiB** 可用空间：安装包本身约 2.85 GiB，首次启动还会把模型解包到 App 私有模型目录。
+- 首次打开会显示“正在部署离线 AI 模型”的进度遮罩；模型部署完成后，下次启动会直接进入应用。
+- 这是 Debug 签名测试包，包名为 `com.firstaid.copilot.debug`。部分 vivo / OPPO / 小米等手机可能会弹出安全确认，需要手动选择“继续安装 / 允许”。
+- 完整 APK 校验文件：`releases/firstaid-copilot-offline-debug-v0.1.0.apk.sha256`。
+- 分片校验文件：`releases/firstaid-copilot-offline-debug-v0.1.0.apk.parts.sha256`。
+- APK 分片通过 Git LFS 管理；从 GitHub 下载时请确保拿到的是实际分片文件，不是 LFS 指针文本。
+
+---
+
 ## 一句话理解这个项目
 
 ```text
@@ -29,6 +57,7 @@ Execution    is Android-driven —— UI / 语音 / 节拍 / 工具调用由 And
 
 ## 目录
 
+- [离线 APK 安装包](#离线-apk-安装包测试用户看这里)
 - [它是什么 / 不是什么](#它是什么--不是什么)
 - [核心特性](#核心特性)
 - [系统架构](#系统架构)
