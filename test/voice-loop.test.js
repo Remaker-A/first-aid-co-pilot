@@ -373,6 +373,48 @@ test("CPR live quality question uses mock vision correction instead of repeating
   assert.equal(result.live_driver_proposal.responseType, "question_answer");
 });
 
+test("CPR live voice turn accepts action recognition frame and produces rule correction", async () => {
+  const service = createVoiceDemoService({
+    runtime: sameIntentRuntime(),
+    tts: { provider: "mock" },
+  });
+  const sessionId = "live_action_recognition_frame";
+  await advanceVoiceSessionToCpr(service, sessionId);
+
+  const result = await service.handleTurn({
+    sessionId,
+    text: "我按得对吗",
+    action_recognition_frame: {
+      timestamp_ms: 2200,
+      stage_hint: AgentStage.S7_CPR_LOOP,
+      chest_center: { x: 0.5, y: 0.52, visibility: 0.9 },
+      hand_center: { x: 0.39, y: 0.53, visibility: 0.88 },
+      torso_width: 0.38,
+      pose: {
+        confidence: 0.86,
+        landmarks: {
+          left_shoulder: { x: 0.42, y: 0.3, visibility: 0.9 },
+          left_elbow: { x: 0.43, y: 0.43, visibility: 0.9 },
+          left_wrist: { x: 0.39, y: 0.53, visibility: 0.9 },
+          right_shoulder: { x: 0.58, y: 0.3, visibility: 0.9 },
+          right_elbow: { x: 0.55, y: 0.43, visibility: 0.9 },
+          right_wrist: { x: 0.39, y: 0.53, visibility: 0.9 }
+        }
+      },
+      compression_timestamps_ms: [0, 652, 1304, 1956]
+    }
+  });
+
+  assert.equal(result.event.source, "vision_cpr");
+  assert.equal(result.event.event_type, "cpr_quality_update");
+  assert.equal(result.event.cpr_quality.hand_position, "left_offset");
+  assert.equal(result.event.cpr_quality.compression_rate_bpm, 92);
+  assert.equal(result.event.metadata.recognizer, "cpr_action_heuristic_v0.1");
+  assert.equal(result.response_type, "critical_correction");
+  assert.equal(result.guidance_source, "rule_feedback_critical");
+  assert.equal(result.guidance_action.intent, "correct_hand_position");
+});
+
 test("CPR live stop question is answered by fast path without waiting for Gemma", async () => {
   const service = createVoiceDemoService({
     runtime: neverResolvingRuntime(),

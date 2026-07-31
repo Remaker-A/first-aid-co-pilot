@@ -208,6 +208,8 @@ function readMetrics(state, event) {
     interruptionSeconds: firstNumber(
       eventQuality.interruption_seconds,
       eventQuality.last_interruption_seconds,
+      millisecondsToSeconds(eventQuality.interruption_ms),
+      millisecondsToSeconds(eventQuality.last_interruption_ms),
       cprState.last_interruption_seconds
     ) ?? 0,
     armBent: isArmBent(eventQuality, cprState),
@@ -318,6 +320,10 @@ function firstNumber(...values) {
     if (typeof value === "number" && Number.isFinite(value)) return value;
   }
   return null;
+}
+
+function millisecondsToSeconds(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value / 1000 : null;
 }
 
 function firstDefined(...values) {

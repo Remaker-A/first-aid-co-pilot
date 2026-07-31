@@ -4,6 +4,7 @@ import { GemmaRuntime } from "../gemma/runtime.js";
 import { createId } from "../domain/types.js";
 import { validateAction } from "../engine/actionValidator.js";
 import { AgentStage } from "../domain/stages.js";
+import { recognizeCprActionFrame } from "../perception/actionRecognition.js";
 import { transcribeInput } from "./stt.js";
 import { synthesizeSpeech } from "./tts.js";
 import {
@@ -423,22 +424,44 @@ function createSessionStartedEvent(sessionId, now) {
 }
 
 function createVoiceEvent({ sessionId, stt, input, now }) {
+  const timestamp = now();
+  const recognitionFrame =
+    input.actionRecognitionFrame ||
+    input.action_recognition_frame ||
+    input.actionRecognition ||
+    input.action_recognition ||
+    null;
+  const recognition = recognitionFrame
+    ? recognizeCprActionFrame(
+        {
+          ...recognitionFrame,
+          session_id: recognitionFrame.session_id ?? recognitionFrame.sessionId ?? sessionId,
+          timestamp: recognitionFrame.timestamp ?? timestamp,
+        },
+        {
+          sessionId,
+          mode: "demo_assisted",
+        },
+      )
+    : null;
   const inferredDeviceState = inferDeviceState(stt.intent);
   const inferredCprQuality = inferCprQuality(stt.intent);
-  const source = input.eventSource || input.event_source || inferEventSource(input);
+  const source = input.eventSource || input.event_source || recognition?.source || inferEventSource(input);
   const eventType =
     input.eventType ||
     input.event_type ||
+    recognition?.event_type ||
     inferEventType(input, stt.intent);
 
   return {
     schema_version: "perception_event.v0.1",
     event_id: createId("evt"),
     session_id: sessionId,
-    timestamp: now(),
+    timestamp,
     mode: "demo_assisted",
     source,
     event_type: eventType,
+    stage_hint: input.stageHint || input.stage_hint || recognition?.stage_hint || null,
     ttl_ms: input.ttlMs || input.ttl_ms || getVoiceEventTtlMs(),
     user_input: {
       stt_text: stt.transcript,
@@ -446,11 +469,12 @@ function createVoiceEvent({ sessionId, stt, input, now }) {
       confidence: stt.confidence,
     },
     patient_state: input.patientState || input.patient_state || null,
-    cpr_quality: input.cprQuality || input.cpr_quality || inferredCprQuality,
-    rescuer_state: input.rescuerState || input.rescuer_state || null,
+    cpr_quality: input.cprQuality || input.cpr_quality || recognition?.cpr_quality || inferredCprQuality,
+    rescuer_state: input.rescuerState || input.rescuer_state || recognition?.rescuer_state || null,
     device_state: input.deviceState || input.device_state || inferredDeviceState,
     tool_result: input.toolResult || input.tool_result || null,
     metadata: {
+      ...(recognition?.metadata || {}),
       ...(input.metadata || {}),
       audio: stt.audio,
     },

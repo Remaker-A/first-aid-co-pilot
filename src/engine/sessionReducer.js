@@ -411,6 +411,8 @@ function reduceCprQuality(next, event, timestamp) {
 
   if (hasOwn(quality, "started")) {
     next.cpr_state.started = quality.started === true;
+  } else if (hasOwn(quality, "compression_started")) {
+    next.cpr_state.started = quality.compression_started === true;
   } else if (hasOwn(quality, "compressions_started")) {
     next.cpr_state.started = quality.compressions_started === true;
   } else if (next.cpr_state.started !== true && event.event_type === "cpr_quality_update") {
@@ -433,7 +435,12 @@ function reduceCprQuality(next, event, timestamp) {
       (next.cpr_state.total_compressions ?? 0) + quality.compressions_delta;
   }
 
-  const rate = firstNumber(quality.compression_rate, quality.rate, quality.current_rate);
+  const rate = firstNumber(
+    quality.compression_rate,
+    quality.compression_rate_bpm,
+    quality.rate,
+    quality.current_rate,
+  );
   if (rate !== null) {
     next.cpr_state.current_rate = rate;
   }
@@ -451,6 +458,8 @@ function reduceCprQuality(next, event, timestamp) {
   const interruptionSeconds = firstNumber(
     quality.interruption_seconds,
     quality.last_interruption_seconds,
+    millisecondsToSeconds(quality.interruption_ms),
+    millisecondsToSeconds(quality.last_interruption_ms),
   );
   if (interruptionSeconds !== null) {
     next.cpr_state.last_interruption_seconds = interruptionSeconds;
@@ -722,6 +731,10 @@ function firstNumber(...values) {
     }
   }
   return null;
+}
+
+function millisecondsToSeconds(value) {
+  return isFiniteNumber(value) ? value / 1000 : null;
 }
 
 function numberOrNull(value) {
