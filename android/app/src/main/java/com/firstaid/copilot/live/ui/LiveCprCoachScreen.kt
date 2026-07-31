@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
+import android.util.Size
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -137,6 +139,7 @@ fun LiveCprCoachScreen(
     var gemmaDriver by remember { mutableStateOf<OnDeviceGemmaDriver?>(null) }
     var streamingAsrSession by remember { mutableStateOf<StreamingAsrSession?>(null) }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
+    val lastRmsLevelUiUpdateMs = remember { longArrayOf(0L) }
 
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -198,8 +201,12 @@ fun LiveCprCoachScreen(
         }
         audioCapture.start(
             onLevel = { level ->
-                mainHandler.post {
-                    rmsLevel = level.coerceIn(0f, 0.25f) / 0.25f
+                val nowMs = SystemClock.elapsedRealtime()
+                if (nowMs - lastRmsLevelUiUpdateMs[0] >= RMS_LEVEL_UI_INTERVAL_MS) {
+                    lastRmsLevelUiUpdateMs[0] = nowMs
+                    mainHandler.post {
+                        rmsLevel = level.coerceIn(0f, 0.25f) / 0.25f
+                    }
                 }
             },
             onPcmChunk = { pcm16 ->
@@ -271,21 +278,19 @@ fun LiveCprCoachScreen(
             }
 
             if (report.asrReady) {
-                val asrWarmup = asrSpeechEngine.prewarmAsr()
-                asrWarmSummary = if (asrWarmup.ok) {
-                    "ASRWarm=${asrWarmup.latencyMs}ms"
-                } else {
-                    "ASRWarm=error"
-                }
-                publishWarmSummary()
                 val session = withContext(Dispatchers.Default) {
                     buildSherpaStreamingAsrSession(context.applicationContext, numThreads = 2)
                 }
                 streamingAsrSession = session
-                asrWarmSummary += if (session.available) {
-                    " ASRStream=ready"
+                asrWarmSummary = if (session.available) {
+                    "ASRStream=ready"
                 } else {
-                    " ASRStream=error"
+                    val asrWarmup = asrSpeechEngine.prewarmAsr()
+                    if (asrWarmup.ok) {
+                        "ASRStream=error ASRWarm=${asrWarmup.latencyMs}ms"
+                    } else {
+                        "ASRStream=error ASRWarm=error"
+                    }
                 }
                 publishWarmSummary()
             }
@@ -785,6 +790,7 @@ private fun CameraPreviewSurface(
                     }
                     val analysis = analyzer?.let {
                         ImageAnalysis.Builder()
+                            .setTargetResolution(VISION_ANALYSIS_TARGET_SIZE)
                             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                             .build()
                             .also { imageAnalysis ->
@@ -1193,3 +1199,5 @@ private val ConnectionState.color: Color
     }
 
 private val recordingMicStates = setOf(MicState.Listening, MicState.Capturing, MicState.Uploading)
+private const val RMS_LEVEL_UI_INTERVAL_MS = 80L
+private val VISION_ANALYSIS_TARGET_SIZE = Size(640, 480)

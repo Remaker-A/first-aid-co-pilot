@@ -94,8 +94,7 @@ class WebSocketAgentChannel(
 
     private fun sendJson(json: JSONObject) {
         val sent = socket?.send(json.toString()) ?: false
-        Log.i(
-            TAG,
+        logVerbose(
             "Sent live JSON type=${json.optString("type")} ok=$sent " +
                 "payloadKeys=${json.optJSONObject("payload")?.names()?.toString().orEmpty()}",
         )
@@ -118,7 +117,7 @@ class WebSocketAgentChannel(
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
-            Log.i(TAG, "Received live text ${text.take(300)}")
+            logVerbose("Received live text ${text.take(300)}")
             runCatching { handleJson(JSONObject(text)) }
                 .onFailure {
                     Log.w(TAG, "Could not parse live event: ${it.message}", it)
@@ -127,7 +126,7 @@ class WebSocketAgentChannel(
         }
 
         override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-            Log.i(TAG, "Received live audio bytes=${bytes.size}")
+            logVerbose("Received live audio bytes=${bytes.size}")
             emit(LiveAgentEvent.AudioChunk(bytes.toByteArray()))
         }
 
@@ -225,9 +224,16 @@ class WebSocketAgentChannel(
     private fun JSONObject.booleanOrNull(key: String): Boolean? =
         if (has(key) && !isNull(key)) optBoolean(key) else null
 
+    private fun logVerbose(message: String) {
+        if (VERBOSE_LIVE_LOGS) {
+            Log.v(TAG, message)
+        }
+    }
+
     companion object {
         const val DEFAULT_WS_URL: String = "ws://127.0.0.1:8787/ws/live"
         private const val TAG = "WebSocketAgentChannel"
+        private const val VERBOSE_LIVE_LOGS = false
         private const val DEFAULT_AUDIO_FORMAT = "pcm16"
         private const val DEFAULT_AUDIO_SAMPLE_RATE = 16_000
         private const val DEFAULT_AUDIO_CHANNELS = 1

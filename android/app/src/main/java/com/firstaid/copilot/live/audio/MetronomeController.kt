@@ -564,7 +564,7 @@ class LiveAudioCapture {
         private const val BARGE_IN_RMS_THRESHOLD = 0.08f
         private const val BARGE_IN_SPEECH_MS = 320
         private const val MIN_UTTERANCE_MS = 250
-        private const val COMMIT_SILENCE_MS = 650
+        private const val COMMIT_SILENCE_MS = 500
         private const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
         private const val PCM_FORMAT = AudioFormat.ENCODING_PCM_16BIT
     }
