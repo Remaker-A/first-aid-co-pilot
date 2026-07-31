@@ -10,6 +10,47 @@ Execution is Android-driven.
 
 Android adapters consume `GuidanceAction` and execute UI, TTS, haptic, tool, and log delivery. They must not infer medical stages, rewrite the medical flow, or bypass Agent validation.
 
+## Camera Input
+
+The debug app now includes a CameraX-backed camera input panel in `MainActivity`. It requests `CAMERA` permission, binds the back camera to a live preview, and records device-state style status lines such as:
+
+```json
+{
+  "source": "device",
+  "event_type": "device_state_update",
+  "device_state": {
+    "camera_available": true,
+    "camera_permission": "granted",
+    "camera_facing": "back",
+    "camera_preview_active": true,
+    "camera_stream_status": "previewing"
+  }
+}
+```
+
+The same CameraX binding also attaches an `ImageAnalysis` analyzer that emits a low-level `camera_frame_signal` about frame usability:
+
+```json
+{
+  "camera_frame_signal": {
+    "frame_id": "android_frame_42",
+    "width": 1280,
+    "height": 720,
+    "rotation_degrees": 90,
+    "brightness": 126.4,
+    "brightness_label": "usable",
+    "motion_score": 21,
+    "motion_label": "high_motion",
+    "camera_facing": "back",
+    "recognition_status": "frame_signal_only"
+  }
+}
+```
+
+This is the first recognition ingress, not medical recognition itself. It does not perform patient, CPR, or rescuer recognition, and it must not write recognition-derived `patient_state`, `cpr_quality`, or `rescuer_state` facts until the perception model is explicitly integrated.
+
+Android owns the same payload shape in `com.firstaid.copilot.perception.CameraPerceptionBridge`. The bridge converts camera permission/preview state and frame signals into `perception_event.v0.1` JSON that can be handed to a local Agent runtime, HTTP bridge, WebSocket bridge, or offline event queue without changing the camera analyzer.
+
 ## Local Toolchain
 
 Current local install root:

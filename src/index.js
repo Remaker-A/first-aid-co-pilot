@@ -14,6 +14,7 @@ export * from "./gemma/promptBuilder.js";
 export * from "./gemma/responseParser.js";
 export * from "./gemma/runtime.js";
 export * from "./knowledge/knowledgeBase.js";
+export * from "./perception/cameraFrameSignal.js";
 export * from "./dispatch/index.js";
 export * from "./report/handoverReportGenerator.js";
 export * from "./report/callBrief.js";

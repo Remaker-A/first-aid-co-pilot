@@ -50,6 +50,11 @@ export function createInitialSessionState(overrides = {}) {
         emergency_call_status: "not_started",
         gps_attached: false,
         gps_available: null,
+        camera_available: null,
+        camera_permission: null,
+        camera_facing: null,
+        camera_preview_active: false,
+        camera_stream_status: null,
         recording_status: "not_started",
         handover_generated: false,
         network: null,
@@ -349,6 +354,26 @@ function reduceDeviceState(next, event) {
 
   if (hasOwn(device, "gps_attached")) {
     next.tool_state.gps_attached = device.gps_attached;
+  }
+
+  if (hasOwn(device, "camera_available")) {
+    next.tool_state.camera_available = device.camera_available;
+  }
+
+  if (hasOwn(device, "camera_permission")) {
+    next.tool_state.camera_permission = device.camera_permission;
+  }
+
+  if (hasOwn(device, "camera_facing")) {
+    next.tool_state.camera_facing = device.camera_facing;
+  }
+
+  if (hasOwn(device, "camera_preview_active")) {
+    next.tool_state.camera_preview_active = device.camera_preview_active === true;
+  }
+
+  if (hasOwn(device, "camera_stream_status")) {
+    next.tool_state.camera_stream_status = device.camera_stream_status;
   }
 
   const location = normalizeLocation(device.location ?? device.gps_location);

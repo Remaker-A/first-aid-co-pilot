@@ -4,10 +4,13 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
   AgentStage,
+  cameraFrameSignalToPerceptionEvent,
+  createPerceptionEvent,
   decideCprStart,
   getKnowledgeVersion,
   isIntentAllowed,
   normalizeAllowedIntents,
+  reduceSessionEvent,
   runDemoPipeline,
   validateAction
 } from "../src/index.js";
@@ -131,6 +134,56 @@ test("monitor branches can call emergency services without CPR diagnosis", () =>
 
     assert.equal(validation.ok, true, `${stage} should allow emergency_call`);
   }
+});
+
+test("device camera status is tracked without creating recognition facts", () => {
+  const state = reduceSessionEvent(undefined, createPerceptionEvent({
+    sessionId: "sess_camera_ready",
+    source: "device",
+    eventType: "device_state_update",
+    deviceState: {
+      camera_available: true,
+      camera_permission: "granted",
+      camera_facing: "back",
+      camera_preview_active: true,
+      camera_stream_status: "previewing",
+    },
+  }));
+
+  assert.equal(state.tool_state.camera_available, true);
+  assert.equal(state.tool_state.camera_permission, "granted");
+  assert.equal(state.tool_state.camera_facing, "back");
+  assert.equal(state.tool_state.camera_preview_active, true);
+  assert.equal(state.tool_state.camera_stream_status, "previewing");
+  assert.equal(state.confirmed_facts.responsive, null);
+  assert.equal(state.confirmed_facts.normal_breathing, null);
+  assert.equal(state.cpr_state.quality_score, null);
+});
+
+test("camera frame signal adapter emits device readiness only", () => {
+  const event = cameraFrameSignalToPerceptionEvent({
+    sessionId: "sess_camera_frame",
+    cameraFrameSignal: {
+      frameId: "frame_001",
+      width: 1280,
+      height: 720,
+      rotationDegrees: 90,
+      brightness: 126.4,
+      motionScore: 21,
+    },
+  });
+  const state = reduceSessionEvent(undefined, event);
+
+  assert.equal(event.source, "device");
+  assert.equal(event.event_type, "device_state_update");
+  assert.equal(event.patient_state, null);
+  assert.equal(event.cpr_quality, null);
+  assert.equal(event.rescuer_state, null);
+  assert.equal(event.metadata.camera_frame_signal.brightness_label, "usable");
+  assert.equal(event.metadata.camera_frame_signal.motion_label, "high_motion");
+  assert.equal(state.tool_state.camera_stream_status, "analyzing");
+  assert.equal(state.confirmed_facts.responsive, null);
+  assert.equal(state.cpr_state.quality_score, null);
 });
 
 test("responsive handover report does not claim suspected cardiac arrest", () => {

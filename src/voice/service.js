@@ -4,6 +4,7 @@ import { GemmaRuntime } from "../gemma/runtime.js";
 import { createId } from "../domain/types.js";
 import { validateAction } from "../engine/actionValidator.js";
 import { AgentStage } from "../domain/stages.js";
+import { normalizeCameraFrameSignal } from "../perception/cameraFrameSignal.js";
 import { transcribeInput } from "./stt.js";
 import { synthesizeSpeech } from "./tts.js";
 import {
@@ -425,11 +426,17 @@ function createSessionStartedEvent(sessionId, now) {
 function createVoiceEvent({ sessionId, stt, input, now }) {
   const inferredDeviceState = inferDeviceState(stt.intent);
   const inferredCprQuality = inferCprQuality(stt.intent);
+  const cameraFrameSignal = getCameraFrameSignal(input);
   const source = input.eventSource || input.event_source || inferEventSource(input);
   const eventType =
     input.eventType ||
     input.event_type ||
     inferEventType(input, stt.intent);
+  const inputDeviceState = input.deviceState || input.device_state || null;
+  const deviceState = mergeDeviceState(
+    inputDeviceState || inferredDeviceState,
+    cameraFrameSignal,
+  );
 
   return {
     schema_version: "perception_event.v0.1",
@@ -448,11 +455,12 @@ function createVoiceEvent({ sessionId, stt, input, now }) {
     patient_state: input.patientState || input.patient_state || null,
     cpr_quality: input.cprQuality || input.cpr_quality || inferredCprQuality,
     rescuer_state: input.rescuerState || input.rescuer_state || null,
-    device_state: input.deviceState || input.device_state || inferredDeviceState,
+    device_state: deviceState,
     tool_result: input.toolResult || input.tool_result || null,
     metadata: {
       ...(input.metadata || {}),
       audio: stt.audio,
+      ...(cameraFrameSignal ? { camera_frame_signal: cameraFrameSignal } : {}),
     },
   };
 }
@@ -490,6 +498,9 @@ function inferCprQuality(intent) {
 }
 
 function inferEventSource(input = {}) {
+  if (hasCameraFrameSignal(input)) {
+    return "device";
+  }
   if (input.cprQuality || input.cpr_quality) {
     return "vision_cpr";
   }
@@ -506,6 +517,9 @@ function inferEventSource(input = {}) {
 }
 
 function inferEventType(input = {}, intent) {
+  if (hasCameraFrameSignal(input)) {
+    return "device_state_update";
+  }
   if (input.toolResult || input.tool_result) {
     return "tool_result";
   }
@@ -542,4 +556,33 @@ function inferEventType(input = {}, intent) {
     return "device_state_update";
   }
   return "user_response";
+}
+
+function getCameraFrameSignal(input = {}) {
+  const raw =
+    input.cameraFrameSignal ||
+    input.camera_frame_signal ||
+    input.cameraFrame ||
+    input.camera_frame;
+
+  return raw && typeof raw === "object" ? normalizeCameraFrameSignal(raw) : null;
+}
+
+function hasCameraFrameSignal(input = {}) {
+  return Boolean(getCameraFrameSignal(input));
+}
+
+function mergeDeviceState(base, cameraFrameSignal) {
+  if (!cameraFrameSignal) {
+    return base ?? null;
+  }
+
+  return {
+    ...(base ?? {}),
+    camera_available: true,
+    camera_permission: base?.camera_permission ?? "granted",
+    camera_facing: cameraFrameSignal.camera_facing,
+    camera_preview_active: true,
+    camera_stream_status: "analyzing",
+  };
 }

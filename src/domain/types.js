@@ -172,6 +172,11 @@ export function createInitialSessionState(options = {}) {
       emergency_call_status:
         options.emergencyCallStatus ?? EmergencyCallStatus.NOT_STARTED,
       gps_attached: options.gpsAttached ?? false,
+      camera_available: options.cameraAvailable ?? null,
+      camera_permission: options.cameraPermission ?? null,
+      camera_facing: options.cameraFacing ?? null,
+      camera_preview_active: options.cameraPreviewActive ?? false,
+      camera_stream_status: options.cameraStreamStatus ?? null,
       recording_status: options.recordingStatus ?? RecordingStatus.NOT_STARTED,
       handover_generated: false,
     },

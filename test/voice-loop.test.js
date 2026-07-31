@@ -209,6 +209,41 @@ test("voice service can carry mock vision facts alongside spoken input", async (
   assert.equal(result.state.confirmed_facts.responsive_source, "vision_patient");
 });
 
+test("voice service accepts camera frame signals without inventing recognition facts", async () => {
+  const service = createVoiceDemoService({
+    runtime: {
+      async generatePatch() {
+        throw new Error("Gemma should be skipped for pure camera frame signals");
+      }
+    },
+    tts: { provider: "mock" },
+    now: () => new Date().toISOString()
+  });
+
+  const result = await service.handleTurn({
+    sessionId: "sess_voice_service_camera_frame",
+    cameraFrameSignal: {
+      frameId: "android_frame_001",
+      width: 640,
+      height: 480,
+      brightness: 30,
+      motionScore: 2,
+      cameraFacing: "back"
+    }
+  });
+
+  assert.equal(result.event.source, "device");
+  assert.equal(result.event.event_type, "device_state_update");
+  assert.equal(result.event.device_state.camera_stream_status, "analyzing");
+  assert.equal(result.event.metadata.camera_frame_signal.brightness_label, "too_dark");
+  assert.equal(result.event.metadata.camera_frame_signal.motion_label, "stable");
+  assert.equal(result.state.tool_state.camera_preview_active, true);
+  assert.equal(result.state.confirmed_facts.responsive, null);
+  assert.equal(result.state.confirmed_facts.normal_breathing, null);
+  assert.equal(result.state.cpr_state.quality_score, null);
+  assert.equal(result.gemma.skipped, true);
+});
+
 test("voice service keeps pure mock vision turns state-machine driven when Gemma changes intent", async () => {
   const service = createVoiceDemoService({
     runtime: {
