@@ -26,6 +26,13 @@ test("inferIntent recognizes common zh-CN emergency call confirmations", () => {
   assert.equal(inferIntent("急救电话打通了"), "emergency_called");
 });
 
+test("inferIntent recognizes spoken scene safety confirmations without mistaking danger", () => {
+  assert.equal(inferIntent("周围是安全的，可以继续"), "scene_safe");
+  assert.equal(inferIntent("安全的安全的，我们来看一下什么情况吧"), "scene_safe");
+  assert.equal(inferIntent("周围没有危险，我可以靠近他"), "scene_safe");
+  assert.equal(inferIntent("周围不安全，别靠近"), "scene_unsafe");
+});
+
 test("inferIntent recognizes common zh-CN handover arrival phrases", () => {
   assert.equal(inferIntent("救护车到了"), "paramedics_arrived");
   assert.equal(inferIntent("救货车到了。"), "paramedics_arrived");

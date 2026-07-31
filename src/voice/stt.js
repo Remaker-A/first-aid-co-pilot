@@ -23,12 +23,12 @@ const RECOMMENDED_STT_URL =
 
 const INTENT_RULES = [
   {
-    intent: "scene_safe",
-    pattern: /(scene\s+safe|safe now|现场.*安全|安全了|可以靠近)/i,
+    intent: "scene_unsafe",
+    pattern: /(unsafe|danger|(?<!没)(?<!没有)(?<!无)危险|不安全|别靠近)/i,
   },
   {
-    intent: "scene_unsafe",
-    pattern: /(unsafe|danger|危险|不安全|别靠近)/i,
+    intent: "scene_safe",
+    pattern: /(scene\s+safe|safe now|(?:现场|周围|环境|这里|那边)?(?:是|已经|现在)?安全(?:了|的)?|没(?:有)?危险|无危险|可以(?:靠近|继续))/i,
   },
   {
     intent: "patient_unresponsive",

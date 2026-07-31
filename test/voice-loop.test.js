@@ -178,6 +178,37 @@ test("voice service sends Gemma patch through ActionValidator before TTS", async
   assert.equal(typeof result.timings.total_ms, "number");
 });
 
+test("voice service advances after spoken scene safety confirmation without mock metadata", async () => {
+  const service = createVoiceDemoService({
+    runtime: {
+      async generatePatch(frame) {
+        assert.equal(frame.user_input.intent_hint, "scene_safe");
+        assert.ok(frame.allowed_intents.includes("ask_response_check"));
+        return {
+          ok: true,
+          patch: VALID_ASK_RESPONSE_PATCH,
+          violations: []
+        };
+      }
+    },
+    tts: { provider: "mock" },
+    now: () => new Date().toISOString()
+  });
+
+  const result = await service.handleTurn({
+    sessionId: "sess_voice_service_scene_safe_spoken",
+    text: "周围是安全的，可以继续"
+  });
+
+  assert.equal(result.stt.intent, "scene_safe");
+  assert.equal(result.event.user_input.intent, "scene_safe");
+  assert.equal(result.state.scope.scene_safe, true);
+  assert.equal(result.state.current_stage, AgentStage.S2_CHECK_RESPONSE);
+  assert.equal(result.state_action.intent, "ask_response_check");
+  assert.equal(result.guidance_action.intent, "ask_response_check");
+  assert.doesNotMatch(result.guidance_action.tts.text, /确认周围安全/);
+});
+
 test("voice service can carry mock vision facts alongside spoken input", async () => {
   const service = createVoiceDemoService({
     runtime: {
