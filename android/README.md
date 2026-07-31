@@ -56,6 +56,35 @@ The debug APK is generated at `android/app/build/outputs/apk/debug/app-debug.apk
 
 Local setup success does not change safety behavior: Demo builds must not automatically dial real 120, sharing or deletion still requires explicit user confirmation, and mock-only passes are not strict real readiness.
 
+## Live CPR Coach
+
+The launcher activity now opens the full-screen Compose Live CPR Coach. It uses
+a camera-like mock preview and posts turns to the Node voice service; it does
+not own medical stage transitions.
+
+Default emulator endpoint:
+
+```text
+http://10.0.2.2:8787
+```
+
+For a physical-device LAN demo, open the Demo drawer in the app and replace the
+endpoint with the host machine URL, for example:
+
+```text
+http://192.168.1.23:8787
+```
+
+Run the bridge service from the repository root:
+
+```powershell
+npm run voice:serve
+```
+
+The Demo drawer mirrors the Node mock sequence: scene safe, unresponsive, no
+normal breathing, 120 started, CPR ready, CPR started, hand left, rate low, arm
+bent, interrupted, quality good, AED arrived, and EMS arrived.
+
 ## Fixtures
 
 GuidanceAction fixtures live in:

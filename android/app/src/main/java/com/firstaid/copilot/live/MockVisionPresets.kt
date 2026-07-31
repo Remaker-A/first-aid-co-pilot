@@ -1,0 +1,260 @@
+package com.firstaid.copilot.live
+
+object MockVisionPresets {
+    private val patientBase = mapOf(
+        "adult_likely" to true,
+        "lying_down" to true,
+    )
+
+    val all: List<MockVisionPreset> = listOf(
+        MockVisionPreset.none,
+        MockVisionPreset(
+            id = "scene_safe",
+            label = "Scene safe",
+            summary = "vision_patient scene_safe=true",
+            setupText = "现场安全了",
+            setupStep = true,
+            payload = mapOf(
+                "eventSource" to "vision_patient",
+                "eventType" to "patient_state_update",
+                "patientState" to patientBase + mapOf(
+                    "responsive" to null,
+                    "normal_breathing" to null,
+                    "agonal_breathing" to null,
+                    "chest_movement" to "unknown",
+                    "confidence" to 0.86,
+                ),
+                "metadata" to mapOf("scene_safe" to true, "scene_note" to "android_scene_safe"),
+            ),
+        ),
+        MockVisionPreset(
+            id = "unresponsive",
+            label = "No response",
+            summary = "vision_patient responsive=false",
+            setupText = "他没有反应",
+            setupStep = true,
+            payload = mapOf(
+                "eventSource" to "vision_patient",
+                "eventType" to "patient_state_update",
+                "patientState" to patientBase + mapOf(
+                    "responsive" to false,
+                    "normal_breathing" to null,
+                    "agonal_breathing" to null,
+                    "chest_movement" to "unknown",
+                    "confidence" to 0.91,
+                ),
+                "metadata" to mapOf("scene_note" to "android_unresponsive"),
+            ),
+        ),
+        MockVisionPreset(
+            id = "no_breathing",
+            label = "No normal breathing",
+            summary = "vision_patient normal_breathing=false",
+            setupText = "没有正常呼吸",
+            setupStep = true,
+            payload = mapOf(
+                "eventSource" to "vision_patient",
+                "eventType" to "breathing_update",
+                "patientState" to patientBase + mapOf(
+                    "responsive" to false,
+                    "normal_breathing" to false,
+                    "agonal_breathing" to true,
+                    "chest_movement" to "irregular",
+                    "confidence" to 0.9,
+                ),
+                "metadata" to mapOf("scene_note" to "android_no_normal_breathing"),
+            ),
+        ),
+        MockVisionPreset(
+            id = "call_started",
+            label = "120 started",
+            summary = "device emergency_call_started=true",
+            setupText = "120 已经拨打",
+            setupStep = true,
+            payload = mapOf(
+                "eventSource" to "device",
+                "eventType" to "device_state_update",
+                "deviceState" to mapOf(
+                    "emergency_call_started" to true,
+                    "emergency_call_status" to "started",
+                    "gps_attached" to true,
+                    "recording" to true,
+                    "network" to "offline",
+                ),
+                "metadata" to mapOf("scene_note" to "android_call_started"),
+            ),
+        ),
+        MockVisionPreset(
+            id = "cpr_ready",
+            label = "CPR ready",
+            summary = "vision_patient ready for compressions",
+            setupText = "准备好了",
+            setupStep = true,
+            payload = mapOf(
+                "eventSource" to "vision_patient",
+                "eventType" to "patient_state_update",
+                "patientState" to patientBase + mapOf(
+                    "responsive" to false,
+                    "normal_breathing" to false,
+                    "agonal_breathing" to true,
+                    "chest_movement" to "irregular",
+                    "confidence" to 0.89,
+                ),
+                "metadata" to mapOf("scene_note" to "android_cpr_ready"),
+            ),
+        ),
+        MockVisionPreset(
+            id = "cpr_start",
+            label = "CPR started",
+            summary = "vision_cpr quality_score=35",
+            setupText = "开始按压",
+            setupStep = true,
+            payload = cprPayload(
+                rate = 100,
+                averageRate = 100,
+                score = 35,
+                hand = "center",
+                arm = "straight",
+                interruptions = 0,
+                total = 10,
+                started = true,
+            ),
+        ),
+        MockVisionPreset(
+            id = "hand_left",
+            label = "Hand left",
+            summary = "vision_cpr hand_position=left",
+            requiresCprLoop = true,
+            payload = cprPayload(
+                rate = 110,
+                averageRate = 105,
+                score = 42,
+                hand = "left",
+                arm = "straight",
+                interruptions = 0,
+                total = 40,
+                started = true,
+            ),
+        ),
+        MockVisionPreset(
+            id = "rate_low",
+            label = "Rate low",
+            summary = "vision_cpr current_rate=82",
+            requiresCprLoop = true,
+            payload = cprPayload(
+                rate = 82,
+                averageRate = 95,
+                score = 50,
+                hand = "center",
+                arm = "straight",
+                interruptions = 0,
+                total = 70,
+                started = true,
+            ),
+        ),
+        MockVisionPreset(
+            id = "arm_bent",
+            label = "Arm bent",
+            summary = "vision_cpr arm_posture=bent",
+            requiresCprLoop = true,
+            payload = cprPayload(
+                rate = 112,
+                averageRate = 102,
+                score = 58,
+                hand = "center",
+                arm = "bent",
+                interruptions = 0,
+                total = 100,
+                started = true,
+            ),
+        ),
+        MockVisionPreset(
+            id = "interrupted",
+            label = "Interrupted",
+            summary = "vision_cpr interruption_seconds=4",
+            requiresCprLoop = true,
+            payload = cprPayload(
+                rate = 0,
+                averageRate = 100,
+                score = 55,
+                hand = "center",
+                arm = "straight",
+                interruptions = 4,
+                total = 120,
+                started = false,
+            ),
+        ),
+        MockVisionPreset(
+            id = "quality_good",
+            label = "Quality good",
+            summary = "vision_cpr quality_score=90",
+            requiresCprLoop = true,
+            payload = cprPayload(
+                rate = 110,
+                averageRate = 109,
+                score = 90,
+                hand = "center",
+                arm = "straight",
+                interruptions = 0,
+                total = 240,
+                started = true,
+            ),
+        ),
+        MockVisionPreset(
+            id = "aed_arrived",
+            label = "AED arrived",
+            summary = "vision_patient aed_available=true",
+            requiresCprLoop = true,
+            payload = mapOf(
+                "eventSource" to "vision_patient",
+                "eventType" to "patient_state_update",
+                "metadata" to mapOf(
+                    "aed_available" to true,
+                    "helper_arrived" to true,
+                    "scene_note" to "android_aed_arrived",
+                ),
+            ),
+        ),
+        MockVisionPreset(
+            id = "ems_arrived",
+            label = "EMS arrived",
+            summary = "vision_patient handover_requested",
+            payload = mapOf(
+                "eventSource" to "vision_patient",
+                "eventType" to "handover_requested",
+                "metadata" to mapOf(
+                    "ems_arrived" to true,
+                    "scene_note" to "android_ems_arrived",
+                ),
+            ),
+        ),
+    )
+
+    val cprSetupSequence: List<MockVisionPreset> = all.filter { it.setupStep }
+
+    fun byId(id: String): MockVisionPreset = all.firstOrNull { it.id == id } ?: MockVisionPreset.none
+
+    private fun cprPayload(
+        rate: Int,
+        averageRate: Int,
+        score: Int,
+        hand: String,
+        arm: String,
+        interruptions: Int,
+        total: Int,
+        started: Boolean,
+    ): Map<String, Any?> = mapOf(
+        "eventSource" to "vision_cpr",
+        "eventType" to "cpr_quality_update",
+        "cprQuality" to mapOf(
+            "compressions_started" to started,
+            "current_rate" to rate,
+            "average_rate" to averageRate,
+            "quality_score" to score,
+            "hand_position" to hand,
+            "arm_posture" to arm,
+            "interruption_seconds" to interruptions,
+            "total_compressions" to total,
+        ),
+    )
+}
