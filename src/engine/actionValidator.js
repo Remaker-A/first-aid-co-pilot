@@ -63,6 +63,7 @@ const DEFAULT_ALLOWED_TOOL_TYPES_BY_STAGE = Object.freeze({
   S9_HANDOVER: [
     "stop_haptic_metronome",
     "generate_handover_report",
+    "generate_practice_debrief",
     "request_share_report",
     "request_share_video",
     "share_report",
