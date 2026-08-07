@@ -17,6 +17,7 @@ export function createInitialSessionState(overrides = {}) {
     {
       session_id: overrides.session_id ?? null,
       mode: overrides.mode ?? "demo_assisted",
+      session_mode: overrides.session_mode ?? overrides.sessionMode ?? "emergency",
       current_stage: STAGES.S0_INIT,
       previous_stage: null,
       started_at: timestamp,
@@ -123,6 +124,7 @@ export function sessionReducer(state, event) {
   const next = cloneSessionState(base);
   next.session_id = next.session_id ?? event.session_id ?? null;
   next.mode = event.mode ?? next.mode;
+  next.session_mode = event.session_mode ?? event.sessionMode ?? next.session_mode ?? "emergency";
   next.started_at = next.started_at ?? timestamp;
   next.updated_at = timestamp;
 

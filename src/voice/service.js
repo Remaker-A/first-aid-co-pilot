@@ -3,7 +3,7 @@ import { createDecisionFrame, SPECIAL_GEMMA_INTENTS } from "../gemma/decisionFra
 import { GemmaRuntime } from "../gemma/runtime.js";
 import { OPEN_QUESTION_GEMMA_SYSTEM_PROMPT_FILE } from "../gemma/promptBuilder.js";
 import { createNluGovernor } from "../gemma/nluCache.js";
-import { createId } from "../domain/types.js";
+import { SessionMode, createId } from "../domain/types.js";
 import { validateAction } from "../engine/actionValidator.js";
 import {
   guidanceSourceRank,
@@ -98,6 +98,7 @@ export function createVoiceDemoService(options = {}) {
       const timings = {};
       const sessionId = input.sessionId || input.session_id || createId("voice_sess");
       const session = getOrCreateSession(sessions, sessionId, now);
+      applySessionModeInput(session, input);
       const stt = await timed(timings, "stt_ms", () => transcribeInput(input, options.stt || {}));
       const guidance = await runVoiceGuidanceCore({
         sessionId,
@@ -162,6 +163,7 @@ export function createVoiceDemoService(options = {}) {
     async createGuidance(input = {}, stt, timings = {}) {
       const sessionId = input.sessionId || input.session_id || createId("voice_sess");
       const session = getOrCreateSession(sessions, sessionId, now);
+      applySessionModeInput(session, input);
       const resolvedStt = stt || await timed(timings, "stt_ms", () => transcribeInput(input, options.stt || {}));
       const guidance = await runVoiceGuidanceCore({
         sessionId,
@@ -244,6 +246,7 @@ export async function runVoiceGuidanceCore({
   const pipeline = await timed(timings, "agent_pipeline_ms", () => runAgentPipeline({
     events: session.events,
     mode: "demo_assisted",
+    sessionMode: session.sessionMode,
     sessionId,
     now,
     useGemma: false,
@@ -1750,6 +1753,7 @@ function getOrCreateSession(sessions, sessionId, now) {
     session = {
       sessionId,
       createdAt: now(),
+      sessionMode: SessionMode.EMERGENCY,
       events: [createSessionStartedEvent(sessionId, now)],
       lastResponse: null,
       openQuestionCache: new Map(),
@@ -1758,6 +1762,31 @@ function getOrCreateSession(sessions, sessionId, now) {
   }
 
   return session;
+}
+
+function applySessionModeInput(session, input = {}) {
+  const requested = normalizeSessionMode(
+    input.sessionMode ??
+    input.session_mode ??
+    input.sessionState?.session_mode ??
+    input.session_state?.session_mode ??
+    null
+  );
+  if (requested) {
+    session.sessionMode = requested;
+  } else if (!session.sessionMode) {
+    session.sessionMode = SessionMode.EMERGENCY;
+  }
+}
+
+function normalizeSessionMode(value) {
+  if (value === SessionMode.PRACTICE) {
+    return SessionMode.PRACTICE;
+  }
+  if (value === SessionMode.EMERGENCY) {
+    return SessionMode.EMERGENCY;
+  }
+  return null;
 }
 
 function createSessionStartedEvent(sessionId, now) {
