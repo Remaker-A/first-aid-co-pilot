@@ -446,6 +446,12 @@ function reduceToolResult(next, event) {
   if (toolType === "generate_handover_report") {
     next.tool_state.handover_generated = status !== "failed";
   }
+
+  // 演练复盘复用 handover_generated 标志：状态机的 isHandoverReportGenerated 检查
+  // 因此在 practice 模式下同样成立，S9 收到回传后才切到"展示复盘"。
+  if (toolType === "generate_practice_debrief") {
+    next.tool_state.handover_generated = status !== "failed";
+  }
 }
 
 function reduceCprQuality(next, event, timestamp) {
