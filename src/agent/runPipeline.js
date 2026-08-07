@@ -113,11 +113,18 @@ async function stepAgentTurnWithGemma({ nextState, candidate, event, runtime, se
 function runAgentPipelineSync({
   events = [],
   mode = "demo_replay",
+  sessionMode,
+  session_mode,
   sessionId = "sess_demo_001",
   now = defaultNow
 } = {}) {
   const log = createSessionLog({ sessionId });
-  let state = createInitialSessionState({ sessionId, mode, now });
+  let state = createInitialSessionState({
+    sessionId,
+    mode,
+    sessionMode: sessionMode ?? session_mode,
+    now,
+  });
   const actions = [];
 
   for (const event of events) {
@@ -150,6 +157,8 @@ function runAgentPipelineSync({
 export async function runAgentPipelineWithGemma({
   events = [],
   mode = "demo_assisted",
+  sessionMode,
+  session_mode,
   sessionId = "sess_demo_001",
   now = defaultNow,
   gemmaRuntime,
@@ -157,7 +166,12 @@ export async function runAgentPipelineWithGemma({
 } = {}) {
   const runtime = gemmaRuntime || new GemmaRuntime(gemma || {});
   const log = createSessionLog({ sessionId });
-  let state = createInitialSessionState({ sessionId, mode, now });
+  let state = createInitialSessionState({
+    sessionId,
+    mode,
+    sessionMode: sessionMode ?? session_mode,
+    now,
+  });
   const actions = [];
   const guidance = [];
 
@@ -398,6 +412,8 @@ function applyTransition(state, transition, now) {
 export function runDemoPipeline({
   script,
   mode = "demo_replay",
+  sessionMode,
+  session_mode,
   sessionId = "sess_demo_001",
   now,
   useGemma = false,
@@ -408,6 +424,7 @@ export function runDemoPipeline({
   return runAgentPipeline({
     events: player.events(),
     mode,
+    sessionMode: sessionMode ?? session_mode,
     sessionId,
     now,
     useGemma,

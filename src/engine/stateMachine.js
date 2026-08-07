@@ -1,5 +1,6 @@
 import { AgentStage } from "../domain/stages.js";
 import { createGuidanceAction } from "../domain/actionFactories.js";
+import { SessionMode } from "../domain/types.js";
 import { CprStartDecision, decideCprStart, getCprStartReasonCodes } from "./cprStartRule.js";
 import { isActionableCprQualityEvent } from "./cprEventGuards.js";
 import { createRuleFeedbackAction } from "./ruleFeedbackEngine.js";
@@ -70,6 +71,9 @@ export function getNextStage(state = {}, event = null, decision = decideCprStart
         ? AgentStage.S5_CALL_EMERGENCY
         : currentStage;
     case AgentStage.S5_CALL_EMERGENCY:
+      if (state.session_mode === SessionMode.PRACTICE) {
+        return AgentStage.S6_CPR_READY;
+      }
       return isEmergencyCallStarted(toolState, event) ? AgentStage.S6_CPR_READY : currentStage;
     case AgentStage.S6_CPR_READY:
       return state.cpr_state?.started === true || isActionableCprQualityEvent(event)
@@ -249,6 +253,30 @@ function buildStateAction(state, currentStage, nextStage, decision, event) {
         logEvent: { type: "suspected_cardiac_arrest", detail: "unresponsive_and_no_normal_breathing" },
       });
     case AgentStage.S5_CALL_EMERGENCY: {
+      if (state.session_mode === SessionMode.PRACTICE) {
+        return action(state, {
+          stage: nextStage,
+          intent: "practice_emergency_call_simulated",
+          priority: "normal",
+          reasonCodes: [...getCprStartReasonCodes(state), "practice_mode"],
+          tts: {
+            text: "演练模式：假设已拨打 120。实际情况下这一步要立刻拨打。现在准备胸外按压。",
+            tone: "calm_firm",
+          },
+          ui: {
+            mainText: "演练 · 假设已拨打 120",
+            secondaryText: "实际场景请立刻拨打 120",
+            statusTags: ["演练", "已模拟呼叫", "CPR准备"],
+          },
+          visualOverlay: { mode: "prepare_cpr_position", highlight_target: "chest_center" },
+          toolActions: [],
+          logEvent: {
+            type: "practice_emergency_call_simulated",
+            detail: "practice_mode_skipped_real_call",
+          },
+        });
+      }
+
       // Auto-dial briefing: generate the "location + GPS + symptoms + dispatch"
       // script and surface it three ways — spoken as the second TTS segment,
       // as the visible `call_brief` field, and inside the emergency_call tool's
