@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { runDemoPipeline } from "../agent/runPipeline.js";
 import { SessionMode } from "../domain/types.js";
+import { generatePracticeDebrief } from "../report/practiceDebrief.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..", "..");
@@ -21,4 +22,8 @@ console.log(`Session mode: ${result.state.session_mode}`);
 console.log(`Actions: ${result.actions.length}`);
 console.log(`Timeline events: ${result.log.entries.length}`);
 console.log("");
-console.log(result.report.text);
+console.log(
+  practice
+    ? generatePracticeDebrief(result.log, result.state).text
+    : result.report.text
+);

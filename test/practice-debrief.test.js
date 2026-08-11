@@ -64,6 +64,32 @@ test("从 SessionLog.toJSON() 格式读取 entries 并折叠阶段时间线", ()
   assert.equal(result.json.time_to_cpr_seconds, 10);
 });
 
+test("复盘结束时间优先取日志最后时间，避免 demo/replay 负时长", () => {
+  const result = generatePracticeDebrief(
+    {
+      entries: [
+        {
+          timestamp: "2026-01-01T00:00:00Z",
+          category: "action",
+          stage: "S7_CPR_LOOP",
+          payload: { intent: "start_cpr_loop" },
+        },
+        {
+          timestamp: "2026-01-01T00:00:30Z",
+          category: "action",
+          stage: "S9_HANDOVER",
+          payload: { intent: "generate_practice_debrief" },
+        },
+      ],
+    },
+    practiceState({ updatedAt: "2025-12-31T23:59:00Z" }),
+  );
+
+  assert.equal(result.json.ended_at, "2026-01-01T00:00:30Z");
+  assert.equal(result.json.duration_seconds, 30);
+  assert.ok(result.json.stage_timeline.every((item) => item.duration_seconds >= 0));
+});
+
 test("纠错事件被正确统计", () => {
   const entries = [
     {

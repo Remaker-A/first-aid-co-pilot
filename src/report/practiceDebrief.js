@@ -30,7 +30,7 @@ export function generatePracticeDebrief(logInput = {}, state = {}) {
 export function generateDebriefJson(entries = [], state = {}) {
   const cprState = state.cpr_state ?? {};
   const startedAt = findSessionStart(entries) ?? state.started_at ?? null;
-  const endedAt = state.updated_at ?? new Date().toISOString();
+  const endedAt = findSessionEnd(entries) ?? state.updated_at ?? new Date().toISOString();
   const stageTimeline = buildStageTimeline(entries, startedAt, endedAt);
   const corrections = collectCorrections(entries);
   const interruptions = collectInterruptions(entries);
@@ -154,6 +154,14 @@ function inferSessionId(entries) {
 
 function findSessionStart(entries) {
   return entries.find((entry) => entry.timestamp)?.timestamp ?? null;
+}
+
+function findSessionEnd(entries) {
+  const timestamps = entries
+    .map((entry) => entry.timestamp)
+    .filter(Boolean)
+    .sort(compareTime);
+  return timestamps.at(-1) ?? null;
 }
 
 // 阶段时间线：把连续同阶段的条目折叠成一段，记录进入时间、停留时长、距开场秒数。
