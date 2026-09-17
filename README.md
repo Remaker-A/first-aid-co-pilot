@@ -10,6 +10,13 @@
 ![offline](https://img.shields.io/badge/runtime-fully%20offline-success)
 ![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey)
 
+**交付与公开状态**
+
+- **Android**：已公开 [应用代码](android/) 和 [离线安装包](https://github.com/Remaker-A/first-aid-co-pilot/releases/tag/v0.1.0-offline-apk)，安装说明见下文。
+- **iOS**：已完成本地真机端侧离线全流程，当前版本尚未同步至本公开仓库。
+
+以下仓库结构、安装与运行说明以已公开的 Android / Node.js 版本为准。
+
 > [!IMPORTANT]
 > **能力边界**：FirstAid Copilot 是公民急救**辅助**工具，**不是**医疗诊断系统，**不是**医生替代品，**不**承担最终医疗责任。当前 MVP 范围仅覆盖**成人疑似心脏骤停 CPR**。紧急情况请第一时间拨打 120。Demo 版本**绝不自动拨打真实 120**（使用「模拟拨打」演示）。
 
@@ -61,11 +68,11 @@ copy /b releases\firstaid-copilot-offline-debug-v0.1.0.apk.part001+releases\firs
 
 ```text
 Medical flow is rule-driven    —— 医疗流程由「可审核的规则状态机」决策
-Interaction  is Gemma-driven   —— 自然语言理解与话术由端侧 Gemma 负责
+Interaction  is hybrid         —— 轻量意图解析、规则首答与端侧 Gemma 补充
 Execution    is Android-driven —— UI / 语音 / 节拍 / 工具调用由 Android 执行
 ```
 
-关键医疗判断**永远**掌握在确定性的规则状态机手里；Gemma 只负责「把话说清楚、听懂用户」，且所有输出都要经过安全校验器（`ActionValidator`）这道刹车。这套架构让产品同时做到 **可信 + 好用 + 安全**。
+关键流程由确定性的规则状态机控制，Gemma 提供受约束的问答补充与话术。Android Live 的闭集意图解析由轻量 NLU 承担；本地 iOS 版本另有带超时上限的 Gemma NLU 路径。视觉姿态由独立感知模块提供，不由 Gemma 直接读取视频；模型输出须经过校验与优先级仲裁。
 
 ---
 
@@ -116,7 +123,7 @@ Execution    is Android-driven —— UI / 语音 / 节拍 / 工具调用由 And
 
 ### 2. 规则掌舵，AI 说话：可信 + 好用 + 安全
 
-医疗流程决策权属于**可审核的规则状态机**（`S0 → S9`），不交给大模型自由发挥。Gemma 只负责「听懂用户 + 把话说人话」，且所有输出经过 `ActionValidator` 硬校验与 `guidanceArbitration` 决策权仲裁。
+医疗流程决策权属于**可审核的规则状态机**（`S0 → S9`），不交给大模型自由发挥。轻量解析器处理闭集意图，Gemma 提供受约束的语言增强；参考实现通过 `ActionValidator` 硬校验与 `guidanceArbitration` 决策权仲裁约束动作输出。
 
 ### 3. 实时 CPR 纠错，像有教练在旁边
 
@@ -124,7 +131,7 @@ Execution    is Android-driven —— UI / 语音 / 节拍 / 工具调用由 And
 
 ### 4. 低延迟语音陪跑，开口就回应
 
-流式低延迟语音 +「**确定性先行、Gemma 异步增强**」（`ack_then_async`）：关键指令立刻播报，AI 答复随后补充。真机实测关键语音路径 **p95 < 1000ms**；开放问答答复 **p95 < 3000ms**。
+流式语音 +「**确定性先行、Gemma 异步增强**」（`ack_then_async`）：关键指令与规则首答不等待 Gemma，模型答复异步补充；超时或失效结果回退或丢弃。
 
 ### 5. 一键交接，从「急救教程」升级为「急救陪跑系统」
 
@@ -187,7 +194,7 @@ flowchart LR
 | **负责** | 阶段切换、用户提问、安抚、报告生成 | 节拍、按压中断、频率、手位、手臂姿势 |
 | **驱动** | 状态机 + Gemma | 感知模型 + `RuleFeedbackEngine` 规则 |
 | **是否等 LLM** | 可短超时调用 Gemma，超时即回退模板 | **绝不等 LLM**，即时反馈 |
-| **典型延迟** | 关键路径 p95 < 1000ms / 开放问答 < 3000ms | 节拍自维持，与单轮服务消息解耦 |
+| **响应设计** | 规则先响应，模型补充受超时与结果有效性检查约束 | 节拍自维持，与单轮服务消息解耦 |
 
 > 设计取舍：CPR 按压过程中的高频反馈不能等待 LLM 推理，因此由规则与感知直接生成 `GuidanceAction`；Gemma 只在状态切换、提问、安抚、报告时介入。这保证了 Gemma 是「增强驱动」而非「单点故障」。
 
@@ -386,7 +393,7 @@ Gemma 只有在「状态机意图与 Gemma 意图都属于当前阶段的 `auton
 
 ## Gemma 端侧集成
 
-模型：**`litert-community/gemma-4-E2B-it-litert-lm`**（`.litertlm`，约 2.4GB），通过 **LiteRT-LM** 运行时端侧推理。Gemma 在系统中的定位是「受规则约束的急救话术与理解层」，绝不是医疗流程决策层。
+模型：**`litert-community/gemma-4-E2B-it-litert-lm`**（`.litertlm`，约 2.4GB），通过 **LiteRT-LM** 运行时端侧推理。Gemma 在系统中的定位是受规则约束的语言增强层，可参与问答补充、话术润色及特定路径的意图候选生成；Android Live 的闭集 NLU 使用轻量解析器，医疗流程仍由规则状态机控制。
 
 ### Gemma Driver 运行链路
 
@@ -421,15 +428,15 @@ sequenceDiagram
 
 ### Android 端侧增强层 C/D/E（`live/edge/`）
 
-`EdgeGemmaAgent` 让端侧 Gemma 在 Node 服务不可达时仍能增强对话，且**永不接管医疗流程**。它实现三个产品功能：
+Android 端侧增强层在 Node 服务不可达时仍能处理对话，且**不接管医疗流程**。各功能按当前 Live 装配分别接入 Gemma 与轻量解析器：
 
 - **(C) 受控开放问答**：先用规则给出即时回答，再异步用 Gemma 补充一句（`ack_then_async`）。
 - **(D) 主动陪伴润色**：`ProactiveCoach` 纯规则决定换手/AED/安抚时机，Gemma 只润色已安全的模板。
-- **(E) 呼吸 NLU 兜底**：优先走 `EdgeTinyNluResolver` / TFLite 文本嵌入分类，Gemma NLU 仅在 regex + 拼音都 miss 后异步纠正。
+- **(E) 呼吸 NLU 兜底**：当前 Live 装配使用 `EdgeTinyNluResolver` 或注入的轻量解析器处理闭集意图；`EdgeGemmaAgent` 保留 Gemma NLU 接口，不等于当前 Live 路径会自动调用该接口。
 
 设计护栏（与 Node 侧一致）：
 
-- **独占单一 `OnDeviceGemmaDriver`**（`generate()` 加 `Mutex` 串行），用一个内部优先级队列调度三功能：`NLU(0) > 开放问答(1) > 主动润色(2)`，`maxQueueDepth = 4`，低价值后台请求永远不会饿死交互请求。
+- **独占单一 `OnDeviceGemmaDriver`**（`generate()` 加 `Mutex` 串行），Gemma 接口的内部优先级队列为 `NLU(0) > 开放问答(1) > 主动润色(2)`，`maxQueueDepth = 4`；当前 Live 的轻量 NLU 不经过该模型队列。
 - **每一次端侧生成都先过 `GemmaSuiteAsserts` 守卫**（`EdgeGuidanceGuard`）再说话/置位：拦截禁止诊断词、CPR 中的「停止按压」类词、超长 TTS、越权意图、泄漏 `stage`/`suspected_cardiac_arrest` 的 NLU、不可解析 JSON——非法输出一律拒绝并改说确定性兜底。
 - **延迟门控**：`GEMMA_NEAR_REALTIME_GATE_MS = 1200`、`GEMMA_GENERATE_BUDGET_MS = 1500`；超过门限时 `recommendation = ack_then_async`（先确定性、Gemma 下一轮补充）。
 - **全功能 flag-gated，默认 OFF**：接进去是行为无副作用的（no-op），翻开 flag 才生效。
@@ -450,7 +457,7 @@ sequenceDiagram
 | **批式 STT** | `stt.js` + `scripts/speech/sherpa_stt.py`（SenseVoice） | HTTP 录音回退路径；失败回退 mock transcript |
 | **流式 STT** | `streamingStt.js` + `sherpa_stt_stream.py`（zipformer） | Live 麦克风路径；端点检测 RULE2 尾随静音默认 0.8s；`sttReconnect.js` 进程退出自动重连，超预算降级 buffered |
 | **批式 / 流式 TTS** | `tts.js` / `streamingTts.js` + `sherpa_tts*.py`（VITS/MeloTTS） | 分句边合边播；`ttsText.js` 把 `120` 在呼叫语境读成「幺二零」，数字读中文数词避免 VITS 降调 |
-| **TTS 缓存** | `ttsCache.js` + `assets/tts_cache/` | 预渲染标准急救话术 WAV，命中即跳过实时合成，首包可近 0ms；Android 与 Node 共用同一 manifest key |
+| **TTS 缓存** | `ttsCache.js` + `assets/tts_cache/` | 预渲染标准急救话术 WAV，命中即跳过实时合成；Android 与 Node 共用同一 manifest key |
 | **意图解析** | `intentResolver.js` / `phoneticIntent.js` | 优先 regex / flow fast path / 拼音模糊；不确定/低置信才升级 Gemma NLU |
 | **指标聚合** | `metricsAggregator.js` | 聚合 `stt/intent/agent/gemma/open_question/tts` 各段 p50/p95/max/mean，TTS 缓存命中率，intent 来源分布；见 `GET /api/metrics` |
 
@@ -462,9 +469,9 @@ sequenceDiagram
 2. 随后 `startOpenQuestionAnswer()` 异步调用 Gemma 生成答案。
 3. 若在同一 `turnSeq` 内未被新输入打断，再流式播报 Gemma 答案。
 
-CPR 高频纠错与任何 `priority=critical` 热路径**永远不等 Gemma**。性能口径：关键语音路径 **p95 < 1000ms**，开放问答答复 **p95 < 3000ms**（与真机 vivo 验收门限一致）。
+CPR 高频纠错与 `priority=critical` 热路径不等待 Gemma；模型补充通过轮次检查、超时与过期结果丢弃约束，保持关键引导可继续执行。
 
-### 混合 NLU（默认关闭）
+### Node.js 混合 NLU（默认关闭）
 
 `INTENT_NLU=on` 时，模糊语料走本地 Gemma 槽位抽取。Live 下采用 `regex_then_async`：本轮先用 regex 即时推进，Gemma 后台异步纠正写入缓存供**下一轮**使用，不阻塞当前回合。NLU 受缓存（LRU 64 / TTL 60s）与每会话预算（默认 12 次/60s）治理。
 
@@ -472,7 +479,7 @@ CPR 高频纠错与任何 `priority=critical` 热路径**永远不等 Gemma**。
 
 ## 视觉 CPR 识别
 
-CPR 按压质量识别基于 **MediaPipe Pose**。指标计算口径在 Node 与 Android 间共享（`src/vision/cprMetrics.js` 与 Android `live/vision/cpr/`），保证两端一致。
+Android 的 CPR 姿态与运动指标来自 **MediaPipe Pose**，不由 Gemma 直接分析视频。Node 与 Android 使用对应的指标计算实现（`src/vision/cprMetrics.js` 与 Android `live/vision/cpr/`）。
 
 ```text
 摄像头帧 → MediaPipe PoseLandmarker → 肩/肘/腕/髋 landmarks → CprMetricsDeriver
@@ -673,9 +680,9 @@ Live 联调（thin client）：仓库根 `npm run voice:serve` 启动后，模�
 | `demo_assisted` | 真实 UI + 真实语音交互，关键感知可脚本注入（**现场推荐**） |
 | `demo_replay` | 完全按时间轴播放 mock 事件，绝对稳定（识别风险时一键切换） |
 
-**Demo 主线**（约 4 分钟）：一键急救 → 判断无反应 → 确认无正常呼吸/濒死喘息 → 模拟拨打 120 + GPS + 录制 → CPR 准备 → 开始按压（质量分 32）→ 实时纠错（手位/频率/手臂，质量分 45→55→78）→ 中断提醒 → 高分稳定（91）→ 疲劳换手 / AED 协助 → 急救员到达 → 生成 Handover Report。
+**脚本 Demo 主线**（约 4 分钟，以下质量分为预设演示数据）：一键急救 → 判断无反应 → 确认无正常呼吸/濒死喘息 → 模拟拨打 120 + GPS + 录制 → CPR 准备 → 开始按压（质量分 32）→ 实时纠错（手位/频率/手臂，质量分 45→55→78）→ 中断提醒 → 高分稳定（91）→ 疲劳换手 / AED 协助 → 急救员到达 → 生成 Handover Report。
 
-**质量分曲线**（视觉锚点）：`32 → 45 → 55 → 78 → 91 → 88`，直观展示「AI 纠错让按压质量持续提升」。
+**质量分曲线（脚本示意）**：`32 → 45 → 55 → 78 → 91 → 88` 是预设演示数据，用于展示纠错提示与界面状态变化，不代表实测按压质量改善或真实施救效果。
 
 ---
 
@@ -700,7 +707,8 @@ Live 联调（thin client）：仓库根 `npm run voice:serve` 启动后，模�
 | --- | --- |
 | 端侧 LLM | Gemma 4 E2B（`litert-community/gemma-4-E2B-it-litert-lm`）· LiteRT-LM 运行时 |
 | 离线语音 | sherpa-onnx（SenseVoice 批式 STT · zipformer 流式 STT · VITS/MeloTTS TTS） |
-| 端侧视觉 | MediaPipe PoseLandmarker（CPR 动作）· TFLite TextEmbedder（呼吸 NLU） |
+| 端侧视觉 | MediaPipe PoseLandmarker（CPR 姿态与运动指标） |
+| 轻量意图解析 | EdgeTinyNluResolver / TFLite TextEmbedder（呼吸 NLU） |
 | Agent Core | Node.js ≥ 20（纯 ESM，零运行时依赖）· `node:test` |
 | Android | Kotlin · Jetpack Compose · MVVM · Coroutine/StateFlow · CameraX · OkHttp/Gson |
 | 协议 | `PerceptionEvent` / `SessionState` / `GuidanceAction`（Node 与 Android 共享契约） |
