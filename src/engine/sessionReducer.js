@@ -17,6 +17,7 @@ export function createInitialSessionState(overrides = {}) {
     {
       session_id: overrides.session_id ?? null,
       mode: overrides.mode ?? "demo_assisted",
+      session_mode: overrides.session_mode ?? overrides.sessionMode ?? "emergency",
       current_stage: STAGES.S0_INIT,
       previous_stage: null,
       started_at: timestamp,
@@ -123,6 +124,7 @@ export function sessionReducer(state, event) {
   const next = cloneSessionState(base);
   next.session_id = next.session_id ?? event.session_id ?? null;
   next.mode = event.mode ?? next.mode;
+  next.session_mode = event.session_mode ?? event.sessionMode ?? next.session_mode ?? "emergency";
   next.started_at = next.started_at ?? timestamp;
   next.updated_at = timestamp;
 
@@ -442,6 +444,12 @@ function reduceToolResult(next, event) {
   }
 
   if (toolType === "generate_handover_report") {
+    next.tool_state.handover_generated = status !== "failed";
+  }
+
+  // 演练复盘复用 handover_generated 标志：状态机的 isHandoverReportGenerated 检查
+  // 因此在 practice 模式下同样成立，S9 收到回传后才切到"展示复盘"。
+  if (toolType === "generate_practice_debrief") {
     next.tool_state.handover_generated = status !== "failed";
   }
 }

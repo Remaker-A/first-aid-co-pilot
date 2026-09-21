@@ -42,6 +42,11 @@ export const Mode = Object.freeze({
   DEMO_REPLAY: "demo_replay",
 });
 
+export const SessionMode = Object.freeze({
+  EMERGENCY: "emergency",
+  PRACTICE: "practice",
+});
+
 export const EventType = Object.freeze({
   SESSION_STARTED: "session_started",
   USER_RESPONSE: "user_response",
@@ -149,6 +154,7 @@ export function createInitialSessionState(options = {}) {
     schema_version: SESSION_STATE_SCHEMA_VERSION,
     session_id: sessionId,
     mode,
+    session_mode: options.sessionMode ?? options.session_mode ?? SessionMode.EMERGENCY,
     current_stage: options.currentStage ?? AgentStage.S0_INIT,
     previous_stage: options.previousStage ?? null,
     started_at: options.startedAt ?? timestamp,

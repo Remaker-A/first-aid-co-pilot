@@ -1,9 +1,11 @@
 import { AgentStage } from "../domain/stages.js";
 import { createGuidanceAction } from "../domain/actionFactories.js";
+import { SessionMode } from "../domain/types.js";
 import { CprStartDecision, decideCprStart, getCprStartReasonCodes } from "./cprStartRule.js";
 import { isActionableCprQualityEvent } from "./cprEventGuards.js";
 import { createRuleFeedbackAction } from "./ruleFeedbackEngine.js";
 import { generateCallBrief } from "../report/callBrief.js";
+import { generatePracticeDebrief } from "../report/practiceDebrief.js";
 
 // Opening line kept verbatim so existing "我将为你拨打 120 / 免提 / 胸外按压" TTS
 // substring assertions stay green; the 120 briefing script is appended after it.
@@ -70,6 +72,9 @@ export function getNextStage(state = {}, event = null, decision = decideCprStart
         ? AgentStage.S5_CALL_EMERGENCY
         : currentStage;
     case AgentStage.S5_CALL_EMERGENCY:
+      if (state.session_mode === SessionMode.PRACTICE) {
+        return AgentStage.S6_CPR_READY;
+      }
       return isEmergencyCallStarted(toolState, event) ? AgentStage.S6_CPR_READY : currentStage;
     case AgentStage.S6_CPR_READY:
       return state.cpr_state?.started === true || isActionableCprQualityEvent(event)
@@ -249,6 +254,30 @@ function buildStateAction(state, currentStage, nextStage, decision, event) {
         logEvent: { type: "suspected_cardiac_arrest", detail: "unresponsive_and_no_normal_breathing" },
       });
     case AgentStage.S5_CALL_EMERGENCY: {
+      if (state.session_mode === SessionMode.PRACTICE) {
+        return action(state, {
+          stage: nextStage,
+          intent: "practice_emergency_call_simulated",
+          priority: "normal",
+          reasonCodes: [...getCprStartReasonCodes(state), "practice_mode"],
+          tts: {
+            text: "演练模式：假设已拨打 120。实际情况下这一步要立刻拨打。现在准备胸外按压。",
+            tone: "calm_firm",
+          },
+          ui: {
+            mainText: "演练 · 假设已拨打 120",
+            secondaryText: "实际场景请立刻拨打 120",
+            statusTags: ["演练", "已模拟呼叫", "CPR准备"],
+          },
+          visualOverlay: { mode: "prepare_cpr_position", highlight_target: "chest_center" },
+          toolActions: [],
+          logEvent: {
+            type: "practice_emergency_call_simulated",
+            detail: "practice_mode_skipped_real_call",
+          },
+        });
+      }
+
       // Auto-dial briefing: generate the "location + GPS + symptoms + dispatch"
       // script and surface it three ways — spoken as the second TTS segment,
       // as the visible `call_brief` field, and inside the emergency_call tool's
@@ -398,6 +427,51 @@ function buildStateAction(state, currentStage, nextStage, decision, event) {
       });
     }
     case AgentStage.S9_HANDOVER:
+      // 演练模式：产出教练式复盘，而不是给急救员的医学交接报告。
+      if (state.session_mode === SessionMode.PRACTICE) {
+        if (isHandoverReportGenerated(event)) {
+          const debrief = generatePracticeDebrief(state.handover_timeline ?? [], state);
+          return action(state, {
+            stage: nextStage,
+            intent: "show_practice_debrief",
+            priority: "normal",
+            reasonCodes: ["practice_debrief_ready"],
+            throttleKey: "stage.practice_debrief_ready",
+            minIntervalMs: 0,
+            tts: {
+              text: `演练结束。${debrief.json.coaching?.overall_assessment ?? ""}复盘报告已生成，可以查看详情。`,
+              tone: "calm_soft",
+            },
+            ui: {
+              mainText: "演练复盘",
+              secondaryText: "查看你的演练表现",
+              statusTags: ["复盘", "演练结束"],
+            },
+            toolActions: [],
+            logEvent: { type: "practice_debrief_displayed", detail: "debrief_shown" },
+          });
+        }
+
+        return action(state, {
+          stage: nextStage,
+          intent: "generate_practice_debrief",
+          priority: "normal",
+          reasonCodes: ["practice_session_ended", "practice_mode"],
+          throttleKey: "stage.practice_debrief",
+          tts: { text: "演练结束，正在生成复盘报告。", tone: "calm_firm" },
+          ui: {
+            mainText: "演练结束",
+            secondaryText: "正在生成复盘报告",
+            statusTags: ["演练结束", "复盘生成中"],
+          },
+          toolActions: [
+            { type: "stop_haptic_metronome", requires_user_confirmation: false },
+            { type: "generate_practice_debrief", requires_user_confirmation: false },
+          ],
+          logEvent: { type: "practice_debrief_requested", detail: "practice_session_ended" },
+        });
+      }
+
       if (isHandoverReportGenerated(event)) {
         return action(state, {
           stage: nextStage,
