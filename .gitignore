@@ -8,6 +8,7 @@ models/
 src/voice/.runtime/
 tmp/
 temp/
+.tooling/
 *.tmp
 *.temp
 *.part

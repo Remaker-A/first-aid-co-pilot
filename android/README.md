@@ -54,6 +54,30 @@ D:\android-dev\gradle\gradle-8.13\bin\gradle.bat :app:assembleDebug
 
 The debug APK is generated at `android/app/build/outputs/apk/debug/app-debug.apk`.
 
+The main Android project also ships a pinned Gradle 8.9 wrapper. On macOS/Linux,
+with JDK 17 and Android SDK API 35 configured, run:
+
+```bash
+cd android
+./gradlew testDebugUnitTest assembleDebug
+```
+
+The wrapper verifies the Gradle distribution with the SHA-256 recorded in
+`gradle/wrapper/gradle-wrapper.properties`. Large JDK/SDK files remain local and
+are not committed to the repository.
+
+## Practice Copilot entry (this branch)
+
+Installing an APK built from this branch adds a separate **FirstAid Practice**
+launcher icon for the five-step adult-collapse touch scenario. The original
+**FirstAid Copilot** launcher still opens the existing live CPR coach. Training
+uses its own Activity, session state, and deterministic rule engine; it never
+initializes the emergency session or invokes phone/location tools.
+
+The three-scenario, two-mode Web experience lives separately in
+[`../prototypes/practice-copilot/`](../prototypes/practice-copilot/). Its voice
+and camera observations are simulated. Existing released APKs are unchanged.
+
 Local setup success does not change safety behavior: Demo builds must not automatically dial real 120, sharing or deletion still requires explicit user confirmation, and mock-only passes are not strict real readiness.
 
 ## On-device Edge Model Smoke
