@@ -9,7 +9,8 @@
 - 保留原急救源码、测试、知识库、提示词与依赖配置；现有 Android 清单只新增独立训练 Activity，原启动入口和配置保留。
 - 保留目标仓库已有的 Android 离线功能与 iOS 公开状态说明。`main` 和现有 Release APK 不因本分支变化。
 - 本次验证：Node 回归 393/393 通过；17 个训练和原型文件与来源逐字节一致；Android 清单原有配置结构一致；Web 三个场景到复盘、错误重试、挑战延迟反馈通过。
-- Android 构建与真机状态见 `CHANGELOG.md` 的本次迁入记录。下文 2026-08-06 的构建结果为来源分支的历史记录，不代表本机重新验证。
+- 本次 Android 验证：Debug APK 构建成功（跳过离线模型）；全量 JVM 测试 297 项，296 通过、1 项既有失败。原 main 快照 292 项、同一项失败，新增训练测试 5/5 通过。详情和复现条件见 `CHANGELOG.md`。
+- 真机验收尚未执行。下文 2026-08-06 的构建结果为来源分支的历史记录，本次结果以上述记录为准。
 
 ## 项目基本信息
 
@@ -55,6 +56,7 @@
 
 ## 已知问题
 
+- 原 main 已存在一项提示词文本断言失败：`EdgeGemmaPromptBuilderTest.supplementPromptIncludesFastAnswerAndAdditiveContract` 第 90 行；迁入前后均可复现，本次保持原急救源码与测试不变。
 - Node 与多个 Android 目录存在规则/协议漂移风险，需要跨端 golden conformance tests。
 - Practice 首版暂时只有触控输入，尚未形成完整多模态演练。
 - Web 原型中的语音与摄像头是体验模拟，尚未读取真实麦克风或摄像头数据。

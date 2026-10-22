@@ -18,7 +18,10 @@
 - 17 个训练与原型文件与来源提交逐字节一致；原急救源码、测试、知识库、提示词、依赖配置未改动。
 - XML 结构比较确认 Android 清单原有配置及启动入口保持一致，只增加训练 Activity。
 - Web 三个场景均走通至复盘；验证引导模式错误重试、情境挑战隐藏即时答案及结束后的错误复盘。
-- Android JVM 测试与 Debug 构建验证进行中；真机验收尚未执行。
+- Android 全量 JVM 测试：迁入后 297 项，296 通过、1 失败；未修改的目标 `main@0e67132` 快照复跑为 292 项，291 通过、同一项失败。新增 5 项训练测试全部通过，未新增测试失败。
+- 既有失败：`EdgeGemmaPromptBuilderTest.supplementPromptIncludesFastAnswerAndAdditiveContract` 第 90 行的提示词文本断言；相关源码和测试与原 main 相同，本次迁入未修改。
+- `assembleDebug -PskipModelAssets=true` 成功。验证使用 JDK 17、Gradle 8.9、Android API 35；因原依赖镜像超时，本机临时 init script 将应用依赖切换到官方 Google Maven / Maven Central，仓库构建配置未改动。
+- 生成的本地 Debug APK 不包含离线模型，不能替代现有离线发布包；真机验收尚未执行。
 
 ## 2026-08-06
 
