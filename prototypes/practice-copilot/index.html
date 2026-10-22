@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#050814" />
+  <title>FirstAid Practice Copilot</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app-shell" aria-live="polite">
+    <section class="screen active" data-screen="home">
+      <header class="status-row">
+        <div class="status-cluster">
+          <span class="pill pill-online"><i></i>离线可用</span>
+          <span class="pill pill-demo"><i></i>情境演练</span>
+        </div>
+        <button class="tutorial-link" data-action="open-tutorial">使用指南</button>
+      </header>
+
+      <div class="agent-banner"><i></i><span>On-device multimodal copilot</span></div>
+
+      <div class="hero">
+        <p class="eyebrow">MULTIMODAL FIRST AID PRACTICE</p>
+        <h1>急救情境<br /><span>实战演练</span></h1>
+        <p class="hero-copy">进入不同急救现场。先看 Copilot 示范，再用语音、视觉或判断完成练习。</p>
+      </div>
+
+      <div class="home-actions">
+        <button class="primary-button" data-action="open-scenarios">开始情境演练 <span>→</span></button>
+        <div class="mode-grid">
+          <div><span class="mode-icon">◉</span><strong>语音理解</strong><small>说出你会怎么做</small></div>
+          <div><span class="mode-icon">⌁</span><strong>视觉观察</strong><small>检测 CPR 动作</small></div>
+          <div><span class="mode-icon">✓</span><strong>规则评价</strong><small>流程可审核</small></div>
+        </div>
+        <p class="safety-note">训练模式不会拨打电话、定位或进入真实急救会话</p>
+      </div>
+    </section>
+
+    <section class="screen" data-screen="scenarios">
+      <header class="page-header">
+        <button class="icon-button" data-action="go-home" aria-label="返回">←</button>
+        <div><span>Practice Copilot</span><strong>选择一个情境</strong></div>
+        <span class="count-badge">03</span>
+      </header>
+
+      <div class="section-intro">
+        <p class="eyebrow">SCENARIO LIBRARY</p>
+        <h2>先做判断，<br />再理解为什么。</h2>
+        <p>每个场景都包含讲解、判断和模拟动作，完成后由规则生成能力复盘。</p>
+      </div>
+
+      <div class="scenario-list">
+        <button class="scenario-card featured" data-action="start-scenario" data-scenario="collapse">
+          <div class="card-top"><span class="card-number">01</span><span class="ready-tag">可以开始</span></div>
+          <div class="scene-visual" aria-hidden="true"><span class="floor"></span><span class="person"></span><span class="pulse"></span></div>
+          <h3>商场内有人突然倒地</h3>
+          <p>从现场安全、检查反应和呼吸，到呼叫 120 并准备 CPR。</p>
+          <div class="card-meta"><span>约 4 分钟</span><span>语音 · 视觉 · 行动</span></div>
+        </button>
+
+        <button class="scenario-card choking-card" data-action="start-scenario" data-scenario="choking">
+          <div class="card-top"><span class="card-number">02</span><span class="ready-tag">可以开始</span></div>
+          <div class="scenario-symbol">AIRWAY <strong>气道</strong></div>
+          <h3>餐厅内成人突然噎住</h3>
+          <p>识别严重气道梗阻，学习呼救、背部叩击和腹部冲击。</p>
+          <div class="card-meta"><span>约 3 分钟</span><span>观察 · 语音 · 判断</span></div>
+        </button>
+
+        <button class="scenario-card bleeding-card" data-action="start-scenario" data-scenario="bleeding">
+          <div class="card-top"><span class="card-number">03</span><span class="ready-tag">可以开始</span></div>
+          <div class="scenario-symbol">BLEEDING <strong>止血</strong></div>
+          <h3>户外有人严重出血</h3>
+          <p>判断危险出血，练习持续直接压迫与现场支援组织。</p>
+          <div class="card-meta"><span>约 3 分钟</span><span>判断 · 动作 · 复盘</span></div>
+        </button>
+      </div>
+    </section>
+
+    <section class="screen mode-screen" data-screen="mode-select">
+      <header class="page-header">
+        <button class="icon-button" data-action="back-scenarios" aria-label="返回">←</button>
+        <div><span id="mode-scenario-kicker">Practice Copilot</span><strong id="mode-scenario-title">选择练习方式</strong></div>
+        <span class="count-badge">MODE</span>
+      </header>
+      <div class="mode-intro">
+        <p class="eyebrow">CHOOSE YOUR MODE</p>
+        <h2>这一次，<br />你想怎么练？</h2>
+        <p>两种模式使用同一套安全规则，只改变提示和反馈方式。</p>
+      </div>
+      <div class="practice-mode-list">
+        <button class="practice-mode-card guided" data-action="choose-mode" data-mode="guided">
+          <div class="mode-card-top"><span>推荐新用户</span><i>01</i></div>
+          <strong>引导练习</strong>
+          <p>Copilot 先示范关键点，操作后立即解释和纠正。</p>
+          <ul><li>保留动作提示</li><li>即时规则反馈</li><li>适合第一次练习</li></ul>
+          <b>开始引导练习 →</b>
+        </button>
+        <button class="practice-mode-card challenge" data-action="choose-mode" data-mode="challenge">
+          <div class="mode-card-top"><span>检验现场判断</span><i>02</i></div>
+          <strong>情境挑战</strong>
+          <p>跳过示范、减少提示，所有判断在场景结束后统一复盘。</p>
+          <ul><li>不提前显示答案</li><li>错误不会中断场景</li><li>适合重复训练</li></ul>
+          <b>开始情境挑战 →</b>
+        </button>
+      </div>
+      <p class="mode-safety">无论选择哪种模式，医疗流程和评价都只由确定性规则推进。</p>
+    </section>
+
+    <section class="screen training-screen" data-screen="training">
+      <header class="training-header">
+        <button class="icon-button" data-action="exit-training" aria-label="退出">×</button>
+        <div class="progress-wrap"><span id="progress-label">步骤 1 / 5</span><div class="progress-track"><i id="progress-bar"></i></div></div>
+        <span class="live-dot" id="training-mode-label"><i></i>引导中</span>
+      </header>
+
+      <div class="scene-status">
+        <span class="scene-kicker" id="scene-kicker">场景开始</span>
+        <h2 id="scene-title">商场里，一名成年人突然倒地。</h2>
+        <p id="scene-description">周围有人聚集，现场情况尚未确认。Copilot 正在等待你的行动。</p>
+      </div>
+
+      <div class="copilot-message">
+        <div class="copilot-avatar" aria-hidden="true"><i></i><i></i><i></i><span>⌁</span></div>
+        <div><span>Copilot</span><p id="copilot-prompt">先观察现场。你现在会怎么做？</p></div>
+      </div>
+
+      <div class="lesson-card" id="lesson-card" hidden>
+        <span id="lesson-label">COPILOT 示范</span>
+        <h3 id="lesson-title"></h3>
+        <p id="lesson-copy"></p>
+        <div class="lesson-tip" id="lesson-tip"></div>
+        <button id="lesson-next">我知道了，开始练习 →</button>
+      </div>
+
+      <div class="sensor-card" id="sensor-card">
+        <div class="sensor-orbit"><i></i><i></i><i></i><span id="sensor-symbol">⌁</span></div>
+        <strong id="sensor-title">请选择你认为正确的下一步</strong>
+        <small id="sensor-caption">点击选项后，Copilot 会解释为什么</small>
+      </div>
+
+      <div class="input-tabs">
+        <button data-input="voice"><span>◉</span>语音</button>
+        <button data-input="camera"><span>▣</span>摄像头</button>
+        <button class="active" data-input="action"><span>↗</span>点击选项</button>
+      </div>
+
+      <div class="action-panel" id="action-panel"></div>
+
+      <div class="feedback-card" id="feedback-card" hidden>
+        <div class="feedback-icon" id="feedback-icon">✓</div>
+        <div><span id="feedback-label">规则评价</span><h3 id="feedback-title"></h3><p id="feedback-copy"></p></div>
+        <button id="feedback-next">继续 →</button>
+      </div>
+    </section>
+
+    <section class="screen" data-screen="complete">
+      <header class="status-row">
+        <span class="pill pill-online"><i></i>演练完成</span>
+        <span class="stage-label" id="complete-mode">引导练习复盘</span>
+      </header>
+      <div class="completion-hero">
+        <div class="score-ring"><strong id="complete-score">5</strong><span id="complete-total">/ 5</span></div>
+        <p class="eyebrow">SCENARIO COMPLETE</p>
+        <h1 id="complete-title">你完成了<br />关键急救流程</h1>
+        <p id="complete-copy">你已经完成本次情境中的关键判断和动作练习。</p>
+      </div>
+      <div class="review-list" id="review-list"></div>
+      <div class="completion-actions">
+        <button class="primary-button" data-action="restart">再练一次</button>
+        <button class="secondary-button" data-action="back-scenarios">返回场景库</button>
+      </div>
+    </section>
+
+    <section class="screen tutorial-screen" data-screen="tutorial">
+      <header class="tutorial-header">
+        <span class="pill pill-demo">首次使用指南</span>
+        <button class="tutorial-skip" data-action="close-tutorial">跳过</button>
+      </header>
+      <div class="tutorial-progress" id="tutorial-progress"><i></i><i></i><i></i><i></i></div>
+      <div class="tutorial-content">
+        <div class="tutorial-visual" id="tutorial-visual">01</div>
+        <p class="eyebrow" id="tutorial-kicker">WELCOME TO FIRSTAID COPILOT</p>
+        <h1 id="tutorial-title">你来行动，<br />Copilot 陪你练习。</h1>
+        <p id="tutorial-copy">选择一个真实感场景。系统会先示范关键动作，再让你亲自判断和练习。</p>
+        <div class="tutorial-callout" id="tutorial-callout">训练模式不会拨打 120，也不会进入真实急救会话。</div>
+      </div>
+      <button class="primary-button tutorial-next" id="tutorial-next">下一步 <span>→</span></button>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

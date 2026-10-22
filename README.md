@@ -17,6 +17,12 @@
 
 以下仓库结构、安装与运行说明以已公开的 Android / Node.js 版本为准。
 
+### Practice Copilot 情境演练（本分支新增）
+
+- **Android**：安装本分支构建的 APK 后，从独立的 **FirstAid Practice** 图标进入成人倒地到 CPR 的五步触控演练。原 FirstAid Copilot 图标继续进入现有急救流程。训练不会初始化急救会话或调用电话、定位工具。
+- **Web 原型**：[`prototypes/practice-copilot/`](prototypes/practice-copilot/) 包含首次使用教程、成人倒地 / 气道梗阻 / 严重出血三个场景、引导练习 / 情境挑战和结束复盘。仓库根目录运行 `python3 -m http.server 4173 --directory prototypes/practice-copilot`，再打开 `http://127.0.0.1:4173/`。
+- Web 语音和摄像头交互是模拟；Android 当前仅支持触控。现有 Release APK 不包含本分支新增功能。
+
 > [!IMPORTANT]
 > **能力边界**：FirstAid Copilot 是公民急救**辅助**工具，**不是**医疗诊断系统，**不是**医生替代品，**不**承担最终医疗责任。当前 MVP 范围仅覆盖**成人疑似心脏骤停 CPR**。紧急情况请第一时间拨打 120。Demo 版本**绝不自动拨打真实 120**（使用「模拟拨打」演示）。
 
